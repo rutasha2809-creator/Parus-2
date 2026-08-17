@@ -181,9 +181,12 @@ function buildForecast(days){
        справочно, чтобы день не выглядел пустым, но в сумму не берём. */
     if(t.date === from){
       if(t.type === 'transfer'){
-        if(liquidIds.has(t.accountId))
+        if(liquidIds.has(t.accountId)){
+          const dst = S.accounts.find(a=>a.id===t.toAccountId);
           push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
-                amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', done:true});
+                amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', done:true,
+                debt: !!(dst && ACC_TYPES[dst.type] && !ACC_TYPES[dst.type].asset)});
+        }
         if(liquidIds.has(t.toAccountId))
           push({date:t.date, name:'Перевод с '+accName(t.accountId),
                 amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)), kind:'income', done:true});
@@ -258,9 +261,17 @@ function forecastMonths(F){
     m.days.push(d);
     m.inc += d.inc; m.exp += d.exp;
     for(const e of d.items){
-      if(e.done) continue;
+      /* Сегодняшние фактические операции (done, но без planned/paidNote)
+         включаем в итоги месяца — иначе таблица и график не покажут,
+         что сегодня были платежи. */
+      const todayActual = e.done && !e.planned && !e.paidNote;
+      if(e.done && !todayActual) continue;
       m.moves++;
       if(e.kind==='expense' && e.debt) m.debt += e.amount;
+      if(todayActual){
+        if(e.kind === 'income') m.inc += e.amount;
+        else m.exp += e.amount;
+      }
     }
     m.close = d.close;
     if(d.close < m.min) m.min = d.close;
@@ -305,6 +316,10 @@ function forecastTable(F, gran){
     const row = bag[name] || (bag[name] = {});
     row[key] = round2((row[key]||0) + v);
   };
+  /* Сегодняшние фактические операции уже сидят в totalLiquid(), но в таблице
+     их тоже надо показать. Считаем поправку, чтобы скорректировать «Остаток
+     на начало» и сохранить правильный «Остаток на конец». */
+  let adjInc = 0, adjExp = 0;
 
   for(const d of F){
     const p = periodOf(d.date, gran);
@@ -315,12 +330,29 @@ function forecastTable(F, gran){
     c.inc += d.inc; c.other += 0;
 
     for(const e of d.items){
-      if(e.done) continue;                  // уже проведено — в сумму не берём
-      if(e.kind === 'income'){ add(inc, e.name, p.key, e.amount); }
-      else if(e.debt){ add(debt, e.name.replace(/^Платёж:\s*/,'').replace(/\s*—\s*остаток$/,''), p.key, e.amount); c.debt += e.amount; }
-      else { add(exp, e.categoryId ? catName(e.categoryId) : e.name, p.key, e.amount); c.other += e.amount; }
+      /* Сегодняшние фактические операции (done, но не план и не «оплачено»)
+         включаем — иначе переводы и платежи сегодня не видны в таблице. */
+      const todayActual = e.done && !e.planned && !e.paidNote;
+      if(e.done && !todayActual) continue;
+      if(e.kind === 'income'){
+        add(inc, e.name, p.key, e.amount);
+        if(todayActual){ c.inc += e.amount; adjInc += e.amount; }
+      }
+      else if(e.debt){
+        add(debt, e.name.replace(/^Платёж:\s*/,'').replace(/^Перевод:\s*/,'').replace(/\s*—\s*остаток$/,''), p.key, e.amount);
+        c.debt += e.amount;
+        if(todayActual) adjExp += e.amount;
+      }
+      else {
+        add(exp, e.categoryId ? catName(e.categoryId) : e.name, p.key, e.amount);
+        c.other += e.amount;
+        if(todayActual) adjExp += e.amount;
+      }
     }
   }
+  /* Корректируем остаток на начало: сегодняшние операции уже учтены в балансе,
+     но теперь мы их включили в доходы/расходы — сдвигаем open назад. */
+  if(cols.length) cols[0].open = round2(cols[0].open - adjInc + adjExp);
   for(const c of cols){ c.inc = round2(c.inc); c.debt = round2(c.debt); c.other = round2(c.other); }
 
   const sortRows = bag => Object.entries(bag)
@@ -388,7 +420,8 @@ function itemCls(e){
 function forecastCatShare(F){
   const by = {}; let total = 0;
   for(const d of F) for(const e of d.items){
-    if(e.kind !== 'expense' || e.done) continue;
+    const todayActual = e.done && !e.planned && !e.paidNote;
+    if(e.kind !== 'expense' || (e.done && !todayActual)) continue;
     const key = e.debt ? '__debt' : (e.categoryId || '__none');
     by[key] = (by[key]||0) + e.amount;
     total += e.amount;
