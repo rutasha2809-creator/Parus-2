@@ -300,6 +300,7 @@ nav button.on{color:var(--brand);font-weight:650}
 <section class="screen" id="s-accounts">
   <div class="btnrow" style="margin-bottom:12px">
     <button class="btn btn-p" onclick="openAccount()">+ Добавить счёт</button>
+    <button class="btn btn-s" onclick="openTransfer()">⇄ Перевод между счетами</button>
   </div>
   <div id="accGroups"></div>
 </section>
@@ -308,7 +309,8 @@ nav button.on{color:var(--brand);font-weight:650}
 <section class="screen" id="s-tx">
   <div class="btnrow" style="margin-bottom:12px">
     <button class="btn btn-p" onclick="openTx()">+ Операция</button>
-    <button class="btn btn-s" onclick="go('import')">Импорт выписки</button>
+    <button class="btn btn-s" onclick="openTransfer()">⇄ Перевод</button>
+    <button class="btn btn-s" onclick="go('import')">Импорт</button>
   </div>
 
   <div class="card">

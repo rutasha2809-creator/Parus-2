@@ -17,7 +17,7 @@ function actualPayments(accountId){
   return S.transactions.filter(t =>
       (t.type==='transfer' && t.toAccountId===accountId) ||
       (t.type==='income'   && t.accountId===accountId)
-    ).map(t=>({date:t.date, amount:t.amount, note:t.note||'', txId:t.id}))
+    ).map(t=>({date:t.date, amount:txAmountFor(t, accountId), note:t.note||'', txId:t.id}))
      .sort((a,b)=>a.date.localeCompare(b.date));
 }
 /* Новые начисления по долгу: траты с этого счёта / переводы с него */

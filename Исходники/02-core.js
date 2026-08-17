@@ -237,6 +237,14 @@ function liquidAccounts(){ return S.accounts.filter(a=>!a.archived && (a.type===
 /* ---------------- балансы ---------------- */
 /* Для активов: openingBalance + доходы − расходы (+ переводы)
    Для долгов:  openingBalance (сумма долга) + начисления − погашения          */
+/* Сколько списано/зачислено по операции на конкретном счёте.
+   У перевода две стороны и, возможно, разные валюты. */
+function txAmountFor(t, accountId){
+  if(t.type === 'transfer' && t.toAccountId === accountId)
+    return (t.toAmount != null ? t.toAmount : t.amount);
+  return t.amount;
+}
+
 function balance(a){
   /* Кредит: остаток считается по амортизации — каждый платёж сначала гасит
      начисленные проценты и только остатком уменьшает тело долга.
@@ -247,8 +255,11 @@ function balance(a){
   const isAsset = ACC_TYPES[a.type] && ACC_TYPES[a.type].asset;
   for(const t of S.transactions){
     if(t.type==='transfer'){
-      if(t.accountId===a.id) b += isAsset ? -t.amount : +t.amount;   // ушло со счёта / погашение долга уменьшает? см ниже
-      if(t.toAccountId===a.id) b += isAsset ? +t.amount : -t.amount;
+      if(t.accountId===a.id)   b += isAsset ? -t.amount : +t.amount;
+      if(t.toAccountId===a.id){
+        const got = txAmountFor(t, a.id);
+        b += isAsset ? +got : -got;
+      }
     } else if(t.accountId===a.id){
       if(isAsset) b += (t.type==='income' ? t.amount : -t.amount);
       else        b += (t.type==='income' ? -t.amount : t.amount);
@@ -592,8 +603,13 @@ function openTx(id){
       <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" inputmode="decimal" id="txAmount" value="${t?t.amount:''}" placeholder="0"></div>
     </div>
     <div class="f"><label id="txAccLabel">Счёт</label><select id="txAccount"></select></div>
-    <div class="f" id="txToWrap" style="display:none"><label>Куда</label><select id="txTo"></select>
+    <div class="f" id="txToWrap" style="display:none"><label>Куда</label><select id="txTo" onchange="txCurrencyCheck()"></select>
       <div class="hint" id="txToHint"></div></div>
+    <div class="f" id="txToAmountWrap" style="display:none">
+      <label id="txToAmountLabel">Сумма зачисления</label>
+      <input type="number" step="0.01" id="txToAmount" placeholder="0">
+      <div class="hint">Счета в разных валютах — укажите, сколько пришло на второй счёт.</div>
+    </div>
     <div class="f" id="txCatWrap"><label>Категория</label><select id="txCategory"></select></div>
     <div class="f"><label>Описание</label><input type="text" id="txNote" value="${t?esc(t.note||''):''}" placeholder="необязательно"></div>
     <div class="btnrow" style="margin-top:6px">
@@ -601,7 +617,26 @@ function openTx(id){
       <button class="btn btn-p" onclick="saveTx(${t?"'"+t.id+"'":'null'})">Сохранить</button>
     </div>`;
   txKind(t ? t.type : 'expense', t);
+  const amtEl = document.getElementById('txAmount');
+  if(amtEl) amtEl.addEventListener('input', txCurrencyCheck);
+  const toAmtEl = document.getElementById('txToAmount');
+  if(toAmtEl) toAmtEl.addEventListener('input', ()=>{ toAmtEl.dataset.touched = '1'; });
+  const accEl = document.getElementById('txAccount');
+  if(accEl) accEl.addEventListener('change', txCurrencyCheck);
+  if(t && t.toAmount != null){
+    const f = document.getElementById('txToAmount');
+    if(f){ f.value = t.toAmount; f.dataset.touched = '1'; }
+  }
   openOv('ovTx');
+}
+
+/* Открыть окно операции сразу на переводе между своими счетами */
+function openTransfer(){
+  if(S.accounts.filter(a=>!a.archived).length < 2){
+    toast('Нужно минимум два счёта'); go('accounts'); return;
+  }
+  openTx();
+  txKind('transfer');
 }
 
 let TXKIND = 'expense';
@@ -635,6 +670,33 @@ function txKind(k, t){
     const cs = document.getElementById('txCategory');
     if(t.categoryId && cs) cs.value = t.categoryId;
   }
+  txCurrencyCheck();
+}
+
+/* Показываем второе поле суммы, только если валюты сторон различаются */
+function txCurrencyCheck(){
+  const wrap = document.getElementById('txToAmountWrap');
+  if(!wrap) return;
+  if(TXKIND !== 'transfer'){ wrap.style.display = 'none'; return; }
+
+  const from = document.getElementById('txAccount').value;
+  const to   = document.getElementById('txTo').value;
+  const cf = accCurrency(from), ct = accCurrency(to);
+
+  if(cf === ct){ wrap.style.display = 'none'; return; }
+
+  wrap.style.display = 'block';
+  document.getElementById('txToAmountLabel').textContent =
+    `Сумма зачисления, ${(CURRENCIES[ct]||{}).sym || ct}`;
+
+  // подставляем пересчёт по текущему курсу — можно поправить руками
+  const amt = parseFloat(document.getElementById('txAmount').value);
+  const field = document.getElementById('txToAmount');
+  if(amt > 0 && !field.dataset.touched){
+    field.value = round2(toBase(amt, cf) / rateOf(ct));
+  }
+  const label = document.getElementById('txAccLabel');
+  if(label) label.textContent = `Откуда, ${(CURRENCIES[cf]||{}).sym || cf}`;
 }
 
 function saveTx(id){
@@ -651,6 +713,14 @@ function saveTx(id){
   if(TXKIND==='transfer'){
     rec.toAccountId = document.getElementById('txTo').value;
     if(rec.toAccountId === accountId){ toast('Выберите разные счета'); return; }
+    // разные валюты — сумма зачисления своя
+    if(accCurrency(accountId) !== accCurrency(rec.toAccountId)){
+      const ta = parseFloat(document.getElementById('txToAmount').value);
+      if(!ta || ta <= 0){ toast('Укажите сумму зачисления'); return; }
+      rec.toAmount = ta;
+    } else {
+      rec.toAmount = null;
+    }
   } else {
     rec.categoryId = document.getElementById('txCategory').value;
   }
@@ -709,8 +779,8 @@ function renderTx(){
 function txRow(t){
   let title, sign, cls, sub;
   if(t.type==='transfer'){
-    title = 'Перевод'; sign='→'; cls='mut';
-    sub = accName(t.accountId)+' → '+accName(t.toAccountId);
+    title = 'Перевод'; sign=''; cls='mut';
+    sub = accLabel(t.accountId)+' → '+accLabel(t.toAccountId);
   } else {
     title = catName(t.categoryId);
     sign = t.type==='income' ? '+' : '−';
@@ -721,7 +791,9 @@ function txRow(t){
   const optChip = (t.type==='expense' && !catMandatory(t.categoryId)) ? ' <span class="chip opt">необяз</span>' : '';
   return `<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
     <div class="l"><div class="t">${esc(title)}${optChip}</div><div class="s">${sub}</div></div>
-    <div class="v ${cls}">${sign}${money(t.amount,{cur:accCurrency(t.accountId)})}</div>
+    <div class="v ${cls}">${sign}${money(t.amount,{cur:accCurrency(t.accountId)})}${
+      t.type==='transfer' && t.toAmount != null
+        ? ` → ${money(t.toAmount,{cur:accCurrency(t.toAccountId)})}` : ''}</div>
   </div>`;
 }
 
