@@ -128,7 +128,9 @@ function buildForecast(days){
   for(const p of futureDebtPayments(to)) push({date:p.date, name:'Платёж: '+p.name, amount:p.amount, kind:'expense', debt:true});
   // 3) закрытие вкладов
   for(const a of S.accounts){
-    if(a.type==='deposit' && a.endDate && a.endDate>=from && a.endDate<=to && !a.archived){
+    /* Приход в день закрытия — только для запертых вкладов.
+       Доступный вклад уже посчитан в остатке, иначе деньги удвоятся. */
+    if(a.type==='deposit' && !depositIsLiquid(a) && a.endDate && a.endDate>=from && a.endDate<=to && !a.archived){
       push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:toBase(balance(a), accCurrency(a)), kind:'income', deposit:true});
     }
   }
@@ -196,6 +198,18 @@ function renderCalendar(){
   const minDay = F[closes.indexOf(minVal)];
 
   document.getElementById('calStart').textContent = moneyShort(totalLiquid());
+  /* Расшифровка: из чего сложился остаток «Сейчас» */
+  const startNote = document.getElementById('calStartNote');
+  if(startNote){
+    const parts = liquidAccounts().map(a=>`${esc(a.name)} ${money(toBase(balance(a), accCurrency(a)))}`);
+    const locked = S.accounts.filter(a=>!a.archived && a.type==='deposit' && !depositIsLiquid(a));
+    startNote.innerHTML = parts.length
+      ? `<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5">
+           Учтено: ${parts.join(' · ')}
+           ${locked.length ? `<br>Не учтено (заперто до срока): ${locked.map(a=>esc(a.name)).join(', ')}` : ''}
+         </div>`
+      : '';
+  }
   const mn = document.getElementById('calMin');
   mn.textContent = moneyShort(minVal);
   mn.className = 'n ' + (minVal < 0 ? 'neg' : minVal < buf ? '' : 'pos');

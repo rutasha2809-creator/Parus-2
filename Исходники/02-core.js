@@ -232,6 +232,15 @@ function catColor(id){
 function assetAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type] && ACC_TYPES[a.type].asset); }
 function debtAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type] && !ACC_TYPES[a.type].asset); }
 /* счета, из которых реально можно платить сегодня (для календаря) */
+/* Вклад доступен к снятию?
+   Если пользователь отметил галочку — верим ей. Для старых записей без
+   галочки считаем доступным всё, кроме вкладов с будущей датой окончания. */
+function depositIsLiquid(a){
+  if(!a) return true;                                  // новый вклад — по умолчанию доступен
+  if(a.liquid != null) return !!a.liquid;
+  return !(a.endDate && a.endDate > today());
+}
+
 /* Деньги, доступные к тратам сегодня.
    Карты и наличные — всегда. Накопительный счёт (вклад без даты окончания)
    тоже: с него можно снять в любой момент. А срочный вклад с датой закрытия
@@ -240,7 +249,7 @@ function debtAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.
 function liquidAccounts(){
   return S.accounts.filter(a => !a.archived && (
     a.type==='debit' || a.type==='cash' ||
-    (a.type==='deposit' && !(a.endDate && a.endDate > today()))
+    (a.type==='deposit' && depositIsLiquid(a))
   ));
 }
 
@@ -393,6 +402,12 @@ function accTypeFields(a){
         <div class="f"><label>Дата окончания</label><input type="date" id="acEndDate" value="${v('endDate')||''}"></div>
       </div>
       <label class="check"><input type="checkbox" id="acCapital" ${a&&a.capitalization?'checked':''}> Капитализация процентов</label>
+      <label class="check"><input type="checkbox" id="acLiquid" ${depositIsLiquid(a)?'checked':''}>
+        Деньги можно снять в любой момент</label>
+      <div class="hint" style="margin:-6px 0 12px">
+        Отмечено — вклад считается доступными деньгами и входит в остаток «Сейчас» в календаре.
+        Снято — деньги заперты до даты окончания и появятся в календаре приходом в этот день.
+      </div>
       <div class="f"><label>Проценты выплачиваются на счёт</label>
         <select id="acLinkAcc"><option value="">— не указан —</option>
         ${liquidAccounts().map(x=>`<option value="${x.id}" ${a&&a.linkAccountId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
@@ -501,6 +516,7 @@ function saveAccount(id){
   if(type==='deposit'){
     a.rate = gn('acRate'); a.endDate = g('acEndDate');
     a.capitalization = gb('acCapital'); a.linkAccountId = g('acLinkAcc');
+    a.liquid = gb('acLiquid');       // доступен ли к снятию прямо сейчас
   }
   if(type==='credit_card'){
     a.limit = gn('acLimit'); a.rate = gn('acRate');
@@ -585,7 +601,10 @@ function accRow(a){
   if(a.type==='credit_card' && a.limit) sub += ` · доступно ${money(Math.max(0,a.limit-b))}`;
   if(a.type==='loan' && a.payment) sub += ` · платёж ${money(a.payment)}`;
   if(a.type==='loan'){ const pd = payoffDateOf(a); if(pd) sub += ` · до ${dateShort(pd)} ${parseISO(pd).getFullYear()}`; }
-  if(a.type==='deposit' && a.rate) sub += ` · ${pct(a.rate)}% годовых`;
+  if(a.type==='deposit'){
+    if(a.rate) sub += ` · ${pct(a.rate)}% годовых`;
+    sub += depositIsLiquid(a) ? ' · доступен' : ` · заперт до ${a.endDate?dateShort(a.endDate):'срока'}`;
+  }
   if(a.type==='installment'){
     const left = installmentPartsLeft(a);
     if(left) sub += ` · ${left} ${plural(left,'платёж','платежа','платежей')} по ${money(a.payment||0)}`;
