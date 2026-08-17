@@ -183,13 +183,15 @@ function buildForecast(days){
       if(t.type === 'transfer'){
         if(liquidIds.has(t.accountId)){
           const dst = S.accounts.find(a=>a.id===t.toAccountId);
+          const isDebt = !!(dst && ACC_TYPES[dst.type] && !ACC_TYPES[dst.type].asset);
           push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
                 amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', done:true,
-                debt: !!(dst && ACC_TYPES[dst.type] && !ACC_TYPES[dst.type].asset)});
+                debt: isDebt, transfer: !isDebt});
         }
         if(liquidIds.has(t.toAccountId))
           push({date:t.date, name:'Перевод с '+accName(t.accountId),
-                amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)), kind:'income', done:true});
+                amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)), kind:'income', done:true,
+                transfer: true});
       } else {
         push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type,
               categoryId:t.categoryId, done:true});
@@ -204,14 +206,15 @@ function buildForecast(days){
       if(liquidIds.has(t.accountId)){
         /* перевод на кредит, кредитку или рассрочку — это платёж по долгу */
         const dst = S.accounts.find(a=>a.id===t.toAccountId);
+        const isDebt = !!(dst && ACC_TYPES[dst.type] && !ACC_TYPES[dst.type].asset);
         push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
               amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', actual:true,
-              debt: !!(dst && ACC_TYPES[dst.type] && !ACC_TYPES[dst.type].asset)});
+              debt: isDebt, transfer: !isDebt});
       }
       if(liquidIds.has(t.toAccountId)){
         push({date:t.date, name:'Перевод с '+accName(t.accountId),
               amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)),
-              kind:'income', actual:true});
+              kind:'income', actual:true, transfer: true});
       }
     } else {
       push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type,
@@ -263,9 +266,10 @@ function forecastMonths(F){
     for(const e of d.items){
       /* Сегодняшние фактические операции (done, но без planned/paidNote)
          включаем в итоги месяца — иначе таблица и график не покажут,
-         что сегодня были платежи. */
+         что сегодня были платежи. Внутренние переводы (transfer) пропускаем. */
       const todayActual = e.done && !e.planned && !e.paidNote;
       if(e.done && !todayActual) continue;
+      if(e.transfer) continue;
       m.moves++;
       if(e.kind==='expense' && e.debt) m.debt += e.amount;
       if(todayActual){
@@ -331,9 +335,12 @@ function forecastTable(F, gran){
 
     for(const e of d.items){
       /* Сегодняшние фактические операции (done, но не план и не «оплачено»)
-         включаем — иначе переводы и платежи сегодня не видны в таблице. */
+         включаем — иначе платежи сегодня не видны в таблице.
+         Переводы между своими счетами (transfer:true) пропускаем —
+         это не доход и не расход, а перемещение денег. */
       const todayActual = e.done && !e.planned && !e.paidNote;
       if(e.done && !todayActual) continue;
+      if(e.transfer) continue;
       if(e.kind === 'income'){
         add(inc, e.name, p.key, e.amount);
         if(todayActual){ c.inc += e.amount; adjInc += e.amount; }
@@ -421,7 +428,7 @@ function forecastCatShare(F){
   const by = {}; let total = 0;
   for(const d of F) for(const e of d.items){
     const todayActual = e.done && !e.planned && !e.paidNote;
-    if(e.kind !== 'expense' || (e.done && !todayActual)) continue;
+    if(e.kind !== 'expense' || (e.done && !todayActual) || e.transfer) continue;
     const key = e.debt ? '__debt' : (e.categoryId || '__none');
     by[key] = (by[key]||0) + e.amount;
     total += e.amount;
