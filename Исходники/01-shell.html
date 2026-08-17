@@ -485,36 +485,6 @@ nav button.on{color:var(--brand);font-weight:650}
 
   <div id="calGapNote"></div>
 
-  <div class="card">
-    <h2>Доходы и расходы</h2>
-    <div class="seg sm" id="calView">
-      <button class="on" onclick="calSetView('chart')">График</button>
-      <button onclick="calSetView('table')">Таблица</button>
-    </div>
-    <div class="f2" id="calGranWrap" style="display:none;margin-bottom:12px">
-      <div class="f" style="margin:0">
-        <label>Разбивка</label>
-        <select id="calGran" onchange="renderCalendar()">
-          <option value="month" selected>По месяцам</option>
-          <option value="quarter">По кварталам</option>
-          <option value="year">По годам</option>
-        </select>
-      </div>
-      <div class="f" style="margin:0">
-        <label>Подробность</label>
-        <select id="calDetail" onchange="renderCalendar()">
-          <option value="full" selected>По статьям</option>
-          <option value="short">Только итоги</option>
-        </select>
-      </div>
-    </div>
-    <div id="calChartWrap" class="chartbox tall"><canvas id="calChart"></canvas></div>
-    <div id="calTableWrap" style="display:none">
-      <div class="tblwrap"><table class="fintbl" id="calTable"></table></div>
-      <div class="hint" style="margin-top:9px">Прокрутите таблицу вбок, если периодов больше, чем помещается.</div>
-    </div>
-  </div>
-
   <div class="card pad0">
     <h2 style="padding:15px 15px 0">Прогноз по месяцам</h2>
     <div class="legend">
@@ -523,12 +493,6 @@ nav button.on{color:var(--brand);font-weight:650}
       <span><i style="background:var(--ink)"></i>прочие расходы</span>
     </div>
     <div id="calDays"></div>
-  </div>
-
-  <div class="card">
-    <h2>Расходы в прогнозе по категориям <span class="act" id="calPieTotal" style="cursor:default"></span></h2>
-    <div class="chartbox"><canvas id="calPie"></canvas></div>
-    <div id="calPieList" style="margin-top:12px"></div>
   </div>
 
   <div class="card">
@@ -599,6 +563,62 @@ nav button.on{color:var(--brand);font-weight:650}
   <div class="card">
     <h2>Крупнейшие необязательные траты</h2>
     <div id="anTopOptional"></div>
+  </div>
+
+  <div style="margin:24px 0 8px;padding:0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Прогноз</div>
+
+  <div class="card">
+    <div class="f2" style="margin:0 0 12px">
+      <div class="f" style="margin:0">
+        <label>Горизонт прогноза</label>
+        <select id="anFcHorizon" onchange="renderAnalytics()">
+          <option value="90" selected>90 дней</option>
+          <option value="180">180 дней</option>
+          <option value="365">12 месяцев</option>
+        </select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Вид</label>
+        <div class="seg sm" id="anFcView">
+          <button class="on" onclick="anFcSetView('chart')">График</button>
+          <button onclick="anFcSetView('table')">Таблица</button>
+        </div>
+      </div>
+    </div>
+    <div id="anFcChartWrap" class="chartbox tall"><canvas id="anFcChart"></canvas></div>
+    <div id="anFcTableWrap" style="display:none">
+      <div class="f2" style="margin:0 0 8px">
+        <div class="f" style="margin:0">
+          <label>Разбивка</label>
+          <select id="anFcGran" onchange="renderAnalytics()">
+            <option value="month" selected>По месяцам</option>
+            <option value="quarter">По кварталам</option>
+            <option value="year">По годам</option>
+          </select>
+        </div>
+        <div class="f" style="margin:0">
+          <label>Подробность</label>
+          <select id="anFcDetail" onchange="renderAnalytics()">
+            <option value="full" selected>По статьям</option>
+            <option value="short">Только итоги</option>
+          </select>
+        </div>
+      </div>
+      <div class="tblwrap"><table class="fintbl" id="anFcTable"></table></div>
+      <div class="hint" style="margin-top:9px">Прокрутите таблицу вбок, если периодов больше, чем помещается.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Расходы в прогнозе по категориям <span class="act" id="anFcPieTotal" style="cursor:default"></span></h2>
+    <div class="chartbox"><canvas id="anFcPie"></canvas></div>
+    <div id="anFcPieList" style="margin-top:12px"></div>
+  </div>
+
+  <div style="margin:24px 0 8px;padding:0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Выводы и рекомендации</div>
+
+  <div class="card" id="anInsights">
+    <div id="anInsightsList"></div>
   </div>
 </section>
 

@@ -238,6 +238,8 @@ function buildForecast(days){
 
 /* ---------------- рендер календаря ---------------- */
 let calChart = null, calPie = null;
+let anFcChart = null, anFcPie = null;
+var AN_FC_VIEW = 'chart';
 
 /* Какие месяцы раскрыты. Живёт вне рендера, иначе после любой правки
    всё схлопывалось бы обратно. По умолчанию свёрнуты все. */
@@ -299,6 +301,14 @@ function calSetView(v){
   document.getElementById('calTableWrap').style.display = v==='table' ? 'block' : 'none';
   document.getElementById('calGranWrap').style.display  = v==='table' ? 'grid'  : 'none';
   renderCalendar();
+}
+function anFcSetView(v){
+  AN_FC_VIEW = v;
+  document.querySelectorAll('#anFcView button').forEach((b,i)=>
+    b.classList.toggle('on', (i===0) === (v==='chart')));
+  document.getElementById('anFcChartWrap').style.display = v==='chart' ? 'block' : 'none';
+  document.getElementById('anFcTableWrap').style.display = v==='table' ? 'block' : 'none';
+  renderAnalytics();
 }
 
 /* Ключ и подпись периода, к которому относится дата */
@@ -494,72 +504,6 @@ function renderCalendar(){
   }
 
   const MO = forecastMonths(F);
-
-  /* График: столбики месяцев (доход вверх, расходы вниз двумя частями)
-     и линия остатка на конец месяца. Шкала одна и знаковая: вторая шкала
-     со своим масштабом делала линию несопоставимой со столбиками, а подпись
-     по модулю превращала «−150 тыс» в «150 тыс» внизу оси. */
-  const ctx = document.getElementById('calChart');
-  if(calChart) calChart.destroy();
-  if(window.Chart && CAL_VIEW === 'chart'){
-    calChart = new Chart(ctx, {
-      data:{ labels: MO.map(m=>m.short),
-        datasets:[
-          {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
-           backgroundColor:'#5c6f5a', borderRadius:3, stack:'bars', order:3},
-          {type:'bar', label:'Платежи по долгам', data: MO.map(m=>-m.debt),
-           backgroundColor:'#9b5f52', borderRadius:3, stack:'bars', order:3},
-          {type:'bar', label:'Прочие расходы', data: MO.map(m=>-m.other),
-           backgroundColor:'#3a3936', borderRadius:3, stack:'bars', order:3},
-          {type:'line', label:'Остаток на конец месяца', data: MO.map(m=>m.close),
-           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
-        ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        interaction:{mode:'index', intersect:false},
-        plugins:{
-          legend:{display:true, position:'bottom',
-            labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11, usePointStyle:true, pointStyle:'rectRounded'}},
-          tooltip:{callbacks:{label: c=> c.dataset.label + ': ' +
-            (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
-        scales:{
-          y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
-              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
-          x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
-    });
-  }
-  if(CAL_VIEW === 'table') renderCalTable(F);
-
-  /* Круговая: на что уйдут деньги за весь горизонт */
-  const share = forecastCatShare(F);
-  document.getElementById('calPieTotal').textContent = share.total ? moneyShort(share.total) : '';
-  if(calPie) calPie.destroy();
-  const pieList = document.getElementById('calPieList');
-  if(!share.rows.length){
-    pieList.innerHTML = `<div class="empty">Расходов в прогнозе нет.</div>`;
-  } else {
-    if(window.Chart){
-      calPie = new Chart(document.getElementById('calPie'), {
-        type:'doughnut',
-        data:{ labels: share.rows.map(r=>r.name),
-          datasets:[{ data: share.rows.map(r=>r.v), backgroundColor: share.rows.map(r=>r.color),
-                      borderColor:'#fff', borderWidth:2 }]},
-        options:{ responsive:true, maintainAspectRatio:false, cutout:'58%',
-          plugins:{ legend:{display:false},
-            tooltip:{callbacks:{label: c=> c.label+': '+money(c.parsed)
-              + ' · ' + (share.total ? (c.parsed/share.total*100).toFixed(0) : 0) + '%'}}}}
-      });
-    }
-    pieList.innerHTML = share.rows.map(r=>{
-      const p = share.total>0 ? r.v/share.total*100 : 0;
-      return `<div class="catrow">
-        <span class="dot" style="background:${r.color}"></span>
-        <span class="nm">${esc(r.name)}${r.opt?' <span class="chip opt">необяз</span>':''}
-          <div class="bar" style="margin:4px 0 0;height:4px"><i style="width:${p}%;background:${r.color}"></i></div></span>
-        <span class="amt">${money(r.v)}</span><span class="pct">${p.toFixed(0)}%</span>
-      </div>`;
-    }).join('');
-  }
 
   // регулярные платежи
   const rbox = document.getElementById('recList');
@@ -757,6 +701,178 @@ function renderAnalytics(){
           <div class="s">${dateLong(t.date)} · ${esc(catName(t.categoryId))}</div></div>
         <div class="v neg">−${money(t.amount,{cur:accCurrency(t.accountId)})}</div></div>`).join('')
     : `<div class="empty">Необязательных трат за период не найдено.</div>`;
+
+  /* ====== Секция ПРОГНОЗ (перенесена из Календаря) ====== */
+  const fcDays = parseInt((document.getElementById('anFcHorizon')||{}).value||'90', 10);
+  const fcF = buildForecast(fcDays);
+  const fcMO = forecastMonths(fcF);
+
+  // График столбиков
+  if(anFcChart) anFcChart.destroy(); anFcChart = null;
+  if(window.Chart && AN_FC_VIEW === 'chart'){
+    anFcChart = new Chart(document.getElementById('anFcChart'), {
+      data:{ labels: fcMO.map(m=>m.short),
+        datasets:[
+          {type:'bar', label:'Доходы', data: fcMO.map(m=>m.inc),
+           backgroundColor:'#5c6f5a', borderRadius:3, stack:'bars', order:3},
+          {type:'bar', label:'Платежи по долгам', data: fcMO.map(m=>-m.debt),
+           backgroundColor:'#9b5f52', borderRadius:3, stack:'bars', order:3},
+          {type:'bar', label:'Прочие расходы', data: fcMO.map(m=>-m.other),
+           backgroundColor:'#3a3936', borderRadius:3, stack:'bars', order:3},
+          {type:'line', label:'Остаток', data: fcMO.map(m=>m.close),
+           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{display:true, position:'bottom',
+            labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11, usePointStyle:true, pointStyle:'rectRounded'}},
+          tooltip:{callbacks:{label: c=> c.dataset.label + ': ' +
+            (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
+        scales:{
+          y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
+              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+          x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
+    });
+  }
+
+  // Таблица
+  if(AN_FC_VIEW === 'table'){
+    const gran = (document.getElementById('anFcGran')||{}).value || 'month';
+    const detail = (document.getElementById('anFcDetail')||{}).value || 'full';
+    const T = forecastTable(fcF, gran);
+    const tbl = document.getElementById('anFcTable');
+    // рендер таблицы — используем ту же логику, что renderCalTable
+    const short = detail === 'short';
+    let h = '<thead><tr><th></th>' + T.cols.map(c=>'<th>'+c.label+'</th>').join('') + '</tr></thead><tbody>';
+    h += '<tr class="sep"><td><b>Остаток на начало</b></td>' + T.cols.map(c=>'<td>'+money(c.open)+'</td>').join('') + '</tr>';
+    if(!short) for(const r of T.income) h += '<tr><td>'+esc(r.name)+'</td>'+T.cols.map(c=>'<td>'+(r.vals[c.key]?money(r.vals[c.key]):'')+'</td>').join('')+'</tr>';
+    h += '<tr class="sep"><td><b>Доходы</b></td>' + T.cols.map(c=>'<td><b>'+money(c.inc)+'</b></td>').join('') + '</tr>';
+    if(!short) for(const r of T.debts) h += '<tr><td>'+esc(r.name)+'</td>'+T.cols.map(c=>'<td>'+(r.vals[c.key]?money(r.vals[c.key]):'')+'</td>').join('')+'</tr>';
+    h += '<tr class="sep"><td><b>Платежи по долгам</b></td>' + T.cols.map(c=>'<td><b>'+money(c.debt)+'</b></td>').join('') + '</tr>';
+    if(!short) for(const r of T.other) h += '<tr><td>'+esc(r.name)+'</td>'+T.cols.map(c=>'<td>'+(r.vals[c.key]?money(r.vals[c.key]):'')+'</td>').join('')+'</tr>';
+    h += '<tr class="sep"><td><b>Прочие расходы</b></td>' + T.cols.map(c=>'<td><b>'+money(c.other)+'</b></td>').join('') + '</tr>';
+    h += '<tr class="total"><td><b>Остаток на конец</b></td>' + T.cols.map(c=>{
+      const cls = c.close<0?'neg':'';
+      return '<td><b class="'+cls+'">'+money(c.close)+'</b></td>';
+    }).join('') + '</tr>';
+    h += '</tbody>';
+    tbl.innerHTML = h;
+  }
+
+  // Пирог прогнозных расходов
+  const fcShare = forecastCatShare(fcF);
+  document.getElementById('anFcPieTotal').textContent = fcShare.total ? moneyShort(fcShare.total) : '';
+  if(anFcPie) anFcPie.destroy(); anFcPie = null;
+  const fcPieList = document.getElementById('anFcPieList');
+  if(!fcShare.rows.length){
+    fcPieList.innerHTML = `<div class="empty">Расходов в прогнозе нет.</div>`;
+  } else {
+    if(window.Chart){
+      anFcPie = new Chart(document.getElementById('anFcPie'), {
+        type:'doughnut',
+        data:{ labels: fcShare.rows.map(r=>r.name),
+          datasets:[{ data: fcShare.rows.map(r=>r.v), backgroundColor: fcShare.rows.map(r=>r.color),
+                      borderColor:'#fff', borderWidth:2 }]},
+        options:{ responsive:true, maintainAspectRatio:false, cutout:'58%',
+          plugins:{ legend:{display:false},
+            tooltip:{callbacks:{label: c=> c.label+': '+money(c.parsed)
+              + ' · ' + (fcShare.total ? (c.parsed/fcShare.total*100).toFixed(0) : 0) + '%'}}}}
+      });
+    }
+    fcPieList.innerHTML = fcShare.rows.map(r=>{
+      const p = fcShare.total>0 ? r.v/fcShare.total*100 : 0;
+      return `<div class="catrow">
+        <span class="dot" style="background:${r.color}"></span>
+        <span class="nm">${esc(r.name)}${r.opt?' <span class="chip opt">необяз</span>':''}
+          <div class="bar" style="margin:4px 0 0;height:4px"><i style="width:${p}%;background:${r.color}"></i></div></span>
+        <span class="amt">${money(r.v)}</span><span class="pct">${p.toFixed(0)}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  /* ====== Секция ВЫВОДЫ И РЕКОМЕНДАЦИИ ====== */
+  const insights = [];
+
+  // 1. Баланс доходов и расходов за период
+  if(total > 0 && kind === 'expense'){
+    const incTotal = txInRange(from,to).filter(t=>t.type==='income').reduce((s,t)=>s+txBase(t),0);
+    const balance_ = incTotal - total;
+    if(balance_ < 0){
+      insights.push({icon:'⚠', cls:'err',
+        text:`<b>Расходы превышают доходы</b> на ${money(Math.abs(balance_))} за период. Доходы ${money(incTotal)}, расходы ${money(total)}. Вы тратите больше, чем зарабатываете — это сокращает накопления.`});
+    } else if(balance_ > 0 && balance_ < incTotal * 0.1){
+      insights.push({icon:'⚡', cls:'warn',
+        text:`<b>Остаток минимальный:</b> ${money(balance_)} из ${money(incTotal)} дохода (${(balance_/incTotal*100).toFixed(0)}%). Небольшой непредвиденный расход может привести к дефициту.`});
+    } else if(balance_ > 0){
+      insights.push({icon:'✓', cls:'ok',
+        text:`<b>Доходы покрывают расходы</b> с запасом ${money(balance_)} (${(balance_/incTotal*100).toFixed(0)}% от дохода).`});
+    }
+  }
+
+  // 2. Тренд расходов (если есть данные за 2+ месяца)
+  if(kind === 'expense'){
+    const byM = {};
+    for(const t of txInRange(from,to).filter(t=>t.type==='expense')){
+      const k = monthKey(t.date);
+      byM[k] = (byM[k]||0) + txBase(t);
+    }
+    const mKeys = Object.keys(byM).sort();
+    if(mKeys.length >= 3){
+      const first3 = mKeys.slice(0, Math.ceil(mKeys.length/2));
+      const last3 = mKeys.slice(Math.ceil(mKeys.length/2));
+      const avgFirst = first3.reduce((s,k)=>s+byM[k],0)/first3.length;
+      const avgLast = last3.reduce((s,k)=>s+byM[k],0)/last3.length;
+      if(avgFirst > 0){
+        const change = ((avgLast - avgFirst)/avgFirst*100);
+        if(change > 10){
+          insights.push({icon:'📈', cls:'warn',
+            text:`<b>Расходы растут:</b> в среднем ${money(avgFirst)}/мес в первой половине периода → ${money(avgLast)}/мес во второй (+${change.toFixed(0)}%).`});
+        } else if(change < -10){
+          insights.push({icon:'📉', cls:'ok',
+            text:`<b>Расходы снижаются:</b> ${money(avgFirst)}/мес → ${money(avgLast)}/мес (${change.toFixed(0)}%). Хорошая динамика.`});
+        } else {
+          insights.push({icon:'📊', cls:'ok',
+            text:`<b>Расходы стабильны:</b> ~${money(avgLast)}/мес, отклонение ${change > 0 ? '+' : ''}${change.toFixed(0)}%.`});
+        }
+      }
+    }
+  }
+
+  // 3. Где сократить — топ необязательных категорий
+  if(kind === 'expense' && opt > 0){
+    const optByCat = {};
+    for(const t of list.filter(t=> !catMandatory(t.categoryId))){
+      const k = t.categoryId || 'none';
+      optByCat[k] = (optByCat[k]||0) + txBase(t);
+    }
+    const topCats = Object.entries(optByCat).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const detail_ = topCats.map(([id,v])=> `${catName(id)} — ${money(v)}`).join(', ');
+    insights.push({icon:'✂', cls:'warn',
+      text:`<b>Топ необязательных категорий:</b> ${detail_}. Итого ${money(opt)} (${pct.toFixed(0)}% расходов). Сокращение вдвое высвободит ~${money(opt/2)} за период.`});
+  }
+
+  // 4. Рекомендация по кассовому разрыву
+  const fcGap = fcF.find(d=>d.close<0);
+  if(fcGap && opt > 0){
+    const need = Math.abs(Math.min(...fcF.map(d=>d.close)));
+    if(opt/monthsSpan >= need){
+      insights.push({icon:'💡', cls:'err',
+        text:`<b>Кассовый разрыв ${dateLong(fcGap.date)}</b> можно предотвратить: необязательные траты ~${money(opt/monthsSpan)}/мес, а не хватает ${money(need)}. Перенесите или сократите необязательные расходы перед этой датой.`});
+    } else {
+      insights.push({icon:'💡', cls:'err',
+        text:`<b>Кассовый разрыв ${dateLong(fcGap.date)}.</b> Не хватает ${money(need)}. Одного сокращения необязательных трат (${money(opt/monthsSpan)}/мес) недостаточно — нужны дополнительные поступления или перенос обязательных платежей.`});
+    }
+  }
+
+  const insBox = document.getElementById('anInsightsList');
+  if(insights.length){
+    insBox.innerHTML = insights.map(i=>`<div class="note ${i.cls}" style="margin-bottom:10px">
+      <span style="font-size:16px;margin-right:6px">${i.icon}</span>${i.text}</div>`).join('');
+  } else {
+    insBox.innerHTML = `<div class="empty">Добавьте операции — и здесь появятся выводы и рекомендации.</div>`;
+  }
 }
 function monthsBetween(a,b){
   const d1 = parseISO(a), d2 = parseISO(b);
