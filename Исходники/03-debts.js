@@ -13,18 +13,22 @@ function annuity(principal, annualRate, months){
 function round2(n){ return Math.round(n*100)/100; }
 
 /* Фактические платежи по долговому счёту: переводы НА него + «доходы» на него */
-function actualPayments(accountId){
+function actualPayments(accountId, upto){
+  const limit = upto || today();
   return S.transactions.filter(t =>
-      (t.type==='transfer' && t.toAccountId===accountId) ||
-      (t.type==='income'   && t.accountId===accountId)
+      t.date <= limit && (
+        (t.type==='transfer' && t.toAccountId===accountId) ||
+        (t.type==='income'   && t.accountId===accountId))
     ).map(t=>({date:t.date, amount:txAmountFor(t, accountId), note:t.note||'', txId:t.id}))
      .sort((a,b)=>a.date.localeCompare(b.date));
 }
 /* Новые начисления по долгу: траты с этого счёта / переводы с него */
-function actualCharges(accountId){
+function actualCharges(accountId, upto){
+  const limit = upto || today();
   return S.transactions.filter(t =>
-      (t.type==='transfer' && t.accountId===accountId) ||
-      (t.type==='expense'  && t.accountId===accountId)
+      t.date <= limit && (
+        (t.type==='transfer' && t.accountId===accountId) ||
+        (t.type==='expense'  && t.accountId===accountId))
     ).map(t=>({date:t.date, amount:t.amount, note:t.note||''}))
      .sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -35,17 +39,17 @@ function actualCharges(accountId){
    остаток идёт на погашение тела долга. Это тот же расчёт, что и в графике,
    поэтому карточка долга и таблица графика всегда показывают одно число.
    ------------------------------------------------------------------------- */
-function loanBalance(a){
+function loanBalance(a, upto){
   let bal = Number(a.openingBalance) || 0;
   const rate = (Number(a.rate)||0)/100/12;
-  const pays = actualPayments(a.id);
+  const pays = actualPayments(a.id, upto);
   for(const p of pays){
     const interest = round2(bal * rate);
     const principal = p.amount - interest;
     bal = round2(Math.max(0, bal - principal));
     if(bal === 0) break;
   }
-  for(const c of actualCharges(a.id)) bal = round2(bal + c.amount);
+  for(const c of actualCharges(a.id, upto)) bal = round2(bal + c.amount);
   return bal;
 }
 

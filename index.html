@@ -827,15 +827,22 @@ function txAmountFor(t, accountId){
   return t.amount;
 }
 
-function balance(a){
+/* Остаток на дату (по умолчанию — на сегодня).
+   Операции, датированные будущим, в текущий остаток не входят:
+   они появятся в прогнозе календаря и учтутся, когда наступит их день.
+   Иначе они считались бы дважды — и в остатке, и как будущее событие. */
+function balance(a, upto){
+  const limit = upto || today();
+
   /* Кредит: остаток считается по амортизации — каждый платёж сначала гасит
      начисленные проценты и только остатком уменьшает тело долга.
      Иначе карточка долга расходилась бы с графиком погашения. */
-  if(a.type==='loan') return loanBalance(a);
+  if(a.type==='loan') return loanBalance(a, limit);
 
   let b = Number(a.openingBalance) || 0;
   const isAsset = ACC_TYPES[a.type] && ACC_TYPES[a.type].asset;
   for(const t of S.transactions){
+    if(t.date > limit) continue;              // будущее — не сейчас
     if(t.type==='transfer'){
       if(t.accountId===a.id)   b += isAsset ? -t.amount : +t.amount;
       if(t.toAccountId===a.id){
@@ -1371,8 +1378,10 @@ function txRow(t){
   }
   if(t.note) sub = esc(t.note) + ' · ' + sub;
   const optChip = (t.type==='expense' && !catMandatory(t.categoryId)) ? ' <span class="chip opt">необяз</span>' : '';
+  /* Будущая дата — операция ещё не влияет на текущий остаток, только на прогноз */
+  const planChip = t.date > today() ? ' <span class="chip info">план</span>' : '';
   return `<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
-    <div class="l"><div class="t">${esc(title)}${optChip}</div><div class="s">${sub}</div></div>
+    <div class="l"><div class="t">${esc(title)}${optChip}${planChip}</div><div class="s">${sub}</div></div>
     <div class="v ${cls}">${sign}${money(t.amount,{cur:accCurrency(t.accountId)})}${
       t.type==='transfer' && t.toAmount != null
         ? ` → ${money(t.toAmount,{cur:accCurrency(t.toAccountId)})}` : ''}</div>
@@ -1571,18 +1580,22 @@ function annuity(principal, annualRate, months){
 function round2(n){ return Math.round(n*100)/100; }
 
 /* Фактические платежи по долговому счёту: переводы НА него + «доходы» на него */
-function actualPayments(accountId){
+function actualPayments(accountId, upto){
+  const limit = upto || today();
   return S.transactions.filter(t =>
-      (t.type==='transfer' && t.toAccountId===accountId) ||
-      (t.type==='income'   && t.accountId===accountId)
+      t.date <= limit && (
+        (t.type==='transfer' && t.toAccountId===accountId) ||
+        (t.type==='income'   && t.accountId===accountId))
     ).map(t=>({date:t.date, amount:txAmountFor(t, accountId), note:t.note||'', txId:t.id}))
      .sort((a,b)=>a.date.localeCompare(b.date));
 }
 /* Новые начисления по долгу: траты с этого счёта / переводы с него */
-function actualCharges(accountId){
+function actualCharges(accountId, upto){
+  const limit = upto || today();
   return S.transactions.filter(t =>
-      (t.type==='transfer' && t.accountId===accountId) ||
-      (t.type==='expense'  && t.accountId===accountId)
+      t.date <= limit && (
+        (t.type==='transfer' && t.accountId===accountId) ||
+        (t.type==='expense'  && t.accountId===accountId))
     ).map(t=>({date:t.date, amount:t.amount, note:t.note||''}))
      .sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -1593,17 +1606,17 @@ function actualCharges(accountId){
    остаток идёт на погашение тела долга. Это тот же расчёт, что и в графике,
    поэтому карточка долга и таблица графика всегда показывают одно число.
    ------------------------------------------------------------------------- */
-function loanBalance(a){
+function loanBalance(a, upto){
   let bal = Number(a.openingBalance) || 0;
   const rate = (Number(a.rate)||0)/100/12;
-  const pays = actualPayments(a.id);
+  const pays = actualPayments(a.id, upto);
   for(const p of pays){
     const interest = round2(bal * rate);
     const principal = p.amount - interest;
     bal = round2(Math.max(0, bal - principal));
     if(bal === 0) break;
   }
-  for(const c of actualCharges(a.id)) bal = round2(bal + c.amount);
+  for(const c of actualCharges(a.id, upto)) bal = round2(bal + c.amount);
   return bal;
 }
 
@@ -2852,9 +2865,24 @@ function buildForecast(days){
       push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:toBase(balance(a), accCurrency(a)), kind:'income', deposit:true});
     }
   }
-  // 4) уже внесённые будущие операции (запланированы задним числом на будущее)
+  // 4) операции, уже внесённые вперёд (плановые)
+  const liquidIds = new Set(liquidAccounts().map(a=>a.id));
   for(const t of S.transactions){
-    if(t.date > from && t.date <= to && t.type!=='transfer'){
+    if(t.date <= from || t.date > to) continue;
+
+    if(t.type === 'transfer'){
+      /* Перевод влияет на прогноз, только если задет счёт с живыми деньгами:
+         перевод на кредитку — это уход средств, зачисление на карту — приход. */
+      if(liquidIds.has(t.accountId)){
+        push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
+              amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', actual:true});
+      }
+      if(liquidIds.has(t.toAccountId)){
+        push({date:t.date, name:'Перевод с '+accName(t.accountId),
+              amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)),
+              kind:'income', actual:true});
+      }
+    } else {
       push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type, actual:true});
     }
   }

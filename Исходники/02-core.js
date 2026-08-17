@@ -245,15 +245,22 @@ function txAmountFor(t, accountId){
   return t.amount;
 }
 
-function balance(a){
+/* Остаток на дату (по умолчанию — на сегодня).
+   Операции, датированные будущим, в текущий остаток не входят:
+   они появятся в прогнозе календаря и учтутся, когда наступит их день.
+   Иначе они считались бы дважды — и в остатке, и как будущее событие. */
+function balance(a, upto){
+  const limit = upto || today();
+
   /* Кредит: остаток считается по амортизации — каждый платёж сначала гасит
      начисленные проценты и только остатком уменьшает тело долга.
      Иначе карточка долга расходилась бы с графиком погашения. */
-  if(a.type==='loan') return loanBalance(a);
+  if(a.type==='loan') return loanBalance(a, limit);
 
   let b = Number(a.openingBalance) || 0;
   const isAsset = ACC_TYPES[a.type] && ACC_TYPES[a.type].asset;
   for(const t of S.transactions){
+    if(t.date > limit) continue;              // будущее — не сейчас
     if(t.type==='transfer'){
       if(t.accountId===a.id)   b += isAsset ? -t.amount : +t.amount;
       if(t.toAccountId===a.id){
@@ -789,8 +796,10 @@ function txRow(t){
   }
   if(t.note) sub = esc(t.note) + ' · ' + sub;
   const optChip = (t.type==='expense' && !catMandatory(t.categoryId)) ? ' <span class="chip opt">необяз</span>' : '';
+  /* Будущая дата — операция ещё не влияет на текущий остаток, только на прогноз */
+  const planChip = t.date > today() ? ' <span class="chip info">план</span>' : '';
   return `<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
-    <div class="l"><div class="t">${esc(title)}${optChip}</div><div class="s">${sub}</div></div>
+    <div class="l"><div class="t">${esc(title)}${optChip}${planChip}</div><div class="s">${sub}</div></div>
     <div class="v ${cls}">${sign}${money(t.amount,{cur:accCurrency(t.accountId)})}${
       t.type==='transfer' && t.toAmount != null
         ? ` → ${money(t.toAmount,{cur:accCurrency(t.toAccountId)})}` : ''}</div>

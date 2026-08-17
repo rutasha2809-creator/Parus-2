@@ -132,9 +132,24 @@ function buildForecast(days){
       push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:toBase(balance(a), accCurrency(a)), kind:'income', deposit:true});
     }
   }
-  // 4) уже внесённые будущие операции (запланированы задним числом на будущее)
+  // 4) операции, уже внесённые вперёд (плановые)
+  const liquidIds = new Set(liquidAccounts().map(a=>a.id));
   for(const t of S.transactions){
-    if(t.date > from && t.date <= to && t.type!=='transfer'){
+    if(t.date <= from || t.date > to) continue;
+
+    if(t.type === 'transfer'){
+      /* Перевод влияет на прогноз, только если задет счёт с живыми деньгами:
+         перевод на кредитку — это уход средств, зачисление на карту — приход. */
+      if(liquidIds.has(t.accountId)){
+        push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
+              amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', actual:true});
+      }
+      if(liquidIds.has(t.toAccountId)){
+        push({date:t.date, name:'Перевод с '+accName(t.accountId),
+              amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)),
+              kind:'income', actual:true});
+      }
+    } else {
       push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type, actual:true});
     }
   }
