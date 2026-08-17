@@ -284,18 +284,30 @@ function installmentSchedule(a){
   return rows;
 }
 
-/* Единая точка: будущие обязательные платежи по всем долгам, от сегодня */
+/* Единая точка: будущие обязательные платежи по всем долгам, от сегодня.
+   Если платёж по этому долгу уже внесён сегодня, сегодняшнюю плановую строку
+   пропускаем — иначе прогноз спишет деньги второй раз. */
 function futureDebtPayments(untilDate){
   const out = [];
+  const T = today();
+
   for(const a of debtAccounts()){
     if(balance(a) <= 0) continue;
+
+    const paidToday = S.transactions.some(t =>
+      t.date === T && (
+        (t.type==='transfer' && t.toAccountId === a.id) ||
+        (t.type==='income'   && t.accountId === a.id)));
+
     let sched = [];
     if(a.type==='loan') sched = loanSchedule(a).filter(r=>!r.paid && !r.error);
     else if(a.type==='credit_card') sched = cardSchedule(a).filter(r=>!r.error);
     else if(a.type==='installment') sched = installmentSchedule(a);
     else if(a.type==='debt' && a.dueDate) sched = [{date:a.dueDate, payment:balance(a)}];
+
     for(const r of sched){
-      if(r.date >= today() && r.date <= untilDate)
+      if(r.date === T && paidToday) continue;       // уже оплачено сегодня
+      if(r.date >= T && r.date <= untilDate)
         out.push({date:r.date, name:a.name, amount:toBase(r.payment, accCurrency(a)), accountId:a.id, kind:'debt'});
     }
   }

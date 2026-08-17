@@ -232,7 +232,17 @@ function catColor(id){
 function assetAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type] && ACC_TYPES[a.type].asset); }
 function debtAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type] && !ACC_TYPES[a.type].asset); }
 /* счета, из которых реально можно платить сегодня (для календаря) */
-function liquidAccounts(){ return S.accounts.filter(a=>!a.archived && (a.type==='debit'||a.type==='cash')); }
+/* Деньги, доступные к тратам сегодня.
+   Карты и наличные — всегда. Накопительный счёт (вклад без даты окончания)
+   тоже: с него можно снять в любой момент. А срочный вклад с датой закрытия
+   заперт до срока — он не в остатке, зато в календаре появится приходом
+   в день закрытия. */
+function liquidAccounts(){
+  return S.accounts.filter(a => !a.archived && (
+    a.type==='debit' || a.type==='cash' ||
+    (a.type==='deposit' && !(a.endDate && a.endDate > today()))
+  ));
+}
 
 /* ---------------- балансы ---------------- */
 /* Для активов: openingBalance + доходы − расходы (+ переводы)

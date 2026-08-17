@@ -135,7 +135,22 @@ function buildForecast(days){
   // 4) операции, уже внесённые вперёд (плановые)
   const liquidIds = new Set(liquidAccounts().map(a=>a.id));
   for(const t of S.transactions){
-    if(t.date <= from || t.date > to) continue;
+    /* Сегодняшние операции уже сидят в текущем остатке. Показываем их
+       справочно, чтобы день не выглядел пустым, но в сумму не берём. */
+    if(t.date === from){
+      if(t.type === 'transfer'){
+        if(liquidIds.has(t.accountId))
+          push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
+                amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', done:true});
+        if(liquidIds.has(t.toAccountId))
+          push({date:t.date, name:'Перевод с '+accName(t.accountId),
+                amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)), kind:'income', done:true});
+      } else {
+        push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type, done:true});
+      }
+      continue;
+    }
+    if(t.date < from || t.date > to) continue;
 
     if(t.type === 'transfer'){
       /* Перевод влияет на прогноз, только если задет счёт с живыми деньгами:
@@ -159,8 +174,8 @@ function buildForecast(days){
   for(let i=0; i<=days; i++){
     const date = addDays(from, i);
     const items = (events[date]||[]).sort((a,b)=> (a.kind===b.kind?0:(a.kind==='income'?-1:1)));
-    const inc = items.filter(e=>e.kind==='income').reduce((s,e)=>s+e.amount,0);
-    const exp = items.filter(e=>e.kind==='expense').reduce((s,e)=>s+e.amount,0);
+    const inc = items.filter(e=>e.kind==='income'  && !e.done).reduce((s,e)=>s+e.amount,0);
+    const exp = items.filter(e=>e.kind==='expense' && !e.done).reduce((s,e)=>s+e.amount,0);
     const open = bal;
     bal = round2(bal + inc - exp);
     out.push({date, items, inc, exp, open, close: bal});
@@ -257,7 +272,8 @@ function renderCalendar(){
       const cls = d.close<0 ? 'gap' : (d.close<buf ? 'low' : '') ;
       const dt = parseISO(d.date);
       const items = d.items.length ? d.items.map(e=>`
-          <div class="it"><span class="nm">${esc(e.name)}</span>
+          <div class="it" ${e.done?'style="opacity:.6"':''}>
+            <span class="nm">${esc(e.name)}${e.done?' <span class="chip req">проведено</span>':''}</span>
             <span class="${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</span></div>`).join('')
         : `<div class="none">нет операций</div>`;
       return `<div class="day ${cls} ${isWeekend(d.date)?'wknd':''}">
@@ -468,7 +484,9 @@ function renderHome(){
 
   // ближайшие платежи
   const up = [];
-  for(let i=0;i<F.length && up.length<6;i++) for(const e of F[i].items) if(up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
+  for(let i=0;i<F.length && up.length<6;i++)
+    for(const e of F[i].items)
+      if(!e.done && up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
   document.getElementById('upcoming').innerHTML = up.length
     ? up.map(e=>`<div class="row"><div class="l"><div class="t">${esc(e.name)}</div>
         <div class="s">${dateLong(e.date)}, ${DOW[parseISO(e.date).getDay()]}</div></div>
