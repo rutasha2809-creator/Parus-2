@@ -539,7 +539,7 @@ function renderAccounts(){
   }
   const groups = [
     ['Свои деньги', ['debit','cash','deposit']],
-    ['Обязательства', ['credit_card','loan','debt']]
+    ['Обязательства', ['credit_card','installment','loan','debt']]
   ];
   box.innerHTML = groups.map(([title, types])=>{
     const list = S.accounts.filter(a=>types.includes(a.type) && !a.archived);
