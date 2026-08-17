@@ -315,6 +315,22 @@ function futureDebtPayments(untilDate){
 }
 
 /* ---------------- рендер экрана «Долги» ---------------- */
+/* Ячейка «След. платёж»: главное — когда платить, сумма подписью.
+   Просроченный платёж остаётся ближайшим и подсвечивается. */
+function nextPayCell(r){
+  if(!r) return `<div class="stat"><div class="n" style="font-size:14px">—</div>
+    <div class="l">След. платёж</div></div>`;
+
+  const T = today();
+  const dt = parseISO(r.date), ty = parseISO(T);
+  const year = dt.getFullYear() !== ty.getFullYear() ? ' ' + dt.getFullYear() : '';
+  const late = r.date < T, now = r.date === T;
+  const when = late ? 'просрочен' : now ? 'сегодня' : 'След. платёж';
+
+  return `<div class="stat"><div class="n${late||now?' neg':''}" style="font-size:14px">${dateShort(r.date)}${year}</div>
+    <div class="l">${when} · ${money(r.payment)}</div></div>`;
+}
+
 function renderDebts(){
   const list = debtAccounts();
   const box = document.getElementById('debtList');
@@ -354,7 +370,7 @@ function renderDebts(){
       const left = installmentPartsLeft(a);
       const last = sched.length ? sched[sched.length-1].date : null;
       meta = `<div class="grid3" style="margin:10px 0">
-        <div class="stat"><div class="n" style="font-size:14px">${nextPay?money(nextPay.payment):'—'}</div><div class="l">След. платёж</div></div>
+        ${nextPayCell(nextPay)}
         <div class="stat"><div class="n" style="font-size:14px">${left||'—'}</div><div class="l">Осталось платежей</div></div>
         <div class="stat"><div class="n" style="font-size:14px">${last?dateShort(last)+' '+parseISO(last).getFullYear():'—'}</div><div class="l">Закрытие</div></div>
       </div>
@@ -363,7 +379,7 @@ function renderDebts(){
     }
     else if(a.type==='loan' || a.type==='credit_card'){
       meta = `<div class="grid3" style="margin:10px 0">
-        <div class="stat"><div class="n" style="font-size:14px">${nextPay?money(nextPay.payment):'—'}</div><div class="l">След. платёж</div></div>
+        ${nextPayCell(nextPay)}
         <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(payoffDate?dateShort(payoffDate)+' '+parseISO(payoffDate).getFullYear():'—')}</div><div class="l">Закрытие</div></div>
         <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(totalInterest>0?moneyShort(totalInterest):'—')}</div><div class="l">Переплата</div></div>
       </div>`;
