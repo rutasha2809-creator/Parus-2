@@ -272,6 +272,112 @@ function forecastMonths(F){
   return out;
 }
 
+/* ---------------- сводная таблица прогноза ----------------
+   Повторяет формат исходного Excel: статьи в строках, периоды в колонках,
+   последняя колонка — итог за весь горизонт. */
+var CAL_VIEW = 'chart';
+function calSetView(v){
+  CAL_VIEW = v;
+  document.querySelectorAll('#calView button').forEach((b,i)=>
+    b.classList.toggle('on', (i===0) === (v==='chart')));
+  document.getElementById('calChartWrap').style.display = v==='chart' ? 'block' : 'none';
+  document.getElementById('calTableWrap').style.display = v==='table' ? 'block' : 'none';
+  document.getElementById('calGranWrap').style.display  = v==='table' ? 'grid'  : 'none';
+  renderCalendar();
+}
+
+/* Ключ и подпись периода, к которому относится дата */
+function periodOf(date, gran){
+  const d = parseISO(date);
+  if(gran === 'year')    return { key: date.slice(0,4), label: date.slice(0,4) };
+  if(gran === 'quarter'){
+    const q = Math.floor(d.getMonth()/3) + 1;
+    return { key: d.getFullYear()+'-Q'+q, label: q+' кв. '+d.getFullYear() };
+  }
+  return { key: date.slice(0,7), label: MONTHS_N[d.getMonth()].slice(0,3)+' '+d.getFullYear() };
+}
+
+/* Данные для таблицы: колонки-периоды и строки-статьи */
+function forecastTable(F, gran){
+  const cols = [], byKey = {};
+  const inc = {}, debt = {}, exp = {};      // статья -> {ключ периода -> сумма}
+  const add = (bag, name, key, v) => {
+    const row = bag[name] || (bag[name] = {});
+    row[key] = round2((row[key]||0) + v);
+  };
+
+  for(const d of F){
+    const p = periodOf(d.date, gran);
+    let c = byKey[p.key];
+    if(!c){ c = byKey[p.key] = { key:p.key, label:p.label, open:d.open, close:d.close, inc:0, debt:0, other:0 };
+            cols.push(c); }
+    c.close = d.close;
+    c.inc += d.inc; c.other += 0;
+
+    for(const e of d.items){
+      if(e.done) continue;                  // уже проведено — в сумму не берём
+      if(e.kind === 'income'){ add(inc, e.name, p.key, e.amount); }
+      else if(e.debt){ add(debt, e.name.replace(/^Платёж:\s*/,'').replace(/\s*—\s*остаток$/,''), p.key, e.amount); c.debt += e.amount; }
+      else { add(exp, e.categoryId ? catName(e.categoryId) : e.name, p.key, e.amount); c.other += e.amount; }
+    }
+  }
+  for(const c of cols){ c.inc = round2(c.inc); c.debt = round2(c.debt); c.other = round2(c.other); }
+
+  const sortRows = bag => Object.entries(bag)
+    .map(([name, vals]) => ({ name, vals, total: round2(Object.values(vals).reduce((s,v)=>s+v,0)) }))
+    .sort((a,b)=> b.total - a.total);
+
+  return { cols, income: sortRows(inc), debts: sortRows(debt), other: sortRows(exp) };
+}
+
+function renderCalTable(F){
+  const gran   = (document.getElementById('calGran')||{}).value   || 'month';
+  const detail = (document.getElementById('calDetail')||{}).value || 'full';
+  const T = forecastTable(F, gran);
+  const el = document.getElementById('calTable');
+  if(!el) return;
+
+  if(!T.cols.length){ el.innerHTML = '<tbody><tr><td>Нет данных за период.</td></tr></tbody>'; return; }
+
+  const n = v => !v ? '<span class="z">—</span>' : Math.round(v).toLocaleString('ru-RU');
+  const sum = f => round2(T.cols.reduce((s,c)=>s+f(c),0));
+
+  const head = `<thead><tr><th>Статья, ₽</th>
+    ${T.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}<th>Итого</th></tr></thead>`;
+
+  const line = (cls, name, vals, total, color) => `<tr class="${cls}">
+    <td>${esc(name)}</td>
+    ${T.cols.map(c=>`<td ${color?`style="color:${color}"`:''}>${n(vals[c.key])}</td>`).join('')}
+    <td class="tot" ${color?`style="color:${color}"`:''}>${n(total)}</td></tr>`;
+
+  const colLine = (cls, name, f, color) => `<tr class="${cls}">
+    <td>${esc(name)}</td>
+    ${T.cols.map(c=>`<td ${color?`style="color:${color}"`:''}>${n(f(c))}</td>`).join('')}
+    <td class="tot" ${color?`style="color:${color}"`:''}>${n(sum(f))}</td></tr>`;
+
+  let body = '';
+  // остаток на начало — берётся из первой колонки, суммировать его нельзя
+  body += `<tr class="edge"><td>Остаток на начало</td>
+    ${T.cols.map(c=>`<td>${n(c.open)}</td>`).join('')}
+    <td class="tot">${n(T.cols[0].open)}</td></tr>`;
+
+  body += colLine('grp', 'ДОХОДЫ', c=>c.inc, 'var(--green)');
+  if(detail === 'full') body += T.income.map(r=>line('sub', r.name, r.vals, r.total)).join('');
+
+  body += colLine('grp', 'РАСХОДЫ', c=>c.debt + c.other);
+  body += colLine('sub', 'Платежи по долгам', c=>c.debt, 'var(--red)');
+  if(detail === 'full') body += T.debts.map(r=>line('sub', '· '+r.name, r.vals, r.total, 'var(--red)')).join('');
+  body += colLine('sub', 'Прочие расходы', c=>c.other);
+  if(detail === 'full') body += T.other.map(r=>line('sub', '· '+r.name, r.vals, r.total)).join('');
+
+  body += colLine('grp', 'Итого за период', c=>round2(c.inc - c.debt - c.other));
+  body += `<tr class="edge"><td>Остаток на конец</td>
+    ${T.cols.map(c=>`<td ${c.close<0?'style="color:var(--red)"':''}>${n(c.close)}</td>`).join('')}
+    <td class="tot" ${T.cols[T.cols.length-1].close<0?'style="color:var(--red)"':''}>${n(T.cols[T.cols.length-1].close)}</td></tr>`;
+
+  el.innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+
 /* Цвет суммы: доход зелёный, долг красный, обычный расход чёрный */
 function itemCls(e){
   if(e.kind === 'income') return 'a-inc';
@@ -350,36 +456,39 @@ function renderCalendar(){
   const MO = forecastMonths(F);
 
   /* График: столбики месяцев (доход вверх, расходы вниз двумя частями)
-     и линия остатка на конец месяца на правой шкале. */
+     и линия остатка на конец месяца. Шкала одна и знаковая: вторая шкала
+     со своим масштабом делала линию несопоставимой со столбиками, а подпись
+     по модулю превращала «−150 тыс» в «150 тыс» внизу оси. */
   const ctx = document.getElementById('calChart');
   if(calChart) calChart.destroy();
-  if(window.Chart){
+  if(window.Chart && CAL_VIEW === 'chart'){
     calChart = new Chart(ctx, {
       data:{ labels: MO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
-           backgroundColor:'#5c6f5a', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+           backgroundColor:'#5c6f5a', borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Платежи по долгам', data: MO.map(m=>-m.debt),
-           backgroundColor:'#9b5f52', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+           backgroundColor:'#9b5f52', borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Прочие расходы', data: MO.map(m=>-m.other),
-           backgroundColor:'#3a3936', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+           backgroundColor:'#3a3936', borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток на конец месяца', data: MO.map(m=>m.close),
-           borderColor:'#8a8880', backgroundColor:'#8a8880', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', yAxisID:'y1', order:1}
+           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
         plugins:{
           legend:{display:true, position:'bottom',
             labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11, usePointStyle:true, pointStyle:'rectRounded'}},
-          tooltip:{callbacks:{label: c=> c.dataset.label+': '+money(Math.abs(c.parsed.y))}}},
+          tooltip:{callbacks:{label: c=> c.dataset.label + ': ' +
+            (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
         scales:{
-          y:{ stacked:true, ticks:{callback:v=>moneyShort(Math.abs(v)), font:{size:10}}, grid:{color:'#eeece8'} },
-          y1:{ position:'right', stacked:false, grid:{display:false},
-               ticks:{callback:v=>moneyShort(v), font:{size:10}, color:'#8a8880'} },
+          y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
+              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
           x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
   }
+  if(CAL_VIEW === 'table') renderCalTable(F);
 
   /* Круговая: на что уйдут деньги за весь горизонт */
   const share = forecastCatShare(F);

@@ -153,6 +153,25 @@ nav button.on{color:var(--brand);font-weight:650}
 .scrolly{max-height:420px;overflow-y:auto}
 
 /* ---------- calendar day rows ---------- */
+/* ---------- сводная таблица прогноза ----------
+   Формат исходного Excel: статьи в строках, периоды в колонках */
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -15px;padding:0 15px}
+.fintbl{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:100%}
+.fintbl th,.fintbl td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line)}
+.fintbl th:first-child,.fintbl td:first-child{
+  text-align:left;position:sticky;left:0;background:var(--card);z-index:1;
+  white-space:normal;min-width:132px;max-width:170px;
+  box-shadow:1px 0 0 var(--line)}
+.fintbl thead th{font-size:10.5px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+.fintbl thead th:last-child,.fintbl td.tot{background:#faf9f7;font-weight:650}
+.fintbl tr.grp td{font-weight:650;background:#f6f5f2}
+.fintbl tr.grp td:first-child{background:#f6f5f2}
+.fintbl tr.sub td:first-child{padding-left:20px;color:var(--muted);font-weight:400}
+.fintbl tr.edge td{font-weight:650;border-top:1px solid var(--ink)}
+.fintbl tr.edge td:first-child{background:var(--card)}
+.fintbl .z{color:#c7c4bd}
+
 /* ---------- прогноз: блоки по месяцам ----------
    Месяц свёрнут по умолчанию: сначала итог, детали по клику */
 .mon{border-bottom:1px solid var(--line)}
@@ -467,8 +486,33 @@ nav button.on{color:var(--brand);font-weight:650}
   <div id="calGapNote"></div>
 
   <div class="card">
-    <h2>Доходы и расходы по месяцам</h2>
-    <div class="chartbox tall"><canvas id="calChart"></canvas></div>
+    <h2>Доходы и расходы</h2>
+    <div class="seg sm" id="calView">
+      <button class="on" onclick="calSetView('chart')">График</button>
+      <button onclick="calSetView('table')">Таблица</button>
+    </div>
+    <div class="f2" id="calGranWrap" style="display:none;margin-bottom:12px">
+      <div class="f" style="margin:0">
+        <label>Разбивка</label>
+        <select id="calGran" onchange="renderCalendar()">
+          <option value="month" selected>По месяцам</option>
+          <option value="quarter">По кварталам</option>
+          <option value="year">По годам</option>
+        </select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Подробность</label>
+        <select id="calDetail" onchange="renderCalendar()">
+          <option value="full" selected>По статьям</option>
+          <option value="short">Только итоги</option>
+        </select>
+      </div>
+    </div>
+    <div id="calChartWrap" class="chartbox tall"><canvas id="calChart"></canvas></div>
+    <div id="calTableWrap" style="display:none">
+      <div class="tblwrap"><table class="fintbl" id="calTable"></table></div>
+      <div class="hint" style="margin-top:9px">Прокрутите таблицу вбок, если периодов больше, чем помещается.</div>
+    </div>
   </div>
 
   <div class="card pad0">

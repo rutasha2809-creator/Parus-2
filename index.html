@@ -153,6 +153,25 @@ nav button.on{color:var(--brand);font-weight:650}
 .scrolly{max-height:420px;overflow-y:auto}
 
 /* ---------- calendar day rows ---------- */
+/* ---------- сводная таблица прогноза ----------
+   Формат исходного Excel: статьи в строках, периоды в колонках */
+.tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -15px;padding:0 15px}
+.fintbl{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:100%}
+.fintbl th,.fintbl td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line)}
+.fintbl th:first-child,.fintbl td:first-child{
+  text-align:left;position:sticky;left:0;background:var(--card);z-index:1;
+  white-space:normal;min-width:132px;max-width:170px;
+  box-shadow:1px 0 0 var(--line)}
+.fintbl thead th{font-size:10.5px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+.fintbl thead th:last-child,.fintbl td.tot{background:#faf9f7;font-weight:650}
+.fintbl tr.grp td{font-weight:650;background:#f6f5f2}
+.fintbl tr.grp td:first-child{background:#f6f5f2}
+.fintbl tr.sub td:first-child{padding-left:20px;color:var(--muted);font-weight:400}
+.fintbl tr.edge td{font-weight:650;border-top:1px solid var(--ink)}
+.fintbl tr.edge td:first-child{background:var(--card)}
+.fintbl .z{color:#c7c4bd}
+
 /* ---------- прогноз: блоки по месяцам ----------
    Месяц свёрнут по умолчанию: сначала итог, детали по клику */
 .mon{border-bottom:1px solid var(--line)}
@@ -467,8 +486,33 @@ nav button.on{color:var(--brand);font-weight:650}
   <div id="calGapNote"></div>
 
   <div class="card">
-    <h2>Доходы и расходы по месяцам</h2>
-    <div class="chartbox tall"><canvas id="calChart"></canvas></div>
+    <h2>Доходы и расходы</h2>
+    <div class="seg sm" id="calView">
+      <button class="on" onclick="calSetView('chart')">График</button>
+      <button onclick="calSetView('table')">Таблица</button>
+    </div>
+    <div class="f2" id="calGranWrap" style="display:none;margin-bottom:12px">
+      <div class="f" style="margin:0">
+        <label>Разбивка</label>
+        <select id="calGran" onchange="renderCalendar()">
+          <option value="month" selected>По месяцам</option>
+          <option value="quarter">По кварталам</option>
+          <option value="year">По годам</option>
+        </select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Подробность</label>
+        <select id="calDetail" onchange="renderCalendar()">
+          <option value="full" selected>По статьям</option>
+          <option value="short">Только итоги</option>
+        </select>
+      </div>
+    </div>
+    <div id="calChartWrap" class="chartbox tall"><canvas id="calChart"></canvas></div>
+    <div id="calTableWrap" style="display:none">
+      <div class="tblwrap"><table class="fintbl" id="calTable"></table></div>
+      <div class="hint" style="margin-top:9px">Прокрутите таблицу вбок, если периодов больше, чем помещается.</div>
+    </div>
   </div>
 
   <div class="card pad0">
@@ -3421,6 +3465,112 @@ function forecastMonths(F){
   return out;
 }
 
+/* ---------------- сводная таблица прогноза ----------------
+   Повторяет формат исходного Excel: статьи в строках, периоды в колонках,
+   последняя колонка — итог за весь горизонт. */
+var CAL_VIEW = 'chart';
+function calSetView(v){
+  CAL_VIEW = v;
+  document.querySelectorAll('#calView button').forEach((b,i)=>
+    b.classList.toggle('on', (i===0) === (v==='chart')));
+  document.getElementById('calChartWrap').style.display = v==='chart' ? 'block' : 'none';
+  document.getElementById('calTableWrap').style.display = v==='table' ? 'block' : 'none';
+  document.getElementById('calGranWrap').style.display  = v==='table' ? 'grid'  : 'none';
+  renderCalendar();
+}
+
+/* Ключ и подпись периода, к которому относится дата */
+function periodOf(date, gran){
+  const d = parseISO(date);
+  if(gran === 'year')    return { key: date.slice(0,4), label: date.slice(0,4) };
+  if(gran === 'quarter'){
+    const q = Math.floor(d.getMonth()/3) + 1;
+    return { key: d.getFullYear()+'-Q'+q, label: q+' кв. '+d.getFullYear() };
+  }
+  return { key: date.slice(0,7), label: MONTHS_N[d.getMonth()].slice(0,3)+' '+d.getFullYear() };
+}
+
+/* Данные для таблицы: колонки-периоды и строки-статьи */
+function forecastTable(F, gran){
+  const cols = [], byKey = {};
+  const inc = {}, debt = {}, exp = {};      // статья -> {ключ периода -> сумма}
+  const add = (bag, name, key, v) => {
+    const row = bag[name] || (bag[name] = {});
+    row[key] = round2((row[key]||0) + v);
+  };
+
+  for(const d of F){
+    const p = periodOf(d.date, gran);
+    let c = byKey[p.key];
+    if(!c){ c = byKey[p.key] = { key:p.key, label:p.label, open:d.open, close:d.close, inc:0, debt:0, other:0 };
+            cols.push(c); }
+    c.close = d.close;
+    c.inc += d.inc; c.other += 0;
+
+    for(const e of d.items){
+      if(e.done) continue;                  // уже проведено — в сумму не берём
+      if(e.kind === 'income'){ add(inc, e.name, p.key, e.amount); }
+      else if(e.debt){ add(debt, e.name.replace(/^Платёж:\s*/,'').replace(/\s*—\s*остаток$/,''), p.key, e.amount); c.debt += e.amount; }
+      else { add(exp, e.categoryId ? catName(e.categoryId) : e.name, p.key, e.amount); c.other += e.amount; }
+    }
+  }
+  for(const c of cols){ c.inc = round2(c.inc); c.debt = round2(c.debt); c.other = round2(c.other); }
+
+  const sortRows = bag => Object.entries(bag)
+    .map(([name, vals]) => ({ name, vals, total: round2(Object.values(vals).reduce((s,v)=>s+v,0)) }))
+    .sort((a,b)=> b.total - a.total);
+
+  return { cols, income: sortRows(inc), debts: sortRows(debt), other: sortRows(exp) };
+}
+
+function renderCalTable(F){
+  const gran   = (document.getElementById('calGran')||{}).value   || 'month';
+  const detail = (document.getElementById('calDetail')||{}).value || 'full';
+  const T = forecastTable(F, gran);
+  const el = document.getElementById('calTable');
+  if(!el) return;
+
+  if(!T.cols.length){ el.innerHTML = '<tbody><tr><td>Нет данных за период.</td></tr></tbody>'; return; }
+
+  const n = v => !v ? '<span class="z">—</span>' : Math.round(v).toLocaleString('ru-RU');
+  const sum = f => round2(T.cols.reduce((s,c)=>s+f(c),0));
+
+  const head = `<thead><tr><th>Статья, ₽</th>
+    ${T.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')}<th>Итого</th></tr></thead>`;
+
+  const line = (cls, name, vals, total, color) => `<tr class="${cls}">
+    <td>${esc(name)}</td>
+    ${T.cols.map(c=>`<td ${color?`style="color:${color}"`:''}>${n(vals[c.key])}</td>`).join('')}
+    <td class="tot" ${color?`style="color:${color}"`:''}>${n(total)}</td></tr>`;
+
+  const colLine = (cls, name, f, color) => `<tr class="${cls}">
+    <td>${esc(name)}</td>
+    ${T.cols.map(c=>`<td ${color?`style="color:${color}"`:''}>${n(f(c))}</td>`).join('')}
+    <td class="tot" ${color?`style="color:${color}"`:''}>${n(sum(f))}</td></tr>`;
+
+  let body = '';
+  // остаток на начало — берётся из первой колонки, суммировать его нельзя
+  body += `<tr class="edge"><td>Остаток на начало</td>
+    ${T.cols.map(c=>`<td>${n(c.open)}</td>`).join('')}
+    <td class="tot">${n(T.cols[0].open)}</td></tr>`;
+
+  body += colLine('grp', 'ДОХОДЫ', c=>c.inc, 'var(--green)');
+  if(detail === 'full') body += T.income.map(r=>line('sub', r.name, r.vals, r.total)).join('');
+
+  body += colLine('grp', 'РАСХОДЫ', c=>c.debt + c.other);
+  body += colLine('sub', 'Платежи по долгам', c=>c.debt, 'var(--red)');
+  if(detail === 'full') body += T.debts.map(r=>line('sub', '· '+r.name, r.vals, r.total, 'var(--red)')).join('');
+  body += colLine('sub', 'Прочие расходы', c=>c.other);
+  if(detail === 'full') body += T.other.map(r=>line('sub', '· '+r.name, r.vals, r.total)).join('');
+
+  body += colLine('grp', 'Итого за период', c=>round2(c.inc - c.debt - c.other));
+  body += `<tr class="edge"><td>Остаток на конец</td>
+    ${T.cols.map(c=>`<td ${c.close<0?'style="color:var(--red)"':''}>${n(c.close)}</td>`).join('')}
+    <td class="tot" ${T.cols[T.cols.length-1].close<0?'style="color:var(--red)"':''}>${n(T.cols[T.cols.length-1].close)}</td></tr>`;
+
+  el.innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+
 /* Цвет суммы: доход зелёный, долг красный, обычный расход чёрный */
 function itemCls(e){
   if(e.kind === 'income') return 'a-inc';
@@ -3499,36 +3649,39 @@ function renderCalendar(){
   const MO = forecastMonths(F);
 
   /* График: столбики месяцев (доход вверх, расходы вниз двумя частями)
-     и линия остатка на конец месяца на правой шкале. */
+     и линия остатка на конец месяца. Шкала одна и знаковая: вторая шкала
+     со своим масштабом делала линию несопоставимой со столбиками, а подпись
+     по модулю превращала «−150 тыс» в «150 тыс» внизу оси. */
   const ctx = document.getElementById('calChart');
   if(calChart) calChart.destroy();
-  if(window.Chart){
+  if(window.Chart && CAL_VIEW === 'chart'){
     calChart = new Chart(ctx, {
       data:{ labels: MO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
-           backgroundColor:'#5c6f5a', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+           backgroundColor:'#5c6f5a', borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Платежи по долгам', data: MO.map(m=>-m.debt),
-           backgroundColor:'#9b5f52', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+           backgroundColor:'#9b5f52', borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Прочие расходы', data: MO.map(m=>-m.other),
-           backgroundColor:'#3a3936', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+           backgroundColor:'#3a3936', borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток на конец месяца', data: MO.map(m=>m.close),
-           borderColor:'#8a8880', backgroundColor:'#8a8880', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', yAxisID:'y1', order:1}
+           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
         plugins:{
           legend:{display:true, position:'bottom',
             labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11, usePointStyle:true, pointStyle:'rectRounded'}},
-          tooltip:{callbacks:{label: c=> c.dataset.label+': '+money(Math.abs(c.parsed.y))}}},
+          tooltip:{callbacks:{label: c=> c.dataset.label + ': ' +
+            (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
         scales:{
-          y:{ stacked:true, ticks:{callback:v=>moneyShort(Math.abs(v)), font:{size:10}}, grid:{color:'#eeece8'} },
-          y1:{ position:'right', stacked:false, grid:{display:false},
-               ticks:{callback:v=>moneyShort(v), font:{size:10}, color:'#8a8880'} },
+          y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
+              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
           x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
   }
+  if(CAL_VIEW === 'table') renderCalTable(F);
 
   /* Круговая: на что уйдут деньги за весь горизонт */
   const share = forecastCatShare(F);

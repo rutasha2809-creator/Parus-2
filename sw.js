@@ -1,7 +1,7 @@
 /* Service worker: приложение работает без интернета.
    Меняйте VERSION при каждом обновлении index.html — иначе браузер
    продолжит показывать старую версию из кэша. */
-const VERSION = 'parus-v16';
+const VERSION = 'parus-v17';
 
 const SHELL = [
   './',
