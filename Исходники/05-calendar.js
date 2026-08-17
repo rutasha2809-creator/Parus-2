@@ -79,7 +79,7 @@ function deleteRecurring(id){
 /* Ищем реальную операцию, которая закрывает плановое начисление.
    Совпадение по счёту, виду и категории, дата — в пределах нескольких дней:
    банк может провести платёж не день в день. */
-const MATCH_DAYS = 4;
+/* MATCH_DAYS объявлен в 02-core.js — им пользуются и долги, и календарь */
 function matchActual(rule, date, used){
   return S.transactions.find(t =>
     !used.has(t.id) &&
@@ -163,7 +163,9 @@ function buildForecast(days){
     }
   }
   // 2) обязательные платежи по долгам из графиков
-  for(const p of futureDebtPayments(to)) push({date:p.date, name:'Платёж: '+p.name, amount:p.amount, kind:'expense', debt:true});
+  for(const p of futureDebtPayments(to))
+    push({date:p.date, name:'Платёж: '+p.name, amount:p.amount, kind:'expense', debt:true,
+          done: !!p.done, paidNote: p.paidNote || null});
   // 3) закрытие вкладов
   for(const a of S.accounts){
     /* Приход в день закрытия — только для запертых вкладов.
