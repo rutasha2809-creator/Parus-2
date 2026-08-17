@@ -186,7 +186,8 @@ function buildForecast(days){
           push({date:t.date, name:'Перевод с '+accName(t.accountId),
                 amount: toBase(txAmountFor(t, t.toAccountId), accCurrency(t.toAccountId)), kind:'income', done:true});
       } else {
-        push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type, done:true});
+        push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type,
+              categoryId:t.categoryId, done:true});
       }
       continue;
     }
@@ -196,8 +197,11 @@ function buildForecast(days){
       /* Перевод влияет на прогноз, только если задет счёт с живыми деньгами:
          перевод на кредитку — это уход средств, зачисление на карту — приход. */
       if(liquidIds.has(t.accountId)){
+        /* перевод на кредит, кредитку или рассрочку — это платёж по долгу */
+        const dst = S.accounts.find(a=>a.id===t.toAccountId);
         push({date:t.date, name:'Перевод: '+accName(t.toAccountId),
-              amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', actual:true});
+              amount: toBase(t.amount, accCurrency(t.accountId)), kind:'expense', actual:true,
+              debt: !!(dst && ACC_TYPES[dst.type] && !ACC_TYPES[dst.type].asset)});
       }
       if(liquidIds.has(t.toAccountId)){
         push({date:t.date, name:'Перевод с '+accName(t.accountId),
@@ -205,7 +209,8 @@ function buildForecast(days){
               kind:'income', actual:true});
       }
     } else {
-      push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type, actual:true});
+      push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type,
+            categoryId:t.categoryId, actual:true});
     }
   }
 
@@ -224,7 +229,71 @@ function buildForecast(days){
 }
 
 /* ---------------- рендер календаря ---------------- */
-let calChart = null;
+let calChart = null, calPie = null;
+
+/* Какие месяцы раскрыты. Живёт вне рендера, иначе после любой правки
+   всё схлопывалось бы обратно. По умолчанию свёрнуты все. */
+var CAL_OPEN = new Set();
+function toggleMonth(key){
+  if(CAL_OPEN.has(key)) CAL_OPEN.delete(key); else CAL_OPEN.add(key);
+  renderCalendar();
+}
+
+/* Дни прогноза, сгруппированные в месяцы */
+function forecastMonths(F){
+  const out = [], byKey = {};
+  for(const d of F){
+    const key = d.date.slice(0,7);
+    let m = byKey[key];
+    if(!m){
+      const dt = parseISO(d.date);
+      /* MONTHS — родительный падеж («17 августа»), для заголовка нужен именительный */
+      m = byKey[key] = { key, label: MONTHS_N[dt.getMonth()] + ' ' + dt.getFullYear(),
+        short: MONTHS_N[dt.getMonth()].slice(0,3), days: [],
+        inc:0, exp:0, debt:0, moves:0, close:0, min:Infinity };
+      out.push(m);
+    }
+    m.days.push(d);
+    m.inc += d.inc; m.exp += d.exp;
+    for(const e of d.items){
+      if(e.done) continue;
+      m.moves++;
+      if(e.kind==='expense' && e.debt) m.debt += e.amount;
+    }
+    m.close = d.close;
+    if(d.close < m.min) m.min = d.close;
+  }
+  for(const m of out){
+    m.inc = round2(m.inc); m.exp = round2(m.exp); m.debt = round2(m.debt);
+    m.other = round2(m.exp - m.debt);
+  }
+  return out;
+}
+
+/* Цвет суммы: доход зелёный, долг красный, обычный расход чёрный */
+function itemCls(e){
+  if(e.kind === 'income') return 'a-inc';
+  return e.debt ? 'a-debt' : 'a-exp';
+}
+
+/* Расходы прогноза в разрезе категорий (для круговой диаграммы) */
+function forecastCatShare(F){
+  const by = {}; let total = 0;
+  for(const d of F) for(const e of d.items){
+    if(e.kind !== 'expense' || e.done) continue;
+    const key = e.debt ? '__debt' : (e.categoryId || '__none');
+    by[key] = (by[key]||0) + e.amount;
+    total += e.amount;
+  }
+  const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({
+    id, v,
+    name:  id==='__debt' ? 'Платежи по долгам' : id==='__none' ? 'Без категории' : catName(id),
+    color: id==='__debt' ? '#9b5f52'          : id==='__none' ? '#b6b3ac'       : catColor(id),
+    opt:   id!=='__debt' && id!=='__none' && !catMandatory(id)
+  }));
+  return { rows, total: round2(total) };
+}
+
 function renderCalendar(){
   const days = parseInt(document.getElementById('calHorizon').value, 10);
   const buf  = parseFloat(document.getElementById('calMinBuf').value) || 0;
@@ -276,27 +345,69 @@ function renderCalendar(){
       <b>Разрывов нет.</b> На горизонте ${days} дн. остаток не опускается ниже ${money(minVal)}.</div>`;
   }
 
-  // график
+  const MO = forecastMonths(F);
+
+  /* График: столбики месяцев (доход вверх, расходы вниз двумя частями)
+     и линия остатка на конец месяца на правой шкале. */
   const ctx = document.getElementById('calChart');
   if(calChart) calChart.destroy();
   if(window.Chart){
-    const step = Math.max(1, Math.floor(F.length/120));
-    const pts = F.filter((_,i)=> i%step===0);
     calChart = new Chart(ctx, {
-      type:'line',
-      data:{ labels: pts.map(d=>dateShort(d.date)),
+      data:{ labels: MO.map(m=>m.short),
         datasets:[
-          {label:'Остаток', data: pts.map(d=>d.close), borderColor:'#4a4844', backgroundColor:'rgba(74,72,68,.07)',
-           fill:true, tension:.25, pointRadius:0, borderWidth:2},
-          {label:'Подушка', data: pts.map(()=>buf), borderColor:'#9b8564', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false},
-          {label:'Ноль', data: pts.map(()=>0), borderColor:'#9b6b5e', borderDash:[3,3], pointRadius:0, borderWidth:1, fill:false}
+          {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
+           backgroundColor:'#5c6f5a', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+          {type:'bar', label:'Платежи по долгам', data: MO.map(m=>-m.debt),
+           backgroundColor:'#9b5f52', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+          {type:'bar', label:'Прочие расходы', data: MO.map(m=>-m.other),
+           backgroundColor:'#3a3936', borderRadius:3, stack:'s', yAxisID:'y', order:3},
+          {type:'line', label:'Остаток на конец месяца', data: MO.map(m=>m.close),
+           borderColor:'#8a8880', backgroundColor:'#8a8880', borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', yAxisID:'y1', order:1}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false},
-          tooltip:{callbacks:{label: c=> c.dataset.label+': '+money(c.parsed.y)}}},
-        scales:{ y:{ ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:'#eeece8'} },
-                 x:{ ticks:{maxTicksLimit:8, font:{size:10}}, grid:{display:false} } } }
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{display:true, position:'bottom',
+            labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11, usePointStyle:true, pointStyle:'rectRounded'}},
+          tooltip:{callbacks:{label: c=> c.dataset.label+': '+money(Math.abs(c.parsed.y))}}},
+        scales:{
+          y:{ stacked:true, ticks:{callback:v=>moneyShort(Math.abs(v)), font:{size:10}}, grid:{color:'#eeece8'} },
+          y1:{ position:'right', stacked:false, grid:{display:false},
+               ticks:{callback:v=>moneyShort(v), font:{size:10}, color:'#8a8880'} },
+          x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
+  }
+
+  /* Круговая: на что уйдут деньги за весь горизонт */
+  const share = forecastCatShare(F);
+  document.getElementById('calPieTotal').textContent = share.total ? moneyShort(share.total) : '';
+  if(calPie) calPie.destroy();
+  const pieList = document.getElementById('calPieList');
+  if(!share.rows.length){
+    pieList.innerHTML = `<div class="empty">Расходов в прогнозе нет.</div>`;
+  } else {
+    if(window.Chart){
+      calPie = new Chart(document.getElementById('calPie'), {
+        type:'doughnut',
+        data:{ labels: share.rows.map(r=>r.name),
+          datasets:[{ data: share.rows.map(r=>r.v), backgroundColor: share.rows.map(r=>r.color),
+                      borderColor:'#fff', borderWidth:2 }]},
+        options:{ responsive:true, maintainAspectRatio:false, cutout:'58%',
+          plugins:{ legend:{display:false},
+            tooltip:{callbacks:{label: c=> c.label+': '+money(c.parsed)
+              + ' · ' + (share.total ? (c.parsed/share.total*100).toFixed(0) : 0) + '%'}}}}
+      });
+    }
+    pieList.innerHTML = share.rows.map(r=>{
+      const p = share.total>0 ? r.v/share.total*100 : 0;
+      return `<div class="catrow">
+        <span class="dot" style="background:${r.color}"></span>
+        <span class="nm">${esc(r.name)}${r.opt?' <span class="chip opt">необяз</span>':''}
+          <div class="bar" style="margin:4px 0 0;height:4px"><i style="width:${p}%;background:${r.color}"></i></div></span>
+        <span class="amt">${money(r.v)}</span><span class="pct">${p.toFixed(0)}%</span>
+      </div>`;
+    }).join('');
   }
 
   // регулярные платежи
@@ -314,37 +425,73 @@ function renderCalendar(){
       </div>`).join('');
   }
 
-  // по дням
+  /* Прогноз по месяцам: свёрнутые блоки, внутри — дни */
   const dbox = document.getElementById('calDays');
-  const shown = F.filter(d=> d.items.length>0 || d.close<buf).slice(0, 120);
-  if(!shown.length){
+  if(!MO.length){
     dbox.innerHTML = `<div class="empty">На горизонте нет запланированных движений.</div>`;
-  } else {
-    dbox.innerHTML = shown.map(d=>{
-      const cls = d.close<0 ? 'gap' : (d.close<buf ? 'low' : '') ;
-      const dt = parseISO(d.date);
-      const items = d.items.length ? d.items.map(e=>{
-          const marks =
-            (e.paidNote ? ' <span class="chip ok">оплачено</span>' : '') +
-            (e.done && !e.paidNote ? ' <span class="chip req">проведено</span>' : '') +
-            (e.edited ? ' <span class="chip info">изменён</span>' : '');
-          const actions = (e.planned && !e.done)
-            ? ` <button class="chip info" style="border:none;cursor:pointer"
-                  onclick="confirmPlanned('${e.recId}','${d.date}')">внести</button>
-               <button class="chip req" style="border:none;cursor:pointer"
-                  onclick="editPlanned('${e.planKey}','${d.date}',${e.amount})">изменить</button>` : '';
-          return `<div class="it" ${e.done?'style="opacity:.55"':''}>
-            <span class="nm">${esc(e.name)}${marks}${actions}</span>
-            <span class="${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</span></div>`;
-        }).join('')
-        : `<div class="none">нет операций</div>`;
-      return `<div class="day ${cls} ${isWeekend(d.date)?'wknd':''}">
-        <div class="dnum"><b>${dt.getDate()}</b><span>${DOW[dt.getDay()]} ${MONTHS[dt.getMonth()].slice(0,3)}</span></div>
-        <div class="items">${items}</div>
-        <div class="cls"><b class="${d.close<0?'neg':''}">${moneyShort(d.close)}</b><span>остаток</span></div>
-      </div>`;
-    }).join('');
+    return;
   }
+  const scale = Math.max(1, ...MO.map(m=>Math.max(m.inc, m.exp)));
+
+  dbox.innerHTML = MO.map(m=>{
+    const open = CAL_OPEN.has(m.key);
+    const cls  = (m.min < 0 ? 'gap' : m.min < buf ? 'low' : '') + (open ? ' open' : '');
+
+    const days = m.days.filter(d=> d.items.length>0 || d.close<buf);
+    const body = days.length
+      ? days.map(d=>renderDay(d, buf)).join('')
+      : `<div class="empty" style="padding:16px">В этом месяце движений нет.</div>`;
+
+    const sub = [
+      m.moves ? m.moves + ' ' + plural(m.moves,'операция','операции','операций') : 'без движений',
+      m.debt  ? 'долги ' + moneyShort(m.debt) : null,
+      m.min < 0 ? 'уходит в минус' : (m.min < buf ? 'ниже подушки' : null)
+    ].filter(Boolean).join(' · ');
+
+    return `<div class="mon ${cls}">
+      <button class="mon-h" onclick="toggleMonth('${m.key}')">
+        <span class="arw">▶</span>
+        <span class="mname">
+          <b>${m.label}</b>
+          <em>${sub}</em>
+          <span class="mbar"><i style="width:${m.inc/scale*100}%;background:var(--green)"></i></span>
+          <span class="mbar"><i style="width:${m.debt/scale*100}%;background:var(--red)"></i><i style="width:${m.other/scale*100}%;background:var(--ink)"></i></span>
+        </span>
+        <span class="msum">
+          <span class="a-inc">+${moneyShort(m.inc)}</span><br>
+          <span class="a-exp">−${moneyShort(m.exp)}</span>
+        </span>
+        <span class="mclose"><b class="${m.close<0?'neg':''}">${moneyShort(m.close)}</b><em>остаток</em></span>
+      </button>
+      <div class="mon-b">${body}</div>
+    </div>`;
+  }).join('');
+}
+
+/* Одна строка дня внутри раскрытого месяца */
+function renderDay(d, buf){
+  const cls = d.close<0 ? 'gap' : (d.close<buf ? 'low' : '');
+  const dt  = parseISO(d.date);
+  const items = d.items.length ? d.items.map(e=>{
+      const marks =
+        (e.paidNote ? ' <span class="chip ok">оплачено</span>' : '') +
+        (e.done && !e.paidNote ? ' <span class="chip req">проведено</span>' : '') +
+        (e.edited ? ' <span class="chip info">изменён</span>' : '');
+      const actions = (e.planned && !e.done)
+        ? ` <button class="chip info" style="border:none;cursor:pointer"
+              onclick="confirmPlanned('${e.recId}','${d.date}')">внести</button>
+           <button class="chip req" style="border:none;cursor:pointer"
+              onclick="editPlanned('${e.planKey}','${d.date}',${e.amount})">изменить</button>` : '';
+      return `<div class="it" ${e.done?'style="opacity:.55"':''}>
+        <span class="nm">${esc(e.name)}${marks}${actions}</span>
+        <span class="${itemCls(e)}">${e.kind==='income'?'+':'−'}${money(e.amount)}</span></div>`;
+    }).join('')
+    : `<div class="none">нет операций</div>`;
+  return `<div class="day ${cls} ${isWeekend(d.date)?'wknd':''}">
+    <div class="dnum"><b>${dt.getDate()}</b><span>${DOW[dt.getDay()]}</span></div>
+    <div class="items">${items}</div>
+    <div class="cls"><b class="${d.close<0?'neg':''}">${moneyShort(d.close)}</b><span>остаток</span></div>
+  </div>`;
 }
 
 /* =========================================================================

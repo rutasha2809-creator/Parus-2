@@ -153,6 +153,35 @@ nav button.on{color:var(--brand);font-weight:650}
 .scrolly{max-height:420px;overflow-y:auto}
 
 /* ---------- calendar day rows ---------- */
+/* ---------- прогноз: блоки по месяцам ----------
+   Месяц свёрнут по умолчанию: сначала итог, детали по клику */
+.mon{border-bottom:1px solid var(--line)}
+.mon:last-child{border-bottom:none}
+.mon-h{display:flex;align-items:flex-start;gap:9px;width:100%;padding:11px 13px;
+  background:none;border:none;text-align:left;color:inherit;cursor:pointer}
+.mon-h:hover{background:var(--brand-l)}
+.mon-h .arw{flex-shrink:0;width:11px;color:var(--muted);font-size:9px;line-height:1.9;transition:transform .15s}
+.mon.open .mon-h .arw{transform:rotate(90deg)}
+.mon-h .mname{flex:1;min-width:0}
+.mon-h .mname b{display:block;font-size:13.5px;font-weight:650}
+.mon-h .mname em{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:1px}
+.mon-h .msum{flex-shrink:0;text-align:right;font-size:12px;font-variant-numeric:tabular-nums;line-height:1.5}
+.mon-h .mclose{flex-shrink:0;width:74px;text-align:right;font-variant-numeric:tabular-nums}
+.mon-h .mclose b{display:block;font-size:14px;font-weight:700}
+.mon-h .mclose em{font-style:normal;font-size:9.5px;color:var(--muted)}
+.mon.low .mon-h{background:var(--amber-l)}
+.mon.gap .mon-h{background:var(--red-l)}
+.mon-b{display:none;border-top:1px solid var(--line);background:#fbfaf9}
+.mon.open .mon-b{display:block}
+.mbar{display:flex;height:3px;border-radius:2px;overflow:hidden;background:#eae8e4;margin-top:4px}
+.mbar i{display:block;height:100%}
+/* цвета сумм: доход зелёный, долг красный, обычный расход чёрный */
+.a-inc{color:var(--green)}
+.a-debt{color:var(--red);font-weight:600}
+.a-exp{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted);padding:0 15px 11px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+
 .day{display:flex;align-items:center;gap:10px;padding:9px 11px;border-bottom:1px solid var(--line)}
 .day:last-child{border-bottom:none}
 .day.gap{background:var(--red-l)}
@@ -438,19 +467,30 @@ nav button.on{color:var(--brand);font-weight:650}
   <div id="calGapNote"></div>
 
   <div class="card">
-    <h2>Прогноз остатка</h2>
-    <div class="chartbox"><canvas id="calChart"></canvas></div>
+    <h2>Доходы и расходы по месяцам</h2>
+    <div class="chartbox tall"><canvas id="calChart"></canvas></div>
+  </div>
+
+  <div class="card pad0">
+    <h2 style="padding:15px 15px 0">Прогноз по месяцам</h2>
+    <div class="legend">
+      <span><i style="background:var(--green)"></i>доходы</span>
+      <span><i style="background:var(--red)"></i>платежи по долгам</span>
+      <span><i style="background:var(--ink)"></i>прочие расходы</span>
+    </div>
+    <div id="calDays"></div>
+  </div>
+
+  <div class="card">
+    <h2>Расходы в прогнозе по категориям <span class="act" id="calPieTotal" style="cursor:default"></span></h2>
+    <div class="chartbox"><canvas id="calPie"></canvas></div>
+    <div id="calPieList" style="margin-top:12px"></div>
   </div>
 
   <div class="card">
     <h2>Регулярные платежи и доходы <button class="act" onclick="openRecurring()">+ Добавить</button></h2>
     <div class="note">Это основа прогноза: повторяющиеся начисления (зарплата, ЖКХ, подписки). Платежи по кредитам подтягиваются автоматически из графиков.</div>
     <div id="recList"></div>
-  </div>
-
-  <div class="card pad0">
-    <h2 style="padding:15px 15px 0">По дням</h2>
-    <div id="calDays"></div>
   </div>
 </section>
 
