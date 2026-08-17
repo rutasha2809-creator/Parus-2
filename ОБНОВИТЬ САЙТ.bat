@@ -52,7 +52,8 @@ git commit -m "Update site"
 if %errorlevel% neq 0 ( echo Nothing new to commit, pushing existing commits... )
 
 echo.
-echo === Step 5: Push to GitHub ===
+echo === Step 5: Pull remote changes and push ===
+git pull --rebase origin main
 git push origin HEAD:main
 if %errorlevel% neq 0 (
     echo ERROR at push - check internet/GitHub credentials
