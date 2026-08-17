@@ -1,0 +1,17 @@
+{
+  "name": "Парус — личные финансы",
+  "short_name": "Парус",
+  "description": "Учёт доходов и расходов, платёжный календарь и графики погашения задолженностей",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f1ef",
+  "theme_color": "#e6e3dc",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

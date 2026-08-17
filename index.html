@@ -1,0 +1,3181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Парус — личные финансы</title>
+<meta name="description" content="Учёт доходов и расходов, платёжный календарь и графики погашения задолженностей">
+<meta name="theme-color" content="#e6e3dc">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Парус">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAACWElEQVR4nO3dQU6DQBiA0dZ4CsMJ9P5H0fO4cOPCr6lYmBHe25aGCf06sPnDdVleLvCTp9ELYF7iIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA7S8+gFHNzH+/uNT1/f3nZbyQpXU/YbuZ3Fd9Mm4rayifvL+O3BexLH4634sefsQxwkcTzY6j1gws1DHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBOuMg9b8ebt7TueK4Z3Do6xiJXE51WznGcPOezhLHYYab93SWOFjhFHEcabh5T6eIg3XEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQZplHNL86oTGx2F+dVqDbyvmV2c2Mg7zq5PzQEoaFof51fnZOUjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA7SsDhWv1lnxRePeq6t2TlII+OY/H/5L861qcE7x68uyh+v4FHPtZ3rsryMXsPlsu/bIY96roebJQ4m5IGUJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA7SJ2VpWLesLqr/AAAAAElFTkSuQmCC">
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAACmUlEQVR4nO3dTU7CUBhAUTCuwrAC3f9SdD0OnJg4ELn4fug54zavLTevTPg4Xy4vJ7jV0+wLYG8CIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIJLn2RdwRB/v778e8/r2NuBKurP5QCNdk85362fkFTbOX+u57ZTBBDTIzSks3pCASAQ0QtxFVt6EBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBITOd4qFkZ4x06oOt/8fl1pIx+Ou4r7CFnZYx30IAedVbGeAcNiHs5YkAPPCtjvCMGxB0JiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZGsNZ3DpJXtrBKQSSubWuIVZtLKvuYHZNLK1uYHxNYmB2TSyu7sQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhkckDxv3NvO338olNuc4yNd6Apj3X8oivXc1ohIB1s7Xy5vMy+htPpj/9+eq8PY/yiU27zX60S0Jdrnu/dH+v4Rafc5j9ZKyC2M/87EFsTEImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCSftgxfIC5bs6UAAAAASUVORK5CYII=">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{
+  /* Строгая монохромная палитра: тёплый песочный фон, графитовый текст.
+     Акценты приглушённые — различимы, но не режут глаз. */
+  --bg:#f2f1ef; --card:#fff; --ink:#1c1c1a; --muted:#8a8880; --line:#e3e1dd;
+  --brand:#2f2e2b; --brand-d:#111110; --brand-l:#f0efec;   /* акцент = графит */
+  --green:#5c6f5a; --green-l:#f0f2ef;                       /* приглушённый шалфей */
+  --red:#9b5f52;   --red-l:#f7f0ee;                         /* приглушённая терракота */
+  --amber:#806b48; --amber-l:#f6f3ec;                       /* приглушённая охра */
+  --violet:#6b6478;
+  --r:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg); color:var(--ink); font-size:15px; line-height:1.45;
+  padding-bottom:calc(70px + env(safe-area-inset-bottom));
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit}
+
+/* ---------- header ----------
+   Светлая шапка в тон фону, но на тон плотнее — отделяется без черноты */
+header{
+  background:#e6e3dc; color:var(--ink);
+  border-bottom:1px solid #d5d1c8;
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px; position:sticky; top:0; z-index:40;
+}
+header .htop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em}
+header .hsub{font-size:12px;color:#63605a;margin-top:1px}
+header .netw{text-align:right}
+header .netw .v{font-size:19px;font-weight:700;letter-spacing:-.02em}
+header .netw .l{font-size:10px;color:#63605a;text-transform:uppercase;letter-spacing:.05em}
+header .hright{display:flex;align-items:center;gap:14px}
+
+/* Аватар: крупный, с обводкой — не теряется на светлом фоне */
+.avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;cursor:pointer;padding:0;
+  background:#2f2e2b;color:#f5f4f1;font-size:16px;font-weight:700;overflow:hidden;
+  border:2px solid #fff; box-shadow:0 0 0 1px #c9c4ba, 0 1px 3px rgba(28,28,26,.18);
+  display:flex;align-items:center;justify-content:center;position:relative}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar.guest{background:#fff;color:#63605a;border:2px dashed #b4afa4;box-shadow:none;font-size:20px;font-weight:400}
+.avatar:active{filter:brightness(.92)}
+.avatar:hover{box-shadow:0 0 0 1px #9b978c, 0 2px 6px rgba(28,28,26,.22)}
+.avatar-lg{width:76px;height:76px;font-size:26px;margin:0 auto 10px;background:#eceae6;color:#5c5a55;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.avatar-lg img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ---------- layout ---------- */
+main{max-width:760px;margin:0 auto;padding:14px 14px 24px}
+.screen{display:none}
+.screen.active{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.card{background:var(--card);border-radius:var(--r);padding:15px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 1px 3px rgba(0,0,0,.04)}
+.card.pad0{padding:0;overflow:hidden}
+.card h2{margin:0 0 11px;font-size:12px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;align-items:center}
+.card h2 .act{font-size:12px;color:var(--brand);text-transform:none;letter-spacing:0;font-weight:600;cursor:pointer;background:none;border:none;padding:0}
+.sec-title{font-size:12px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.05em;margin:16px 2px 8px}
+
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:none}
+.row .l{min-width:0}
+.row .t{font-weight:500}
+.row .s{font-size:12px;color:var(--muted);margin-top:1px}
+.row .v{font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pos{color:var(--green)} .neg{color:var(--red)} .mut{color:var(--muted)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#faf9f7;border:1px solid var(--line);border-radius:10px;padding:11px}
+.stat .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat .l{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ---------- buttons ---------- */
+.btn{border:none;border-radius:9px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;transition:filter .12s}
+.btn:active{filter:brightness(.93)}
+.btn-p{background:var(--brand);color:#fff}
+.btn-s{background:#eceae6;color:#3a3936}
+.btn-d{background:var(--red-l);color:var(--red)}
+.btn-sm{padding:6px 11px;font-size:13px;border-radius:8px}
+.btn-blk{display:block;width:100%}
+.btnrow{display:flex;gap:8px}
+.btnrow .btn{flex:1}
+
+.fab{position:fixed;right:16px;bottom:calc(80px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;
+  background:var(--brand);color:#fff;font-size:26px;border:none;box-shadow:0 4px 14px rgba(28,28,26,.28);z-index:35;cursor:pointer;line-height:1}
+
+/* ---------- nav ---------- */
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);display:flex;z-index:40;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:none;background:none;padding:8px 2px 7px;font-size:10px;color:var(--muted);
+  display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+nav button .ic{font-size:19px;line-height:1}
+nav button.on{color:var(--brand);font-weight:650}
+
+/* ---------- pills / tabs ---------- */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:6px 13px;
+  font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer}
+.tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+
+.chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}
+.chip.req{background:#eceae6;color:#5c5a55}
+.chip.opt{background:var(--amber-l);color:var(--amber)}
+.chip.ok{background:var(--green-l);color:var(--green)}
+.chip.bad{background:var(--red-l);color:var(--red)}
+.chip.info{background:var(--brand-l);color:var(--brand)}
+
+/* ---------- account cards ---------- */
+.acc{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.acc:last-child{border-bottom:none}
+.acc .ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;color:#5c5a55}
+.acc .nm{font-weight:600;font-size:14px}
+.acc .sb{font-size:11.5px;color:var(--muted);margin-top:1px}
+.acc .bal{margin-left:auto;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin:8px 0 5px}
+.bar>i{display:block;height:100%;background:var(--brand);border-radius:4px;transition:width .3s}
+.bar.g>i{background:var(--green)} .bar.a>i{background:var(--amber)} .bar.r>i{background:var(--red)}
+
+/* ---------- tables ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;
+  padding:8px 9px;border-bottom:1px solid var(--line);font-weight:650;background:#faf9f7;position:sticky;top:0}
+.tbl td{padding:8px 9px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:none}
+.tbl td.r,.tbl th.r{text-align:right}
+.tbl tr.paid{background:var(--green-l)}
+.tbl tr.today{background:var(--brand-l)}
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scrolly{max-height:420px;overflow-y:auto}
+
+/* ---------- calendar day rows ---------- */
+.day{display:flex;align-items:center;gap:10px;padding:9px 11px;border-bottom:1px solid var(--line)}
+.day:last-child{border-bottom:none}
+.day.gap{background:var(--red-l)}
+.day.low{background:var(--amber-l)}
+.day.wknd .dnum{color:var(--red)}
+.day .dnum{width:34px;flex-shrink:0;text-align:center}
+.day .dnum b{display:block;font-size:16px;font-weight:700;line-height:1.1}
+.day .dnum span{font-size:9.5px;color:var(--muted);text-transform:uppercase}
+.day .items{flex:1;min-width:0;font-size:12.5px}
+.day .items .it{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+.day .items .it .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.day .items .none{color:var(--muted);font-size:12px}
+.day .cls{text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
+.day .cls b{display:block;font-size:14px;font-weight:700}
+.day .cls span{font-size:9.5px;color:var(--muted)}
+
+/* ---------- modal ---------- */
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:flex-end;justify-content:center;z-index:60}
+.ov.on{display:flex}
+.sheet{background:#fff;width:100%;max-width:600px;border-radius:16px 16px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height:92vh;overflow-y:auto;position:relative;animation:up .2s ease}
+@keyframes up{from{transform:translateY(24px)}to{transform:none}}
+.sheet.wide{max-width:860px}
+.sheet h3{margin:0 0 14px;font-size:17px;font-weight:650;padding-right:30px}
+.xbtn{position:absolute;top:14px;right:14px;background:#eceae6;border:none;width:28px;height:28px;border-radius:50%;
+  font-size:15px;color:var(--muted);cursor:pointer;line-height:1}
+
+.f{margin-bottom:12px}
+.f label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.f input,.f select,.f textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:#faf9f7;outline:none}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--brand);background:#fff}
+.f .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer}
+.check input{width:auto;margin:0}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
+.seg button{flex:1;padding:9px 6px;border:none;background:#faf9f7;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--brand);color:#fff}
+.seg.sm button{padding:7px 5px;font-size:12.5px}
+
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:26px 12px;line-height:1.6}
+.empty .big{font-size:26px;display:block;margin-bottom:8px;opacity:.35;color:var(--muted)}
+
+.note{background:var(--brand-l);border:1px solid var(--line);color:#4a4844;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:12px}
+.note.warn{background:var(--amber-l);border-color:#e5dcc8;color:#6e5c3c}
+.note.err{background:var(--red-l);border-color:#e6d2cc;color:#7d4a3f}
+.note.ok{background:var(--green-l);border-color:#d3dbd0;color:#46583f}
+
+.drop{border:2px dashed #cfccc5;border-radius:12px;padding:26px 16px;text-align:center;background:#faf9f7;cursor:pointer}
+.drop.over{border-color:var(--brand);background:var(--brand-l)}
+.drop .big{font-size:26px;display:block;margin-bottom:8px;opacity:.4}
+.drop .t{font-weight:600;font-size:14px}
+.drop .s{font-size:12px;color:var(--muted);margin-top:3px}
+
+.chartbox{position:relative;height:210px}
+.chartbox.tall{height:250px}
+
+.catrow{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--line)}
+.catrow:last-child{border-bottom:none}
+.catrow .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.catrow .nm{flex:1;min-width:0;font-size:13.5px}
+.catrow .amt{font-weight:650;font-variant-numeric:tabular-nums;font-size:13.5px}
+.catrow .pct{font-size:11px;color:var(--muted);width:38px;text-align:right}
+
+.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  background:#1c1c1a;color:#f5f4f1;padding:10px 18px;border-radius:22px;font-size:13.5px;z-index:90;
+  opacity:0;pointer-events:none;transition:opacity .2s;white-space:nowrap;max-width:90vw}
+.toast.on{opacity:1}
+
+@media (min-width:700px){
+  .grid2{gap:12px}
+  body{padding-bottom:24px}
+  nav{position:sticky;bottom:0}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="htop">
+    <div>
+      <h1>Парус</h1>
+      <div class="hsub" id="hSub">Личные финансы</div>
+      <div id="syncChip" style="margin-top:5px"></div>
+    </div>
+    <div class="hright">
+      <div class="netw">
+        <div class="v" id="hNet">—</div>
+        <div class="l">Чистый капитал</div>
+      </div>
+      <button class="avatar guest" id="avatarBtn" onclick="openAccountSheet()" aria-label="Аккаунт">?</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ ОБЗОР ============ -->
+<section class="screen active" id="s-home">
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="stat"><div class="n pos" id="kLiquid">—</div><div class="l">Свободные деньги</div></div>
+    <div class="stat"><div class="n neg" id="kDebt">—</div><div class="l">Всего долгов</div></div>
+  </div>
+
+  <div class="card" id="cardAlerts" style="display:none">
+    <h2>Требует внимания</h2>
+    <div id="alerts"></div>
+  </div>
+
+  <div class="card">
+    <h2>Этот месяц <button class="act" onclick="go('analytics')">Аналитика →</button></h2>
+    <div class="grid3">
+      <div class="stat"><div class="n pos" id="kInc" style="font-size:15px">—</div><div class="l">Доходы</div></div>
+      <div class="stat"><div class="n neg" id="kExp" style="font-size:15px">—</div><div class="l">Расходы</div></div>
+      <div class="stat"><div class="n" id="kNet" style="font-size:15px">—</div><div class="l">Итог</div></div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+        <span class="mut">Обязательные / необязательные</span><span id="kOptPct" class="mut">—</span>
+      </div>
+      <div class="bar a"><i id="kOptBar" style="width:0%"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px">
+        <span class="mut">Обяз. <b id="kReqSum">—</b></span>
+        <span style="color:var(--amber)">Необяз. <b id="kOptSum">—</b></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ближайшие платежи <button class="act" onclick="go('calendar')">Календарь →</button></h2>
+    <div id="upcoming"></div>
+  </div>
+
+  <div class="card">
+    <h2>Счета <button class="act" onclick="go('accounts')">Все →</button></h2>
+    <div id="homeAccounts"></div>
+  </div>
+
+  <div class="card">
+    <h2>Последние операции <button class="act" onclick="go('tx')">Все →</button></h2>
+    <div id="homeTx"></div>
+  </div>
+</section>
+
+<!-- ============ СЧЕТА ============ -->
+<section class="screen" id="s-accounts">
+  <div class="btnrow" style="margin-bottom:12px">
+    <button class="btn btn-p" onclick="openAccount()">+ Добавить счёт</button>
+  </div>
+  <div id="accGroups"></div>
+</section>
+
+<!-- ============ ОПЕРАЦИИ ============ -->
+<section class="screen" id="s-tx">
+  <div class="btnrow" style="margin-bottom:12px">
+    <button class="btn btn-p" onclick="openTx()">+ Операция</button>
+    <button class="btn btn-s" onclick="go('import')">Импорт выписки</button>
+  </div>
+
+  <div class="card">
+    <div class="f2" style="margin-bottom:0">
+      <div class="f" style="margin-bottom:0">
+        <label>Период</label>
+        <select id="fltPeriod" onchange="renderTx()">
+          <option value="thismonth">Текущий месяц</option>
+          <option value="lastmonth">Прошлый месяц</option>
+          <option value="3m">Последние 3 месяца</option>
+          <option value="year">Текущий год</option>
+          <option value="all">Всё время</option>
+        </select>
+      </div>
+      <div class="f" style="margin-bottom:0">
+        <label>Счёт</label>
+        <select id="fltAccount" onchange="renderTx()"><option value="">Все счета</option></select>
+      </div>
+    </div>
+    <div class="f" style="margin:10px 0 0">
+      <input type="search" id="fltSearch" placeholder="Поиск по описанию или категории…" oninput="renderTx()">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span id="txCount">Операции</span><button class="act" onclick="exportCSV()">Выгрузить CSV</button></h2>
+    <div class="grid3" style="margin-bottom:10px">
+      <div class="stat"><div class="n pos" id="txInc" style="font-size:14px">—</div><div class="l">Доходы</div></div>
+      <div class="stat"><div class="n neg" id="txExp" style="font-size:14px">—</div><div class="l">Расходы</div></div>
+      <div class="stat"><div class="n" id="txNet" style="font-size:14px">—</div><div class="l">Итог</div></div>
+    </div>
+    <div id="txList"></div>
+  </div>
+</section>
+
+<!-- ============ ИМПОРТ ============ -->
+<section class="screen" id="s-import">
+  <div class="card">
+    <h2>Загрузка выписки</h2>
+    <div class="note">Поддерживаются <b>CSV</b>, <b>Excel</b> (.xlsx/.xls) и <b>PDF</b>. Файл обрабатывается прямо в браузере и никуда не отправляется.</div>
+    <div class="drop" id="drop" onclick="document.getElementById('fileInput').click()">
+      <span class="big">▤</span>
+      <div class="t">Выберите файл или перетащите сюда</div>
+      <div class="s">CSV · XLSX · XLS · PDF</div>
+    </div>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.pdf,.txt" style="display:none">
+    <div class="f" style="margin-top:12px">
+      <label>Или вставьте операции текстом</label>
+      <textarea id="pasteArea" rows="4" placeholder="Например:&#10;05.08.2026  Пятёрочка  -1 240,50&#10;06.08.2026  Зарплата  +85 000"></textarea>
+      <button class="btn btn-s btn-sm btn-blk" style="margin-top:8px" onclick="parsePasted()">Разобрать текст</button>
+    </div>
+  </div>
+
+  <div class="card" id="impMapCard" style="display:none">
+    <h2>Настройка колонок</h2>
+    <div id="impMapBody"></div>
+  </div>
+
+  <div class="card" id="impPreviewCard" style="display:none">
+    <h2><span id="impPreviewTitle">Предпросмотр</span></h2>
+    <div id="impStats"></div>
+    <div class="f2" style="margin:10px 0">
+      <div class="f" style="margin:0">
+        <label>Зачислить на счёт</label>
+        <select id="impAccount"></select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Строк выбрано</label>
+        <input type="text" id="impSelCount" readonly>
+      </div>
+    </div>
+    <div class="scrollx scrolly"><table class="tbl" id="impTable"></table></div>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn btn-s" onclick="cancelImport()">Отмена</button>
+      <button class="btn btn-p" onclick="commitImport()">Импортировать</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Правила автокатегоризации <button class="act" onclick="openRule()">+ Правило</button></h2>
+    <div class="note">Если описание операции содержит указанный текст — категория подставится автоматически при импорте.</div>
+    <div id="rulesList"></div>
+  </div>
+</section>
+
+<!-- ============ КАЛЕНДАРЬ ============ -->
+<section class="screen" id="s-calendar">
+  <div class="card">
+    <h2>Платёжный календарь</h2>
+    <div class="f2">
+      <div class="f" style="margin:0">
+        <label>Горизонт прогноза</label>
+        <select id="calHorizon" onchange="renderCalendar()">
+          <option value="30">30 дней</option>
+          <option value="60">60 дней</option>
+          <option value="90" selected>90 дней</option>
+          <option value="180">180 дней</option>
+          <option value="365">12 месяцев</option>
+        </select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Минимальный остаток, ₽</label>
+        <input type="number" id="calMinBuf" value="10000" onchange="renderCalendar()">
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3" style="margin-bottom:12px">
+    <div class="stat"><div class="n" id="calStart" style="font-size:15px">—</div><div class="l">Сейчас</div></div>
+    <div class="stat"><div class="n" id="calMin" style="font-size:15px">—</div><div class="l">Минимум</div></div>
+    <div class="stat"><div class="n" id="calEnd" style="font-size:15px">—</div><div class="l">В конце</div></div>
+  </div>
+
+  <div id="calGapNote"></div>
+
+  <div class="card">
+    <h2>Прогноз остатка</h2>
+    <div class="chartbox"><canvas id="calChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Регулярные платежи и доходы <button class="act" onclick="openRecurring()">+ Добавить</button></h2>
+    <div class="note">Это основа прогноза: повторяющиеся начисления (зарплата, ЖКХ, подписки). Платежи по кредитам подтягиваются автоматически из графиков.</div>
+    <div id="recList"></div>
+  </div>
+
+  <div class="card pad0">
+    <h2 style="padding:15px 15px 0">По дням</h2>
+    <div id="calDays"></div>
+  </div>
+</section>
+
+<!-- ============ ДОЛГИ ============ -->
+<section class="screen" id="s-debts">
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="stat"><div class="n neg" id="dTotal">—</div><div class="l">Общий долг</div></div>
+    <div class="stat"><div class="n" id="dMonthly">—</div><div class="l">Платежей в месяц</div></div>
+  </div>
+  <div id="debtList"></div>
+</section>
+
+<!-- ============ АНАЛИТИКА ============ -->
+<section class="screen" id="s-analytics">
+  <div class="card">
+    <div class="f2" style="margin:0">
+      <div class="f" style="margin:0">
+        <label>Период</label>
+        <select id="anPeriod" onchange="renderAnalytics()">
+          <option value="thismonth">Текущий месяц</option>
+          <option value="lastmonth">Прошлый месяц</option>
+          <option value="3m" selected>Последние 3 месяца</option>
+          <option value="6m">Последние 6 месяцев</option>
+          <option value="year">Текущий год</option>
+          <option value="all">Всё время</option>
+        </select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Показать</label>
+        <select id="anKind" onchange="renderAnalytics()">
+          <option value="expense">Расходы</option>
+          <option value="income">Доходы</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Обязательные и необязательные</h2>
+    <div class="grid2">
+      <div class="stat"><div class="n" id="anReq" style="font-size:16px">—</div><div class="l">Обязательные</div></div>
+      <div class="stat"><div class="n" id="anOpt" style="font-size:16px;color:var(--amber)">—</div><div class="l">Необязательные</div></div>
+    </div>
+    <div id="anOptNote" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Динамика по месяцам</h2>
+    <div class="chartbox"><canvas id="anTrendChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Структура по категориям</h2>
+    <div class="chartbox tall"><canvas id="anPieChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2><span id="anCatTitle">По категориям</span></h2>
+    <div id="anCats"></div>
+  </div>
+
+  <div class="card">
+    <h2>Крупнейшие необязательные траты</h2>
+    <div id="anTopOptional"></div>
+  </div>
+</section>
+
+<!-- ============ НАСТРОЙКИ ============ -->
+<section class="screen" id="s-settings">
+  <div class="card">
+    <h2>Категории <button class="act" onclick="openCategory()">+ Категория</button></h2>
+    <div class="note">Отметка «необязательная» используется в аналитике, чтобы показать, где можно сократить траты.</div>
+    <div class="tabs" id="catTabs">
+      <button class="on" data-k="expense" onclick="setCatTab('expense')">Расходы</button>
+      <button data-k="income" onclick="setCatTab('income')">Доходы</button>
+    </div>
+    <div id="catList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Данные</h2>
+    <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
+      <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
+    <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
+      <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
+    <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
+      <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
+    <input type="file" id="restoreInput" accept=".json" style="display:none">
+  </div>
+
+  <div class="card">
+    <h2>О приложении</h2>
+    <div style="font-size:13px;color:var(--muted);line-height:1.65">
+      Все данные хранятся локально в вашем браузере и никуда не передаются.
+      Чтобы поставить иконку на телефон — откройте страницу в браузере и выберите «Добавить на экран Домой».
+      Регулярно делайте резервную копию: очистка данных браузера удалит информацию.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<button class="fab" onclick="openTx()">+</button>
+
+<nav>
+  <button class="nv on" data-s="home" onclick="go('home')"><span class="ic">◉</span>Обзор</button>
+  <button class="nv" data-s="accounts" onclick="go('accounts')"><span class="ic">▦</span>Счета</button>
+  <button class="nv" data-s="tx" onclick="go('tx')"><span class="ic">☰</span>Операции</button>
+  <button class="nv" data-s="calendar" onclick="go('calendar')"><span class="ic">▤</span>Календарь</button>
+  <button class="nv" data-s="debts" onclick="go('debts')"><span class="ic">◺</span>Долги</button>
+  <button class="nv" data-s="analytics" onclick="go('analytics')"><span class="ic">▥</span>Анализ</button>
+  <button class="nv" data-s="settings" onclick="go('settings')"><span class="ic">⋯</span>Ещё</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===== модалки ===== -->
+<div class="ov" id="ovTx"><div class="sheet"><button class="xbtn" onclick="closeOv('ovTx')">✕</button><div id="ovTxBody"></div></div></div>
+<div class="ov" id="ovAcc"><div class="sheet"><button class="xbtn" onclick="closeOv('ovAcc')">✕</button><div id="ovAccBody"></div></div></div>
+<div class="ov" id="ovCat"><div class="sheet"><button class="xbtn" onclick="closeOv('ovCat')">✕</button><div id="ovCatBody"></div></div></div>
+<div class="ov" id="ovRec"><div class="sheet"><button class="xbtn" onclick="closeOv('ovRec')">✕</button><div id="ovRecBody"></div></div></div>
+<div class="ov" id="ovRule"><div class="sheet"><button class="xbtn" onclick="closeOv('ovRule')">✕</button><div id="ovRuleBody"></div></div></div>
+<div class="ov" id="ovAccount"><div class="sheet"><button class="xbtn" onclick="closeOv('ovAccount')">✕</button><div id="accountBody"></div></div></div>
+<input type="file" id="avatarInput" accept="image/*" style="display:none">
+<div class="ov" id="ovSched"><div class="sheet wide"><button class="xbtn" onclick="closeOv('ovSched')">✕</button><div id="ovSchedBody"></div></div></div>
+
+<script>
+/* =========================================================================
+   ЯДРО: хранилище, модель данных, утилиты
+   ========================================================================= */
+const KEY = 'finapp_v2';
+
+const ACC_TYPES = {
+  debit:   {label:'Дебетовая карта', icon:'▭', bg:'#ecebe7', asset:true},
+  cash:    {label:'Наличные',        icon:'≡', bg:'#eaeee9', asset:true},
+  deposit: {label:'Вклад / накопительный', icon:'◫', bg:'#e9ebee', asset:true},
+  credit_card:{label:'Кредитная карта', icon:'▤', bg:'#f0e8e5', asset:false},
+  loan:    {label:'Кредит / ипотека',  icon:'⌂', bg:'#f0ece2', asset:false},
+  debt:    {label:'Прочий долг',       icon:'§', bg:'#eceaee', asset:false}
+};
+
+/* Приглушённая палитра категорий: тона одной насыщенности, без кислотных цветов */
+const PALETTE = ['#4a4844','#6f7a6c','#9b8564','#9b6b5e','#6d6a7d','#5f7378','#8a7080','#77806a',
+                 '#a08268','#5c5f6b','#6b7d75','#8f6a66','#7a6c86','#63737f','#93855f','#78766f'];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+const DEFAULT = {
+  version: 2,
+  accounts: [],
+  transactions: [],
+  categories: [
+    // расходы — обязательные
+    {id:'c_mortgage', name:'Ипотека',            kind:'expense', mandatory:true},
+    {id:'c_loan',     name:'Платежи по кредитам',kind:'expense', mandatory:true},
+    {id:'c_utility',  name:'ЖКХ',                kind:'expense', mandatory:true},
+    {id:'c_food',     name:'Продукты',           kind:'expense', mandatory:true},
+    {id:'c_transport',name:'Транспорт',          kind:'expense', mandatory:true},
+    {id:'c_health',   name:'Здоровье и аптека',  kind:'expense', mandatory:true},
+    {id:'c_comm',     name:'Связь и интернет',   kind:'expense', mandatory:true},
+    {id:'c_tax',      name:'Налоги',             kind:'expense', mandatory:true},
+    {id:'c_pets',     name:'Питомцы',            kind:'expense', mandatory:true},
+    {id:'c_children', name:'Дети и образование', kind:'expense', mandatory:true},
+    // расходы — необязательные
+    {id:'c_cafe',     name:'Кафе и рестораны',   kind:'expense', mandatory:false},
+    {id:'c_shopping', name:'Покупки и одежда',   kind:'expense', mandatory:false},
+    {id:'c_beauty',   name:'Красота и уход',     kind:'expense', mandatory:false},
+    {id:'c_fun',      name:'Развлечения',        kind:'expense', mandatory:false},
+    {id:'c_subs',     name:'Подписки и сервисы', kind:'expense', mandatory:false},
+    {id:'c_travel',   name:'Путешествия',        kind:'expense', mandatory:false},
+    {id:'c_gifts',    name:'Подарки',            kind:'expense', mandatory:false},
+    {id:'c_home',     name:'Дом и техника',      kind:'expense', mandatory:false},
+    {id:'c_other_e',  name:'Прочие расходы',     kind:'expense', mandatory:false},
+    // доходы
+    {id:'c_salary',   name:'Зарплата',           kind:'income', mandatory:true},
+    {id:'c_freelance',name:'Подработка / клиенты',kind:'income', mandatory:true},
+    {id:'c_interest', name:'Проценты по вкладам',kind:'income', mandatory:true},
+    {id:'c_sale',     name:'Продажи',            kind:'income', mandatory:false},
+    {id:'c_refund',   name:'Возвраты и кэшбэк',  kind:'income', mandatory:false},
+    {id:'c_other_i',  name:'Прочие поступления', kind:'income', mandatory:false}
+  ],
+  rules: [
+    {id:'r1', match:'пятероч',   categoryId:'c_food'},
+    {id:'r2', match:'магнит',    categoryId:'c_food'},
+    {id:'r3', match:'перекрест', categoryId:'c_food'},
+    {id:'r4', match:'лента',     categoryId:'c_food'},
+    {id:'r5', match:'вкусвилл',  categoryId:'c_food'},
+    {id:'r6', match:'яндекс.такси',categoryId:'c_transport'},
+    {id:'r7', match:'озон',      categoryId:'c_shopping'},
+    {id:'r8', match:'wildberries',categoryId:'c_shopping'},
+    {id:'r9', match:'аптек',     categoryId:'c_health'},
+    {id:'r10',match:'жкх',       categoryId:'c_utility'},
+    {id:'r11',match:'зарплат',   categoryId:'c_salary'}
+  ],
+  recurring: [],
+  profile: { name: '', avatar: '' },   // имя и фото пользователя
+  settings: { minBuffer: 10000 }
+};
+
+var S = load();   // доступно в консоли браузера для отладки
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw){ const d = JSON.parse(JSON.stringify(DEFAULT)); localStorage.setItem(KEY, JSON.stringify(d)); return d; }
+    const p = JSON.parse(raw);
+    const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT)), p);
+    ['accounts','transactions','categories','rules','recurring'].forEach(k=>{ if(!Array.isArray(merged[k])) merged[k]=[]; });
+    return merged;
+  }catch(e){
+    console.error('Ошибка чтения данных', e);
+    return JSON.parse(JSON.stringify(DEFAULT));
+  }
+}
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(S));
+    // помечаем данные изменёнными и отправляем в облако, если оно подключено
+    if(typeof syncScheduleUpload === 'function') syncScheduleUpload();
+  }
+  catch(e){ toast('Не удалось сохранить: хранилище переполнено'); }
+}
+
+/* ---------------- форматирование ---------------- */
+function money(n, opts){
+  opts = opts || {};
+  if(n===null || n===undefined || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  const dec = opts.cents ? 2 : 0;
+  let s = abs.toLocaleString('ru-RU',{minimumFractionDigits:dec, maximumFractionDigits:dec});
+  const sign = n<0 ? '−' : (opts.plus ? '+' : '');
+  return sign + s + ' ₽';
+}
+/* Проценты по-русски: 3.9 → «3,9» */
+function pct(n){
+  if(n==null || isNaN(n)) return '0';
+  return String(Number(n)).replace('.', ',');
+}
+function moneyShort(n){
+  const a = Math.abs(n);
+  const sign = n<0 ? '−' : '';
+  if(a>=1000000) return sign + (a/1000000).toFixed(a>=10000000?0:1).replace('.',',') + ' млн';
+  if(a>=10000)   return sign + Math.round(a/1000) + ' тыс';
+  return money(n);
+}
+function iso(d){
+  if(typeof d === 'string') return d.slice(0,10);
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function today(){ return iso(new Date()); }
+function parseISO(s){ const [y,m,d] = s.slice(0,10).split('-').map(Number); return new Date(y, m-1, d); }
+function addDays(s, n){ const d = parseISO(s); d.setDate(d.getDate()+n); return iso(d); }
+function addMonths(s, n){
+  const d = parseISO(s); const day = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth()+n);
+  const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(day, last));
+  return iso(d);
+}
+const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MONTHS_N = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DOW = ['вс','пн','вт','ср','чт','пт','сб'];
+function dateShort(s){ const d = parseISO(s); return d.getDate()+' '+MONTHS[d.getMonth()].slice(0,3); }
+function dateLong(s){ const d = parseISO(s); return d.getDate()+' '+MONTHS[d.getMonth()]+' '+d.getFullYear(); }
+function monthKey(s){ return s.slice(0,7); }
+function monthLabel(k){ const [y,m] = k.split('-'); return MONTHS_N[+m-1]+' '+y; }
+function isWeekend(s){ const w = parseISO(s).getDay(); return w===0 || w===6; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- справочники ---------------- */
+function acc(id){ return S.accounts.find(a=>a.id===id); }
+function accName(id){ const a = acc(id); return a ? a.name : '—'; }
+function cat(id){ return S.categories.find(c=>c.id===id); }
+function catName(id){ const c = cat(id); return c ? c.name : 'Без категории'; }
+function catMandatory(id){ const c = cat(id); return c ? c.mandatory !== false : true; }
+function catColor(id){
+  const i = S.categories.findIndex(c=>c.id===id);
+  return PALETTE[(i<0?0:i) % PALETTE.length];
+}
+function assetAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type] && ACC_TYPES[a.type].asset); }
+function debtAccounts(){ return S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type] && !ACC_TYPES[a.type].asset); }
+/* счета, из которых реально можно платить сегодня (для календаря) */
+function liquidAccounts(){ return S.accounts.filter(a=>!a.archived && (a.type==='debit'||a.type==='cash')); }
+
+/* ---------------- балансы ---------------- */
+/* Для активов: openingBalance + доходы − расходы (+ переводы)
+   Для долгов:  openingBalance (сумма долга) + начисления − погашения          */
+function balance(a){
+  /* Кредит: остаток считается по амортизации — каждый платёж сначала гасит
+     начисленные проценты и только остатком уменьшает тело долга.
+     Иначе карточка долга расходилась бы с графиком погашения. */
+  if(a.type==='loan') return loanBalance(a);
+
+  let b = Number(a.openingBalance) || 0;
+  const isAsset = ACC_TYPES[a.type] && ACC_TYPES[a.type].asset;
+  for(const t of S.transactions){
+    if(t.type==='transfer'){
+      if(t.accountId===a.id) b += isAsset ? -t.amount : +t.amount;   // ушло со счёта / погашение долга уменьшает? см ниже
+      if(t.toAccountId===a.id) b += isAsset ? +t.amount : -t.amount;
+    } else if(t.accountId===a.id){
+      if(isAsset) b += (t.type==='income' ? t.amount : -t.amount);
+      else        b += (t.type==='income' ? -t.amount : t.amount);
+    }
+  }
+  return b;
+}
+/* Пояснение для долговых счетов:
+   - перевод НА долговой счёт (toAccountId) = погашение → долг уменьшается
+   - перевод С долгового счёта (accountId)  = трата в долг (снятие с кредитки) → долг растёт
+   - расход, оплаченный с долгового счёта   = долг растёт
+   - «доход» на долговой счёт (редко)       = уменьшение долга                       */
+
+function totalLiquid(){ return liquidAccounts().reduce((s,a)=>s+balance(a),0); }
+function totalAssets(){ return assetAccounts().reduce((s,a)=>s+balance(a),0); }
+function totalDebt(){ return debtAccounts().reduce((s,a)=>s+Math.max(0,balance(a)),0); }
+function netWorth(){ return totalAssets() - totalDebt(); }
+
+/* ---------------- периоды ---------------- */
+function periodRange(code){
+  const n = new Date(), y = n.getFullYear(), m = n.getMonth();
+  const first = (yy,mm)=> iso(new Date(yy,mm,1));
+  const last  = (yy,mm)=> iso(new Date(yy,mm+1,0));
+  switch(code){
+    case 'thismonth': return [first(y,m), last(y,m)];
+    case 'lastmonth': return [first(y,m-1), last(y,m-1)];
+    case '3m':  return [first(y,m-2), last(y,m)];
+    case '6m':  return [first(y,m-5), last(y,m)];
+    case 'year':return [first(y,0), last(y,11)];
+    default:    return ['1900-01-01','2999-12-31'];
+  }
+}
+function txInRange(from, to){
+  return S.transactions.filter(t=> t.date>=from && t.date<=to);
+}
+
+/* ---------------- UI утилиты ---------------- */
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('on'), 2400);
+}
+function openOv(id){ document.getElementById(id).classList.add('on'); }
+function closeOv(id){ document.getElementById(id).classList.remove('on'); }
+document.querySelectorAll('.ov').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.classList.remove('on'); });
+});
+
+let CUR = 'home';
+function go(name){
+  CUR = name;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el = document.getElementById('s-'+name);
+  if(el) el.classList.add('active');
+  document.querySelectorAll('.nv').forEach(b=>b.classList.toggle('on', b.dataset.s===name));
+  window.scrollTo(0,0);
+  renderAll();
+}
+
+/* =========================================================================
+   СЧЕТА
+   ========================================================================= */
+function openAccount(id){
+  const a = id ? acc(id) : null;
+  const t = a ? a.type : 'debit';
+  document.getElementById('ovAccBody').innerHTML = `
+    <h3>${a ? 'Счёт: '+esc(a.name) : 'Новый счёт'}</h3>
+    <div class="f">
+      <label>Тип счёта</label>
+      <select id="acType" onchange="accTypeFields()" ${a?'disabled':''}>
+        ${Object.entries(ACC_TYPES).map(([k,v])=>`<option value="${k}" ${k===t?'selected':''}>${v.icon} ${v.label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="f">
+      <label>Название</label>
+      <input type="text" id="acName" value="${a?esc(a.name):''}" placeholder="Например: Сбер зарплатная">
+    </div>
+    <div id="acFields"></div>
+    <div class="btnrow" style="margin-top:14px">
+      ${a?`<button class="btn btn-d" onclick="deleteAccount('${a.id}')">Удалить</button>`:''}
+      <button class="btn btn-p" onclick="saveAccount(${a?"'"+a.id+"'":'null'})">Сохранить</button>
+    </div>`;
+  accTypeFields(a);
+  openOv('ovAcc');
+}
+
+function accTypeFields(a){
+  const type = document.getElementById('acType').value;
+  const v = k => (a && a[k]!=null) ? a[k] : '';
+  const box = document.getElementById('acFields');
+  let html = '';
+
+  if(type==='debit' || type==='cash'){
+    html = `<div class="f"><label>Текущий остаток, ₽</label>
+      <input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}">
+      <div class="hint">Сколько сейчас на счёте. Дальше остаток считается по операциям.</div></div>`;
+  }
+  else if(type==='deposit'){
+    html = `<div class="f"><label>Сумма на вкладе, ₽</label><input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}"></div>
+      <div class="f2">
+        <div class="f"><label>Ставка, % годовых</label><input type="number" step="0.01" id="acRate" value="${v('rate')||0}"></div>
+        <div class="f"><label>Дата окончания</label><input type="date" id="acEndDate" value="${v('endDate')||''}"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="acCapital" ${a&&a.capitalization?'checked':''}> Капитализация процентов</label>
+      <div class="f"><label>Проценты выплачиваются на счёт</label>
+        <select id="acLinkAcc"><option value="">— не указан —</option>
+        ${liquidAccounts().map(x=>`<option value="${x.id}" ${a&&a.linkAccountId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
+  }
+  else if(type==='credit_card'){
+    html = `<div class="f2">
+        <div class="f"><label>Текущий долг, ₽</label><input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}"></div>
+        <div class="f"><label>Кредитный лимит, ₽</label><input type="number" step="0.01" id="acLimit" value="${v('limit')||0}"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Ставка, % годовых</label><input type="number" step="0.01" id="acRate" value="${v('rate')||0}">
+          <div class="hint">Действует после льготного периода</div></div>
+        <div class="f"><label>День платежа</label><input type="number" min="1" max="31" id="acPayDay" value="${v('paymentDay')||25}"></div>
+      </div>
+
+      <div class="sec-title" style="margin:14px 0 6px">Минимальный платёж</div>
+      <div class="f2">
+        <div class="f"><label>Процент от долга, %</label>
+          <input type="number" step="0.1" id="acMinPct" value="${a&&a.minPercent!=null?a.minPercent:5}" placeholder="3,9">
+          <div class="hint">Например 3,9</div></div>
+        <div class="f"><label>Но не менее, ₽</label>
+          <input type="number" step="0.01" id="acMinPay" value="${v('minPayment')||''}" placeholder="напр. 500">
+          <div class="hint">Нижняя граница платежа</div></div>
+      </div>
+
+      <div class="sec-title" style="margin:14px 0 6px">Льготный период</div>
+      <div class="f2">
+        <div class="f"><label>Длительность, дней</label>
+          <input type="number" id="acGraceDays" value="${v('gracePeriodDays')||''}" placeholder="напр. 55">
+        </div>
+        <div class="f"><label>Действует до</label>
+          <input type="date" id="acGraceUntil" value="${v('graceUntil')||''}">
+        </div>
+      </div>
+      <div class="hint" style="margin:-6px 0 12px">
+        Пока льготный период не закончился, проценты не начисляются — если погасить весь долг до этой даты.
+        Не успели — начисляется полная ставка, а платить придётся не менее указанного процента от долга.
+        Достаточно заполнить любое одно поле: по количеству дней дата посчитается от сегодняшней.
+      </div>`;
+  }
+  else if(type==='loan'){
+    html = `<div class="f2">
+        <div class="f"><label>Остаток долга, ₽</label><input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}"></div>
+        <div class="f"><label>Ставка, % годовых</label><input type="number" step="0.01" id="acRate" value="${v('rate')||0}"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Осталось платежей, мес.</label><input type="number" id="acTerm" value="${v('termMonths')||''}"></div>
+        <div class="f"><label>День платежа</label><input type="number" min="1" max="31" id="acPayDay" value="${v('paymentDay')||1}"></div>
+      </div>
+      <div class="f"><label>Дата ближайшего платежа</label><input type="date" id="acNextDate" value="${v('nextPaymentDate')||today()}"></div>
+      <div class="f"><label>Ежемесячный платёж, ₽</label><input type="number" step="0.01" id="acPayment" value="${v('payment')||''}">
+        <div class="hint">Оставьте пустым — рассчитаю аннуитет по ставке и сроку.</div></div>
+      <div class="f"><label>Источник графика</label>
+        <select id="acSchedMode">
+          <option value="auto" ${v('scheduleMode')!=='manual'?'selected':''}>Рассчитывать автоматически</option>
+          <option value="manual" ${v('scheduleMode')==='manual'?'selected':''}>Использовать график банка (введу вручную)</option>
+        </select></div>`;
+  }
+  else if(type==='debt'){
+    html = `<div class="f"><label>Сумма долга, ₽</label><input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}"></div>
+      <div class="f"><label>Срок возврата</label><input type="date" id="acDueDate" value="${v('dueDate')||''}"></div>`;
+  }
+  html += `<div class="f"><label>Заметка</label><input type="text" id="acNote" value="${v('note')?esc(a.note):''}" placeholder="необязательно"></div>`;
+  box.innerHTML = html;
+}
+
+function saveAccount(id){
+  const g = i => { const e = document.getElementById(i); return e ? e.value : ''; };
+  const gn = i => { const e = document.getElementById(i); return e && e.value!=='' ? parseFloat(e.value) : null; };
+  const gb = i => { const e = document.getElementById(i); return e ? e.checked : false; };
+
+  const name = g('acName').trim();
+  if(!name){ toast('Укажите название счёта'); return; }
+  const type = g('acType');
+
+  let a = id ? acc(id) : {id:uid(), type, archived:false};
+  a.name = name;
+  a.openingBalance = gn('acOpening') || 0;
+  a.note = g('acNote');
+
+  if(type==='deposit'){
+    a.rate = gn('acRate'); a.endDate = g('acEndDate');
+    a.capitalization = gb('acCapital'); a.linkAccountId = g('acLinkAcc');
+  }
+  if(type==='credit_card'){
+    a.limit = gn('acLimit'); a.rate = gn('acRate');
+    a.paymentDay = gn('acPayDay') || 25;
+    a.minPayment = gn('acMinPay');                    // нижняя граница платежа, ₽
+    a.minPercent = gn('acMinPct');                    // процент от долга
+    if(a.minPercent==null) a.minPercent = 5;
+    a.gracePeriodDays = gn('acGraceDays');
+    a.graceUntil = g('acGraceUntil') || null;
+    // если указали только длительность — считаем дату окончания от сегодняшнего дня
+    if(!a.graceUntil && a.gracePeriodDays) a.graceUntil = addDays(today(), a.gracePeriodDays);
+  }
+  if(type==='loan'){
+    a.rate = gn('acRate'); a.termMonths = gn('acTerm');
+    a.paymentDay = gn('acPayDay') || 1;
+    a.nextPaymentDate = g('acNextDate') || today();
+    a.payment = gn('acPayment');
+    a.scheduleMode = g('acSchedMode');
+    if(!a.manualSchedule) a.manualSchedule = [];
+    if(!a.payment && a.rate!=null && a.termMonths) a.payment = annuity(a.openingBalance, a.rate, a.termMonths);
+  }
+  if(type==='debt'){ a.dueDate = g('acDueDate'); }
+
+  if(!id) S.accounts.push(a);
+  save(); closeOv('ovAcc'); renderAll();
+  toast(id ? 'Счёт обновлён' : 'Счёт добавлен');
+}
+
+function deleteAccount(id){
+  const n = S.transactions.filter(t=>t.accountId===id||t.toAccountId===id).length;
+  if(!confirm(n ? `У счёта ${n} операц. Они тоже будут удалены. Продолжить?` : 'Удалить счёт?')) return;
+  S.accounts = S.accounts.filter(a=>a.id!==id);
+  S.transactions = S.transactions.filter(t=>t.accountId!==id && t.toAccountId!==id);
+  S.recurring = S.recurring.filter(r=>r.accountId!==id);
+  save(); closeOv('ovAcc'); renderAll(); toast('Счёт удалён');
+}
+
+function renderAccounts(){
+  const box = document.getElementById('accGroups');
+  if(S.accounts.length===0){
+    box.innerHTML = `<div class="card"><div class="empty"><span class="big">▦</span>
+      Пока нет ни одного счёта.<br>Добавьте карты, наличные, вклады и кредиты — приложение начнёт считать баланс и строить календарь.</div></div>`;
+    return;
+  }
+  const groups = [
+    ['Свои деньги', ['debit','cash','deposit']],
+    ['Обязательства', ['credit_card','loan','debt']]
+  ];
+  box.innerHTML = groups.map(([title, types])=>{
+    const list = S.accounts.filter(a=>types.includes(a.type) && !a.archived);
+    if(!list.length) return '';
+    const sum = list.reduce((s,a)=>s+balance(a),0);
+    return `<div class="sec-title">${title} · <span style="text-transform:none;letter-spacing:0">${money(sum)}</span></div>
+      <div class="card">${list.map(accRow).join('')}</div>`;
+  }).join('');
+}
+
+function accRow(a){
+  const T = ACC_TYPES[a.type]; const b = balance(a);
+  const isAsset = T.asset;
+  let sub = T.label;
+  if(a.type==='credit_card' && a.limit) sub += ` · доступно ${money(Math.max(0,a.limit-b))}`;
+  if(a.type==='loan' && a.payment) sub += ` · платёж ${money(a.payment)}`;
+  if(a.type==='deposit' && a.rate) sub += ` · ${pct(a.rate)}% годовых`;
+  if(a.type==='debt' && a.dueDate) sub += ` · до ${dateShort(a.dueDate)}`;
+  return `<div class="acc" onclick="openAccount('${a.id}')">
+    <div class="ico" style="background:${T.bg}">${T.icon}</div>
+    <div class="l"><div class="nm">${esc(a.name)}</div><div class="sb">${sub}</div></div>
+    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b)}</div>
+  </div>`;
+}
+
+/* =========================================================================
+   ОПЕРАЦИИ
+   ========================================================================= */
+function openTx(id){
+  const t = id ? S.transactions.find(x=>x.id===id) : null;
+  if(S.accounts.length===0){
+    toast('Сначала добавьте хотя бы один счёт'); go('accounts'); return;
+  }
+  document.getElementById('ovTxBody').innerHTML = `
+    <h3>${t ? 'Операция' : 'Новая операция'}</h3>
+    <div class="seg" id="txSeg">
+      <button data-t="expense" onclick="txKind('expense')">Расход</button>
+      <button data-t="income"  onclick="txKind('income')">Доход</button>
+      <button data-t="transfer"onclick="txKind('transfer')">Перевод</button>
+    </div>
+    <div class="f2">
+      <div class="f"><label>Дата</label><input type="date" id="txDate" value="${t?t.date:today()}"></div>
+      <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" inputmode="decimal" id="txAmount" value="${t?t.amount:''}" placeholder="0"></div>
+    </div>
+    <div class="f"><label id="txAccLabel">Счёт</label><select id="txAccount"></select></div>
+    <div class="f" id="txToWrap" style="display:none"><label>Куда</label><select id="txTo"></select>
+      <div class="hint" id="txToHint"></div></div>
+    <div class="f" id="txCatWrap"><label>Категория</label><select id="txCategory"></select></div>
+    <div class="f"><label>Описание</label><input type="text" id="txNote" value="${t?esc(t.note||''):''}" placeholder="необязательно"></div>
+    <div class="btnrow" style="margin-top:6px">
+      ${t?`<button class="btn btn-d" onclick="deleteTx('${t.id}')">Удалить</button>`:''}
+      <button class="btn btn-p" onclick="saveTx(${t?"'"+t.id+"'":'null'})">Сохранить</button>
+    </div>`;
+  txKind(t ? t.type : 'expense', t);
+  openOv('ovTx');
+}
+
+let TXKIND = 'expense';
+function txKind(k, t){
+  TXKIND = k;
+  document.querySelectorAll('#txSeg button').forEach(b=>b.classList.toggle('on', b.dataset.t===k));
+  const accSel = document.getElementById('txAccount');
+  const toSel  = document.getElementById('txTo');
+  const opts = list => list.map(a=>`<option value="${a.id}">${ACC_TYPES[a.type].icon} ${esc(a.name)}</option>`).join('');
+
+  if(k==='transfer'){
+    document.getElementById('txAccLabel').textContent = 'Откуда';
+    accSel.innerHTML = opts(S.accounts.filter(a=>!a.archived));
+    toSel.innerHTML  = opts(S.accounts.filter(a=>!a.archived));
+    document.getElementById('txToWrap').style.display = 'block';
+    document.getElementById('txCatWrap').style.display = 'none';
+    document.getElementById('txToHint').textContent =
+      'Перевод на кредит или кредитку = погашение долга. Перевод с кредитки на карту = снятие в долг.';
+  } else {
+    document.getElementById('txAccLabel').textContent = k==='income' ? 'Куда зачислено' : 'Чем оплачено';
+    accSel.innerHTML = opts(S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card')));
+    document.getElementById('txToWrap').style.display = 'none';
+    document.getElementById('txCatWrap').style.display = 'block';
+    const cats = S.categories.filter(c=>c.kind===k);
+    document.getElementById('txCategory').innerHTML =
+      cats.map(c=>`<option value="${c.id}">${esc(c.name)}${c.mandatory===false?' •':''}</option>`).join('');
+  }
+  if(t){
+    if(t.accountId) accSel.value = t.accountId;
+    if(t.toAccountId && toSel) toSel.value = t.toAccountId;
+    const cs = document.getElementById('txCategory');
+    if(t.categoryId && cs) cs.value = t.categoryId;
+  }
+}
+
+function saveTx(id){
+  const amount = parseFloat(document.getElementById('txAmount').value);
+  if(!amount || amount<=0){ toast('Введите сумму'); return; }
+  const date = document.getElementById('txDate').value || today();
+  const accountId = document.getElementById('txAccount').value;
+  const note = document.getElementById('txNote').value.trim();
+
+  const rec = {
+    id: id || uid(), date, type: TXKIND, accountId, amount,
+    note, source: 'manual'
+  };
+  if(TXKIND==='transfer'){
+    rec.toAccountId = document.getElementById('txTo').value;
+    if(rec.toAccountId === accountId){ toast('Выберите разные счета'); return; }
+  } else {
+    rec.categoryId = document.getElementById('txCategory').value;
+  }
+
+  if(id){
+    const i = S.transactions.findIndex(t=>t.id===id);
+    S.transactions[i] = Object.assign(S.transactions[i], rec);
+  } else {
+    S.transactions.push(rec);
+  }
+  save(); closeOv('ovTx'); renderAll();
+  toast(id ? 'Операция обновлена' : 'Операция добавлена');
+}
+
+function deleteTx(id){
+  if(!confirm('Удалить операцию?')) return;
+  S.transactions = S.transactions.filter(t=>t.id!==id);
+  save(); closeOv('ovTx'); renderAll(); toast('Удалено');
+}
+
+function renderTx(){
+  const [from,to] = periodRange(document.getElementById('fltPeriod').value);
+  const accF = document.getElementById('fltAccount').value;
+  const q = document.getElementById('fltSearch').value.trim().toLowerCase();
+
+  let list = txInRange(from,to);
+  if(accF) list = list.filter(t=>t.accountId===accF || t.toAccountId===accF);
+  if(q) list = list.filter(t =>
+    (t.note||'').toLowerCase().includes(q) || catName(t.categoryId).toLowerCase().includes(q));
+  list.sort((a,b)=> b.date.localeCompare(a.date) || (b.id>a.id?1:-1));
+
+  const inc = list.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = list.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  document.getElementById('txInc').textContent = moneyShort(inc);
+  document.getElementById('txExp').textContent = moneyShort(exp);
+  const net = document.getElementById('txNet');
+  net.textContent = moneyShort(inc-exp);
+  net.className = 'n ' + (inc-exp>=0?'pos':'neg');
+  document.getElementById('txCount').textContent = 'Операции · ' + list.length;
+
+  const box = document.getElementById('txList');
+  if(!list.length){ box.innerHTML = `<div class="empty"><span class="big">☰</span>Операций за этот период нет.</div>`; return; }
+
+  let html = '', lastDate = '';
+  for(const t of list.slice(0,400)){
+    if(t.date!==lastDate){
+      lastDate = t.date;
+      html += `<div style="font-size:11.5px;color:var(--muted);font-weight:650;padding:10px 0 3px">${dateLong(t.date)}, ${DOW[parseISO(t.date).getDay()]}</div>`;
+    }
+    html += txRow(t);
+  }
+  if(list.length>400) html += `<div class="empty">Показаны первые 400 операций из ${list.length}. Уточните фильтр.</div>`;
+  box.innerHTML = html;
+}
+
+function txRow(t){
+  let title, sign, cls, sub;
+  if(t.type==='transfer'){
+    title = 'Перевод'; sign='→'; cls='mut';
+    sub = accName(t.accountId)+' → '+accName(t.toAccountId);
+  } else {
+    title = catName(t.categoryId);
+    sign = t.type==='income' ? '+' : '−';
+    cls = t.type==='income' ? 'pos' : 'neg';
+    sub = accName(t.accountId);
+  }
+  if(t.note) sub = esc(t.note) + ' · ' + sub;
+  const optChip = (t.type==='expense' && !catMandatory(t.categoryId)) ? ' <span class="chip opt">необяз</span>' : '';
+  return `<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
+    <div class="l"><div class="t">${esc(title)}${optChip}</div><div class="s">${sub}</div></div>
+    <div class="v ${cls}">${sign}${money(t.amount)}</div>
+  </div>`;
+}
+
+function exportCSV(){
+  const rows = [['Дата','Тип','Счёт','Категория','Сумма','Описание']];
+  const sorted = [...S.transactions].sort((a,b)=>a.date.localeCompare(b.date));
+  for(const t of sorted){
+    rows.push([
+      t.date,
+      t.type==='income'?'Доход':t.type==='expense'?'Расход':'Перевод',
+      accName(t.accountId) + (t.type==='transfer' ? ' → '+accName(t.toAccountId) : ''),
+      t.type==='transfer' ? '' : catName(t.categoryId),
+      String(t.amount).replace('.',','),
+      (t.note||'')
+    ]);
+  }
+  const csv = '﻿' + rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  download(csv, 'operacii_'+today()+'.csv', 'text/csv;charset=utf-8');
+}
+function download(content, filename, mime){
+  const blob = new Blob([content], {type: mime||'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+/* =========================================================================
+   КАТЕГОРИИ
+   ========================================================================= */
+let CATTAB = 'expense';
+function setCatTab(k){
+  CATTAB = k;
+  document.querySelectorAll('#catTabs button').forEach(b=>b.classList.toggle('on', b.dataset.k===k));
+  renderCategories();
+}
+function renderCategories(){
+  const list = S.categories.filter(c=>c.kind===CATTAB);
+  document.getElementById('catList').innerHTML = list.map(c=>`
+    <div class="row">
+      <div class="l" onclick="openCategory('${c.id}')" style="cursor:pointer">
+        <div class="t"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${catColor(c.id)};margin-right:6px"></span>${esc(c.name)}</div>
+        <div class="s">${c.mandatory===false?'можно сократить':'обязательная'}</div>
+      </div>
+      <label class="check" style="margin:0" title="Необязательная">
+        <input type="checkbox" ${c.mandatory===false?'checked':''} onchange="toggleMandatory('${c.id}', this.checked)">
+        <span style="font-size:12px;color:var(--muted)">необяз.</span>
+      </label>
+    </div>`).join('');
+}
+function toggleMandatory(id, optional){
+  const c = cat(id); if(!c) return;
+  c.mandatory = !optional; save(); renderAll();
+}
+function openCategory(id){
+  const c = id ? cat(id) : null;
+  document.getElementById('ovCatBody').innerHTML = `
+    <h3>${c?'Категория':'Новая категория'}</h3>
+    <div class="f"><label>Название</label><input type="text" id="ctName" value="${c?esc(c.name):''}"></div>
+    <div class="f"><label>Тип</label>
+      <select id="ctKind" ${c?'disabled':''}>
+        <option value="expense" ${(!c||c.kind==='expense')?'selected':''}>Расход</option>
+        <option value="income"  ${c&&c.kind==='income'?'selected':''}>Доход</option>
+      </select></div>
+    <label class="check"><input type="checkbox" id="ctOpt" ${c&&c.mandatory===false?'checked':''}>
+      Необязательная — можно сократить</label>
+    <div class="btnrow">
+      ${c?`<button class="btn btn-d" onclick="deleteCategory('${c.id}')">Удалить</button>`:''}
+      <button class="btn btn-p" onclick="saveCategory(${c?"'"+c.id+"'":'null'})">Сохранить</button>
+    </div>`;
+  openOv('ovCat');
+}
+function saveCategory(id){
+  const name = document.getElementById('ctName').value.trim();
+  if(!name){ toast('Введите название'); return; }
+  const kind = document.getElementById('ctKind').value;
+  const mandatory = !document.getElementById('ctOpt').checked;
+  if(id){ const c = cat(id); c.name = name; c.mandatory = mandatory; }
+  else S.categories.push({id:uid(), name, kind, mandatory});
+  save(); closeOv('ovCat'); setCatTab(kind); renderAll(); toast('Сохранено');
+}
+function deleteCategory(id){
+  const n = S.transactions.filter(t=>t.categoryId===id).length;
+  if(n){ toast(`Нельзя удалить: используется в ${n} операц.`); return; }
+  S.categories = S.categories.filter(c=>c.id!==id);
+  S.rules = S.rules.filter(r=>r.categoryId!==id);
+  save(); closeOv('ovCat'); renderAll(); toast('Удалено');
+}
+
+/* =========================================================================
+   РЕЗЕРВНАЯ КОПИЯ
+   ========================================================================= */
+function backupData(){
+  download(JSON.stringify(S,null,2), 'finansy_backup_'+today()+'.json', 'application/json');
+  toast('Копия сохранена');
+}
+document.getElementById('restoreInput').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.accounts)) throw new Error('bad');
+      if(!confirm('Текущие данные будут заменены. Продолжить?')) return;
+      S = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), d);
+      save(); renderAll(); toast('Данные восстановлены');
+    }catch(err){ toast('Не удалось прочитать файл копии'); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+});
+function wipeData(){
+  if(!confirm('Удалить ВСЕ данные без возможности восстановления?')) return;
+  if(!confirm('Точно? Сделайте резервную копию, если ещё не сделали.')) return;
+  localStorage.removeItem(KEY);
+  S = load(); renderAll(); toast('Данные очищены');
+}
+/* =========================================================================
+   КРЕДИТЫ И ГРАФИКИ ПОГАШЕНИЯ
+   ========================================================================= */
+
+/* Аннуитетный платёж: P·i / (1 − (1+i)^−n) */
+function annuity(principal, annualRate, months){
+  principal = Number(principal)||0; months = Number(months)||0;
+  const i = (Number(annualRate)||0)/100/12;
+  if(principal<=0 || months<=0) return 0;
+  if(i===0) return round2(principal/months);
+  return round2(principal * i / (1 - Math.pow(1+i, -months)));
+}
+function round2(n){ return Math.round(n*100)/100; }
+
+/* Фактические платежи по долговому счёту: переводы НА него + «доходы» на него */
+function actualPayments(accountId){
+  return S.transactions.filter(t =>
+      (t.type==='transfer' && t.toAccountId===accountId) ||
+      (t.type==='income'   && t.accountId===accountId)
+    ).map(t=>({date:t.date, amount:t.amount, note:t.note||'', txId:t.id}))
+     .sort((a,b)=>a.date.localeCompare(b.date));
+}
+/* Новые начисления по долгу: траты с этого счёта / переводы с него */
+function actualCharges(accountId){
+  return S.transactions.filter(t =>
+      (t.type==='transfer' && t.accountId===accountId) ||
+      (t.type==='expense'  && t.accountId===accountId)
+    ).map(t=>({date:t.date, amount:t.amount, note:t.note||''}))
+     .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+/* -------------------------------------------------------------------------
+   Остаток долга по кредиту с учётом начисления процентов.
+   Каждый внесённый платёж сначала покрывает проценты за период,
+   остаток идёт на погашение тела долга. Это тот же расчёт, что и в графике,
+   поэтому карточка долга и таблица графика всегда показывают одно число.
+   ------------------------------------------------------------------------- */
+function loanBalance(a){
+  let bal = Number(a.openingBalance) || 0;
+  const rate = (Number(a.rate)||0)/100/12;
+  const pays = actualPayments(a.id);
+  for(const p of pays){
+    const interest = round2(bal * rate);
+    const principal = p.amount - interest;
+    bal = round2(Math.max(0, bal - principal));
+    if(bal === 0) break;
+  }
+  for(const c of actualCharges(a.id)) bal = round2(bal + c.amount);
+  return bal;
+}
+
+/* -------------------------------------------------------------------------
+   Построение графика для КРЕДИТА.
+   Учитывает фактически внесённые платежи: они гасят долг, а остаток графика
+   пересчитывается от реального остатка. Переплата сверх графика сокращает срок.
+   ------------------------------------------------------------------------- */
+function loanSchedule(a){
+  const rows = [];
+  const rate = (Number(a.rate)||0)/100/12;
+  const pays = actualPayments(a.id);
+
+  /* --- ручной график банка: показываем как есть, отмечаем оплаченные --- */
+  if(a.scheduleMode==='manual' && Array.isArray(a.manualSchedule) && a.manualSchedule.length){
+    let bal = Number(a.openingBalance)||0;
+    const used = new Set();
+    for(const r of [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date))){
+      // ищем фактический платёж в пределах ±10 дней
+      const hit = pays.find((p,idx)=> !used.has(idx) && Math.abs(daysBetween(p.date, r.date))<=10 && !used.has(idx));
+      let paid = null;
+      if(hit){ const idx = pays.indexOf(hit); if(!used.has(idx)){ used.add(idx); paid = hit; } }
+      const amount = Number(r.amount)||0;
+      const interest = r.interest!=null ? Number(r.interest) : round2(bal*rate);
+      const principal = round2((paid ? paid.amount : amount) - interest);
+      bal = round2(Math.max(0, bal - principal));
+      rows.push({date:r.date, payment:amount, interest, principal, balance:bal,
+                 paid: !!paid, paidAmount: paid?paid.amount:null, paidDate: paid?paid.date:null});
+    }
+    // платежи, не попавшие ни в одну строку графика (досрочные)
+    pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
+      principal:p.amount, balance:null, paid:true, paidAmount:p.amount, extra:true, note:p.note}); });
+    rows.sort((x,y)=>x.date.localeCompare(y.date));
+    return rows;
+  }
+
+  /* --- автоматический аннуитет --- */
+  let bal = Number(a.openingBalance)||0;
+  let payment = Number(a.payment) || annuity(bal, a.rate, a.termMonths);
+  if(!payment || payment<=0) return rows;
+
+  // 1) сначала проводим фактические платежи
+  for(const p of pays){
+    const interest = round2(bal*rate);
+    const principal = round2(p.amount - interest);
+    bal = round2(Math.max(0, bal - principal));
+    rows.push({date:p.date, payment:p.amount, interest, principal, balance:bal,
+               paid:true, paidAmount:p.amount, note:p.note});
+  }
+
+  // 2) дальше — плановый график от текущего остатка
+  let d = a.nextPaymentDate || today();
+  if(pays.length){
+    const lastPay = pays[pays.length-1].date;
+    // следующий плановый — на месяц позже последнего платежа либо nextPaymentDate, что позже
+    d = addMonths(lastPay, 1);
+    if(a.nextPaymentDate && a.nextPaymentDate > d) d = a.nextPaymentDate;
+  }
+  let guard = 0;
+  while(bal > 0.01 && guard < 600){
+    const interest = round2(bal*rate);
+    let pay = payment;
+    if(pay <= interest && rate>0){ // платёж не покрывает проценты — некорректные данные
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true});
+      break;
+    }
+    let principal = round2(pay - interest);
+    if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
+    bal = round2(bal - principal);
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false});
+    d = addMonths(d, 1);
+    guard++;
+  }
+  return rows;
+}
+
+function daysBetween(a,b){ return Math.round((parseISO(a)-parseISO(b))/86400000); }
+
+/* Склонение: 1 день, 2 дня, 5 дней */
+function plural(n, one, few, many){
+  n = Math.abs(n) % 100;
+  const n1 = n % 10;
+  if(n > 10 && n < 20) return many;
+  if(n1 > 1 && n1 < 5) return few;
+  if(n1 === 1) return one;
+  return many;
+}
+
+/* -------------------------------------------------------------------------
+   КРЕДИТНАЯ КАРТА
+
+   Льготный период: пока он не закончился, проценты не начисляются — но только
+   если весь долг погашен до его окончания. Не успели — банк начисляет полную
+   ставку, и минимальный платёж считается как процент от долга
+   (но не меньше фиксированной суммы, если она задана).
+   ------------------------------------------------------------------------- */
+
+/* Дата окончания льготного периода (или null, если он не задан) */
+function graceEnd(a){
+  if(a.graceUntil) return a.graceUntil;
+  if(a.gracePeriodDays) return addDays(today(), Number(a.gracePeriodDays));
+  return null;
+}
+/* Сколько дней осталось: >0 — ещё действует, <=0 — истёк */
+function graceDaysLeft(a){
+  const g = graceEnd(a);
+  return g ? daysBetween(g, today()) : null;
+}
+/* Минимальный платёж при заданном остатке */
+function cardMinPayment(a, bal){
+  const share = (a.minPercent!=null ? Number(a.minPercent) : 5)/100;
+  const floor = Number(a.minPayment)||0;
+  return round2(Math.max(bal*share, floor, 100));  // 100 ₽ — технический минимум, чтобы долг гасился
+}
+
+/* mode: 'min'  — платим минимальный платёж (проценты после льготного периода)
+         'full' — гасим всё одной суммой до конца льготного периода            */
+function cardSchedule(a, mode){
+  mode = mode || 'min';
+  const rows = [];
+  let bal = balance(a);
+  if(bal<=0) return rows;
+
+  const rate = (Number(a.rate)||0)/100/12;
+  const gEnd = graceEnd(a);
+
+  if(mode==='full'){
+    const d = (gEnd && gEnd>=today()) ? gEnd : nextDayOfMonth(a.paymentDay || 25);
+    return [{date:d, payment:bal, interest:0, principal:bal, balance:0, grace:!!(gEnd && gEnd>=today()), full:true}];
+  }
+
+  let d = nextDayOfMonth(a.paymentDay || 25);
+  const LIMIT = 720;              // 60 лет — дальше считать бессмысленно
+  let guard = 0;
+  while(bal>0.01 && guard<LIMIT){
+    // проценты не начисляются, пока платёж приходится на льготный период
+    const inGrace = !!(gEnd && d <= gEnd);
+    const interest = inGrace ? 0 : round2(bal*rate);
+    let pay = cardMinPayment(a, bal);
+
+    if(pay <= interest){
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true});
+      break;
+    }
+    let principal = round2(pay - interest);
+    if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
+    bal = round2(bal - principal);
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, grace:inGrace});
+    d = addMonths(d,1); guard++;
+  }
+  // долг так и не погашен за 60 лет — минимальный платёж почти целиком уходит в проценты
+  if(bal > 0.01 && rows.length) rows[rows.length-1].truncated = true;
+  return rows;
+}
+
+/* «40 месяцев» → «3 года 4 месяца» */
+function formatTerm(months){
+  months = Math.round(months);
+  if(months < 24) return months + ' ' + plural(months,'месяц','месяца','месяцев');
+  const y = Math.floor(months/12), m = months%12;
+  let s = y + ' ' + plural(y,'год','года','лет');
+  if(m) s += ' ' + m + ' ' + plural(m,'месяц','месяца','месяцев');
+  return s;
+}
+function nextDayOfMonth(day){
+  const n = new Date();
+  let d = new Date(n.getFullYear(), n.getMonth(), Math.min(day, new Date(n.getFullYear(), n.getMonth()+1, 0).getDate()));
+  if(iso(d) < today()) d = parseISO(addMonths(iso(d),1));
+  return iso(d);
+}
+
+/* Единая точка: будущие обязательные платежи по всем долгам, от сегодня */
+function futureDebtPayments(untilDate){
+  const out = [];
+  for(const a of debtAccounts()){
+    if(balance(a) <= 0) continue;
+    let sched = [];
+    if(a.type==='loan') sched = loanSchedule(a).filter(r=>!r.paid && !r.error);
+    else if(a.type==='credit_card') sched = cardSchedule(a).filter(r=>!r.error);
+    else if(a.type==='debt' && a.dueDate) sched = [{date:a.dueDate, payment:balance(a)}];
+    for(const r of sched){
+      if(r.date >= today() && r.date <= untilDate)
+        out.push({date:r.date, name:a.name, amount:r.payment, accountId:a.id, kind:'debt'});
+    }
+  }
+  return out;
+}
+
+/* ---------------- рендер экрана «Долги» ---------------- */
+function renderDebts(){
+  const list = debtAccounts();
+  const box = document.getElementById('debtList');
+
+  const total = list.reduce((s,a)=>s+Math.max(0,balance(a)),0);
+  document.getElementById('dTotal').textContent = moneyShort(total);
+
+  const horizon = addDays(today(), 31);
+  const monthly = futureDebtPayments(horizon).reduce((s,p)=>s+p.amount,0);
+  document.getElementById('dMonthly').textContent = moneyShort(monthly);
+
+  if(!list.length){
+    box.innerHTML = `<div class="card"><div class="empty"><span class="big">✓</span>
+      Долговых счетов нет.<br>Добавьте кредит, ипотеку или кредитную карту на вкладке «Счета», чтобы видеть график погашения.</div></div>`;
+    return;
+  }
+
+  box.innerHTML = list.map(a=>{
+    const bal = balance(a);
+    const start = Number(a.openingBalance)||0;
+    const paidOff = Math.max(0, start - bal);
+    const pct = start>0 ? Math.min(100, paidOff/start*100) : 0;
+
+    let sched = [];
+    if(a.type==='loan') sched = loanSchedule(a);
+    else if(a.type==='credit_card') sched = cardSchedule(a);
+
+    const future = sched.filter(r=>!r.paid && !r.error);
+    const nextPay = future[0];
+    const totalInterest = future.reduce((s,r)=>s+(r.interest||0),0);
+    const neverPaid = sched.some(r=>r.truncated);
+    const payoffDate = future.length ? future[future.length-1].date : (a.dueDate||null);
+
+    let meta = '';
+    if(a.type==='loan' || a.type==='credit_card'){
+      meta = `<div class="grid3" style="margin:10px 0">
+        <div class="stat"><div class="n" style="font-size:14px">${nextPay?money(nextPay.payment):'—'}</div><div class="l">След. платёж</div></div>
+        <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(payoffDate?dateShort(payoffDate)+' '+parseISO(payoffDate).getFullYear():'—')}</div><div class="l">Закрытие</div></div>
+        <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(totalInterest>0?moneyShort(totalInterest):'—')}</div><div class="l">Переплата</div></div>
+      </div>`;
+    }
+    if(a.type==='credit_card'){
+      /* Льготный период: статус и обратный отсчёт */
+      const left = graceDaysLeft(a);
+      const gEnd = graceEnd(a);
+      if(gEnd){
+        if(left > 0){
+          const full = cardSchedule(a,'full')[0];
+          const minSched = cardSchedule(a,'min').filter(r=>!r.error);
+          const minInterest = minSched.reduce((s,r)=>s+(r.interest||0),0);
+          const cls = left<=10 ? 'warn' : '';
+          meta += `<div class="note ${cls}" style="margin-top:10px">
+            <b>Льготный период: осталось ${left} ${plural(left,'день','дня','дней')}</b> — до ${dateLong(gEnd)}.<br>
+            Погасите <b>${money(full.payment)}</b> до этой даты — процентов не будет.
+            ${minInterest>0?`Если платить только минимальный платёж, переплата составит около <b>${money(minInterest)}</b>.`:''}
+          </div>`;
+        } else {
+          meta += `<div class="note err" style="margin-top:10px">
+            <b>Льготный период истёк</b> ${dateLong(gEnd)}.
+            Начисляется полная ставка${a.rate?' '+pct(a.rate)+'% годовых':''}, минимальный платёж —
+            ${pct(a.minPercent!=null?a.minPercent:5)}% от долга${a.minPayment?', но не менее '+money(a.minPayment):''}.
+          </div>`;
+        }
+      }
+      if(a.limit){
+        const use = a.limit>0 ? bal/a.limit*100 : 0;
+        meta += `<div style="font-size:12px;color:var(--muted);margin-top:6px">Использовано ${use.toFixed(0)}% лимита · доступно ${money(Math.max(0,a.limit-bal))}</div>`;
+      }
+    }
+    if(a.type==='debt'){
+      meta = `<div style="font-size:12.5px;color:var(--muted);margin:8px 0">
+        ${a.dueDate ? 'Срок возврата: <b>'+dateLong(a.dueDate)+'</b>' : 'Срок не указан'}</div>`;
+    }
+
+    const T = ACC_TYPES[a.type];
+    const barCls = pct>66?'g':pct>33?'a':'r';
+    return `<div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div class="acc" style="padding:0;border:none;flex:1">
+          <div class="ico" style="background:${T.bg}">${T.icon}</div>
+          <div class="l"><div class="nm">${esc(a.name)}</div><div class="sb">${T.label}${a.rate?' · '+a.rate+'%':''}</div></div>
+          <div class="bal neg">${money(bal)}</div>
+        </div>
+      </div>
+      <div class="bar ${barCls}"><i style="width:${pct}%"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)">
+        <span>Погашено ${money(paidOff)} (${pct.toFixed(0)}%)</span><span>Изначально ${money(start)}</span>
+      </div>
+      ${meta}
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn btn-p btn-sm" onclick="quickPay('${a.id}')">Внести платёж</button>
+        ${(a.type==='loan'||a.type==='credit_card')?`<button class="btn btn-s btn-sm" onclick="showSchedule('${a.id}')">График</button>`:''}
+        <button class="btn btn-s btn-sm" onclick="openAccount('${a.id}')">Настроить</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* Быстрое внесение платежа = перевод с ликвидного счёта на долговой */
+function quickPay(debtId){
+  const a = acc(debtId);
+  const froms = liquidAccounts();
+  if(!froms.length){ toast('Сначала добавьте карту или наличные'); return; }
+
+  let suggested = '';
+  if(a.type==='loan'){
+    const s = loanSchedule(a).filter(r=>!r.paid && !r.error);
+    if(s.length) suggested = s[0].payment;
+  } else if(a.type==='credit_card'){
+    const s = cardSchedule(a);
+    if(s.length) suggested = s[0].payment;
+  }
+
+  document.getElementById('ovTxBody').innerHTML = `
+    <h3>Платёж: ${esc(a.name)}</h3>
+    <div class="note">Текущий долг ${money(balance(a))}. Платёж уменьшит долг и спишется с выбранного счёта.</div>
+    <div class="f2">
+      <div class="f"><label>Дата</label><input type="date" id="qpDate" value="${today()}"></div>
+      <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" id="qpAmount" value="${suggested}"></div>
+    </div>
+    <div class="f"><label>Откуда списать</label>
+      <select id="qpFrom">${froms.map(x=>`<option value="${x.id}">${esc(x.name)} · ${money(balance(x))}</option>`).join('')}</select></div>
+    <div class="f"><label>Комментарий</label><input type="text" id="qpNote" placeholder="напр. досрочное погашение"></div>
+    <button class="btn btn-p btn-blk" onclick="saveQuickPay('${debtId}')">Внести платёж</button>`;
+  openOv('ovTx');
+}
+function saveQuickPay(debtId){
+  const amount = parseFloat(document.getElementById('qpAmount').value);
+  if(!amount || amount<=0){ toast('Введите сумму'); return; }
+  S.transactions.push({
+    id: uid(), date: document.getElementById('qpDate').value || today(),
+    type:'transfer', accountId: document.getElementById('qpFrom').value,
+    toAccountId: debtId, amount, note: document.getElementById('qpNote').value.trim() || 'Платёж по долгу',
+    source:'manual'
+  });
+  save(); closeOv('ovTx'); renderAll(); toast('Платёж учтён, график пересчитан');
+}
+
+/* ---------------- окно графика ---------------- */
+function showSchedule(id){
+  const a = acc(id);
+  const rows = a.type==='loan' ? loanSchedule(a) : cardSchedule(a);
+  const paidCount = rows.filter(r=>r.paid).length;
+  const totalPay = rows.reduce((s,r)=>s+(r.payment||0),0);
+  const totalInt = rows.reduce((s,r)=>s+(r.interest||0),0);
+
+  const manualBlock = a.type==='loan' ? `
+    <div class="note warn" style="margin-top:12px">
+      <b>График банка.</b> Если у вас есть официальный график — вставьте его сюда,
+      и расчёт будет вестись по нему. Формат строки: <code>дата;платёж;проценты</code> (проценты необязательны).
+      <br>Пример: <code>05.09.2026;79 315;9 200</code>
+    </div>
+    <div class="f"><textarea id="schedPaste" rows="4" placeholder="05.09.2026;79315&#10;05.10.2026;79315"></textarea></div>
+    <div class="btnrow">
+      <button class="btn btn-s btn-sm" onclick="applyManualSchedule('${id}')">Загрузить график банка</button>
+      ${a.scheduleMode==='manual'?`<button class="btn btn-s btn-sm" onclick="switchToAuto('${id}')">Вернуться к авторасчёту</button>`:''}
+    </div>` : '';
+
+  /* Для кредитки — сравнение двух сценариев */
+  let graceBlock = '';
+  if(a.type==='credit_card'){
+    const gEnd = graceEnd(a), left = graceDaysLeft(a);
+    const full = cardSchedule(a,'full')[0];
+    if(gEnd && left > 0 && full){
+      graceBlock = `
+        <div class="note ok" style="margin-bottom:12px">
+          <b>Вариант 1 — погасить в льготный период.</b><br>
+          Внести ${money(full.payment)} до ${dateLong(gEnd)} (осталось ${left} ${plural(left,'день','дня','дней')}).
+          Проценты — <b>0 ₽</b>.
+        </div>
+        <div class="note ${(rows.some(r=>r.truncated) || rows.length>120)?'err':'warn'}" style="margin-bottom:12px">
+          <b>Вариант 2 — платить минимальный платёж.</b><br>
+          По ${pct(a.minPercent!=null?a.minPercent:5)}% от долга${a.minPayment?' (но не менее '+money(a.minPayment)+')':''}.
+          ${rows.some(r=>r.truncated)
+            ? `За 60 лет долг так и не закроется: почти весь платёж уходит на проценты.
+               Минимальный платёж ${pct(a.minPercent)}% не перекрывает ставку ${pct(a.rate)}% годовых.`
+            : `Долг закроется за <b>${formatTerm(rows.length)}</b>, переплата <b>${money(totalInt)}</b>.` +
+              (rows.length>120
+                ? ` Это ловушка минимального платежа: он лишь немного превышает проценты,
+                    поэтому долг тает крайне медленно, а переплата в ${(totalInt/Math.max(1,balance(a))).toFixed(1).replace('.',',')} раза
+                    превысит сам долг. Вносите больше минимума, когда возможно.`
+                : '')}
+        </div>`;
+    } else if(gEnd){
+      graceBlock = `<div class="note err" style="margin-bottom:12px">
+        <b>Льготный период истёк ${dateLong(gEnd)}.</b> Проценты начисляются по ставке
+        ${pct(a.rate||0)}% годовых. Минимальный платёж — ${pct(a.minPercent!=null?a.minPercent:5)}% от долга${a.minPayment?', но не менее '+money(a.minPayment):''}.
+        ${rows.some(r=>r.truncated)
+          ? 'Платить только минимальный платёж бессмысленно: он почти целиком уходит на проценты, долг не уменьшается. Нужно вносить больше.'
+          : `Долг закроется за <b>${formatTerm(rows.length)}</b>, переплата составит <b>${money(totalInt)}</b>.`}
+      </div>`;
+    }
+  }
+
+  const modeNote = a.type==='credit_card'
+    ? `<div class="note">Минимальный платёж: <b>${pct(a.minPercent!=null?a.minPercent:5)}%</b> от долга${a.minPayment?`, но не менее <b>${money(a.minPayment)}</b>`:''}.
+        Строки внутри льготного периода отмечены — по ним проценты не начисляются.</div>`
+    : `<div class="note">Режим: <b>${a.scheduleMode==='manual'?'график банка':'автоматический аннуитет'}</b>.
+        Внесённые платежи подсвечены, остаток графика пересчитан от реального долга.</div>`;
+
+  document.getElementById('ovSchedBody').innerHTML = `
+    <h3>График: ${esc(a.name)}</h3>
+    <div class="grid3" style="margin-bottom:12px">
+      <div class="stat"><div class="n" style="font-size:14px">${rows.length}</div><div class="l">Платежей всего</div></div>
+      <div class="stat"><div class="n pos" style="font-size:14px">${paidCount}</div><div class="l">Уже внесено</div></div>
+      <div class="stat"><div class="n" style="font-size:14px">${moneyShort(totalInt)}</div><div class="l">Проценты</div></div>
+    </div>
+    ${graceBlock}
+    ${modeNote}
+    <div class="scrollx scrolly">
+      <table class="tbl">
+        <thead><tr><th>Дата</th><th class="r">Платёж</th><th class="r">Проценты</th><th class="r">Тело долга</th><th class="r">Остаток</th><th></th></tr></thead>
+        <tbody>${rows.map(schedRow).join('')}</tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Всего к выплате: <b>${money(totalPay)}</b></div>
+    ${manualBlock}`;
+  openOv('ovSched');
+}
+function schedRow(r){
+  const cls = r.paid ? 'paid' : (r.date<=addDays(today(),7) && r.date>=today() ? 'today' : '');
+  const mark = r.error ? '<span class="chip bad">платёж меньше процентов</span>'
+             : r.extra ? '<span class="chip info">досрочно</span>'
+             : r.paid  ? '<span class="chip ok">внесён</span>'
+             : r.grace ? '<span class="chip ok">льготный</span>' : '';
+  return `<tr class="${cls}">
+    <td>${dateShort(r.date)} ${parseISO(r.date).getFullYear()}</td>
+    <td class="r">${money(r.paidAmount!=null?r.paidAmount:r.payment)}</td>
+    <td class="r mut">${r.interest?money(r.interest):'—'}</td>
+    <td class="r">${r.principal?money(r.principal):'—'}</td>
+    <td class="r">${r.balance!=null?money(r.balance):'—'}</td>
+    <td>${mark}</td></tr>`;
+}
+function applyManualSchedule(id){
+  const txt = document.getElementById('schedPaste').value.trim();
+  if(!txt){ toast('Вставьте строки графика'); return; }
+  const rows = [];
+  for(const line of txt.split(/\r?\n/)){
+    if(!line.trim()) continue;
+    const parts = line.split(/[;\t|]/).map(s=>s.trim());
+    const d = parseAnyDate(parts[0]);
+    const amt = parseAnyNumber(parts[1]);
+    if(!d || amt===null) continue;
+    const int = parts[2] ? parseAnyNumber(parts[2]) : null;
+    rows.push({date:d, amount:Math.abs(amt), interest: int!=null?Math.abs(int):null});
+  }
+  if(!rows.length){ toast('Не удалось разобрать ни одной строки'); return; }
+  const a = acc(id);
+  a.manualSchedule = rows; a.scheduleMode = 'manual';
+  save(); showSchedule(id); renderAll();
+  toast(`Загружено строк графика: ${rows.length}`);
+}
+function switchToAuto(id){
+  const a = acc(id); a.scheduleMode = 'auto';
+  save(); showSchedule(id); renderAll(); toast('Переключено на авторасчёт');
+}
+/* =========================================================================
+   ИМПОРТ ВЫПИСОК: CSV / XLSX / PDF / текст
+   ========================================================================= */
+
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+var IMP = null;   // текущий разбираемый импорт  // {raw: [][], headers: [], map:{date,desc,amount,debit,credit}, rows:[], mode}
+
+/* ---------------- разбор дат и чисел ---------------- */
+function parseAnyDate(v){
+  if(v==null) return null;
+  if(v instanceof Date && !isNaN(v)) return iso(v);
+  if(typeof v === 'number'){                      // серийная дата Excel
+    if(v > 20000 && v < 60000){
+      const d = new Date(Date.UTC(1899,11,30) + v*86400000);
+      if(!isNaN(d)) return iso(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+    return null;
+  }
+  let s = String(v).trim();
+  if(!s) return null;
+  s = s.replace(/\s*(г\.|года)\s*$/i,'').trim();
+
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                       // 2026-08-05
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);         // 05.08.2026
+  if(m){
+    let [_,d,mo,y] = m;
+    if(y.length===2) y = (+y > 60 ? '19' : '20') + y;
+    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  const MN = {'янв':1,'фев':2,'мар':3,'апр':4,'мая':5,'май':5,'июн':6,'июл':7,'авг':8,'сен':9,'окт':10,'ноя':11,'дек':12};
+  m = s.match(/^(\d{1,2})\s+([а-яё]{3,})\.?\s*(\d{4})?/i);           // 5 августа 2026
+  if(m){
+    const k = m[2].toLowerCase().slice(0,3);
+    if(MN[k]){
+      const y = m[3] || String(new Date().getFullYear());
+      return `${y}-${String(MN[k]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+    }
+  }
+  return null;
+}
+
+function parseAnyNumber(v){
+  if(v==null || v==='') return null;
+  if(typeof v === 'number') return isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if(!s) return null;
+  const neg = /^\(.*\)$/.test(s) || /^-/.test(s) || /^−/.test(s);
+  s = s.replace(/руб\.?|коп\.?|RUB|USD|EUR/gi,'')
+       .replace(/[()₽$€\s  ]/g,'')
+       .replace(/^[−\-+]/,'');
+  // 1 234,56 → 1234.56 ; 1,234.56 → 1234.56
+  if(s.includes(',') && s.includes('.')){
+    s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+  } else if(s.includes(',')){
+    const after = s.split(',').pop();
+    s = after.length<=2 ? s.replace(',','.') : s.replace(/,/g,'');
+  }
+  s = s.replace(/[^\d.]/g,'');
+  if(!s || s==='.') return null;
+  const n = parseFloat(s);
+  if(!isFinite(n)) return null;
+  return neg ? -n : n;
+}
+
+/* ---------------- загрузка файла ---------------- */
+const dropEl = document.getElementById('drop');
+const fileEl = document.getElementById('fileInput');
+fileEl.addEventListener('change', e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=''; });
+['dragenter','dragover'].forEach(ev=> dropEl.addEventListener(ev, e=>{e.preventDefault(); dropEl.classList.add('over');}));
+['dragleave','drop'].forEach(ev=> dropEl.addEventListener(ev, e=>{e.preventDefault(); dropEl.classList.remove('over');}));
+dropEl.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; if(f) handleFile(f); });
+
+async function handleFile(file){
+  const name = file.name.toLowerCase();
+  toast('Читаю файл…');
+  try{
+    if(name.endsWith('.pdf'))                     await readPDF(file);
+    else if(name.endsWith('.csv')||name.endsWith('.txt')) await readCSV(file);
+    else                                          await readXLSX(file);
+  }catch(e){
+    console.error(e);
+    toast('Не удалось прочитать файл: ' + (e.message||e));
+  }
+}
+
+function readXLSX(file){
+  if(!window.XLSX) return Promise.reject(new Error('Модуль чтения Excel не загрузился. Проверьте интернет-соединение или сохраните выписку в CSV.'));
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = () => {
+      try{
+        const wb = XLSX.read(new Uint8Array(r.result), {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+        startMapping(raw.filter(r=>r.some(c=>c!=='' && c!=null)));
+        res();
+      }catch(e){ rej(e); }
+    };
+    r.onerror = rej;
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function readCSV(file){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = () => {
+      try{
+        let text = r.result;
+        if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
+        const delim = detectDelimiter(text);
+        const raw = csvParse(text, delim).filter(r=>r.some(c=>String(c).trim()!==''));
+        startMapping(raw);
+        res();
+      }catch(e){ rej(e); }
+    };
+    r.onerror = rej;
+    r.readAsText(file, 'utf-8');
+  });
+}
+function detectDelimiter(text){
+  const head = text.split(/\r?\n/).slice(0,6).join('\n');
+  const counts = {';': (head.match(/;/g)||[]).length, ',': (head.match(/,/g)||[]).length, '\t': (head.match(/\t/g)||[]).length};
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+}
+function csvParse(text, delim){
+  const rows = []; let row = [], cell = '', q = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){ cell+='"'; i++; } else q=false; }
+      else cell += c;
+    } else {
+      if(c==='"') q = true;
+      else if(c===delim){ row.push(cell); cell=''; }
+      else if(c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+      else if(c==='\r'){ /* skip */ }
+      else cell += c;
+    }
+  }
+  if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+
+async function readPDF(file){
+  if(!window.pdfjsLib) throw new Error('Модуль чтения PDF не загрузился. Проверьте интернет-соединение.');
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const lines = [];
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    // группируем элементы по вертикальной координате в строки
+    const byY = {};
+    for(const it of tc.items){
+      const y = Math.round(it.transform[5]);
+      (byY[y] = byY[y] || []).push({x: it.transform[4], s: it.str});
+    }
+    Object.keys(byY).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const line = byY[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
+      if(line) lines.push(line);
+    });
+  }
+  if(!lines.length) throw new Error('В PDF не найден текстовый слой (возможно, это скан). Попробуйте выгрузить выписку в CSV или Excel.');
+  parseTextLines(lines, 'PDF');
+}
+
+/* ---------------- разбор текстовых строк (PDF / вставка) ---------------- */
+function parseTextLines(lines, sourceLabel){
+  const parsed = [];
+  const dateRe = /(\d{1,2}[.\-\/]\d{1,2}[.\-\/]\d{2,4}|\d{4}-\d{2}-\d{2})/;
+  const amtRe  = /([−\-+]?\s?\d[\d\s  ]*(?:[.,]\d{2})?)\s*(?:₽|руб|RUB)?/gi;
+
+  for(const line of lines){
+    const dm = line.match(dateRe);
+    if(!dm) continue;
+    const date = parseAnyDate(dm[1]);
+    if(!date) continue;
+
+    let rest = line.slice(line.indexOf(dm[1]) + dm[1].length);
+    // все числа-кандидаты в строке
+    const nums = [];
+    let m; amtRe.lastIndex = 0;
+    while((m = amtRe.exec(rest)) !== null){
+      const raw = m[1];
+      if(!/\d/.test(raw)) continue;
+      const cleaned = raw.replace(/[\s  ]/g,'');
+      if(cleaned.replace(/[^\d]/g,'').length < 2) continue;   // отбрасываем одиночные цифры
+      const val = parseAnyNumber(raw);
+      if(val!==null && Math.abs(val)>=1) nums.push({val, raw, idx:m.index});
+    }
+    if(!nums.length) continue;
+
+    // сумма операции — обычно первое денежное число; последнее часто остаток по счёту
+    const chosen = nums[0];
+    const negative = /[−\-]\s?\d/.test(chosen.raw) || /списан|покупк|оплат|снятие|перевод от вас/i.test(rest);
+    const desc = rest.slice(0, chosen.idx).replace(/[|;]+/g,' ').replace(/\s+/g,' ').trim()
+              || rest.replace(/[\d\s.,₽−\-+]/g,' ').replace(/\s+/g,' ').trim();
+
+    parsed.push({
+      date,
+      desc: desc.slice(0,120),
+      amount: Math.abs(chosen.val),
+      kind: (chosen.val<0 || negative) ? 'expense' : 'income'
+    });
+  }
+  if(!parsed.length){
+    toast('Не удалось распознать операции. Попробуйте формат CSV/Excel.');
+    return;
+  }
+  IMP = {mode:'text', source:sourceLabel, rows: prepRows(parsed)};
+  document.getElementById('impMapCard').style.display = 'none';
+  showPreview();
+}
+
+function parsePasted(){
+  const txt = document.getElementById('pasteArea').value.trim();
+  if(!txt){ toast('Вставьте текст операций'); return; }
+  parseTextLines(txt.split(/\r?\n/), 'текст');
+}
+
+/* ---------------- маппинг колонок для таблиц ---------------- */
+function startMapping(raw){
+  if(!raw || raw.length<2){ toast('В файле нет данных'); return; }
+
+  // находим строку заголовков — первую, где есть похожие на «дата» и «сумма»
+  let hIdx = 0;
+  const kw = /дата|date|сумма|amount|описан|назначен|операц|приход|расход|дебет|кредит|payment/i;
+  for(let i=0; i<Math.min(raw.length, 25); i++){
+    const hits = raw[i].filter(c=> kw.test(String(c))).length;
+    if(hits >= 2){ hIdx = i; break; }
+  }
+  const headers = raw[hIdx].map((h,i)=> String(h).trim() || 'Колонка '+(i+1));
+  const body = raw.slice(hIdx+1);
+
+  IMP = {mode:'table', raw: body, headers, map:{}};
+  autoDetectColumns();
+  renderMapping();
+}
+
+function autoDetectColumns(){
+  const H = IMP.headers.map(h=>h.toLowerCase());
+  const find = re => H.findIndex(h=>re.test(h));
+  const m = IMP.map;
+  m.date   = find(/дата\s*(операц|провед|транз)?|date|дата$/);
+  if(m.date<0) m.date = find(/дата/);
+  m.desc   = find(/описан|назначен|коммент|детал|контраг|мерчант|получат|наименован|description|purpose/);
+  m.amount = find(/сумма\s*(в валюте счета|операции)?$|amount|сумма/);
+  m.debit  = find(/расход|списан|дебет|debit|withdraw/);
+  m.credit = find(/приход|поступл|зачисл|кредит|credit|deposit/);
+
+  // если явных колонок нет — определяем по содержимому
+  const sample = IMP.raw.slice(0, 40);
+  if(m.date<0){
+    for(let c=0;c<IMP.headers.length;c++){
+      const ok = sample.filter(r=>parseAnyDate(r[c])).length;
+      if(ok >= Math.max(2, sample.length*0.5)){ m.date = c; break; }
+    }
+  }
+  if(m.amount<0 && m.debit<0 && m.credit<0){
+    let best = -1, bestScore = 0;
+    for(let c=0;c<IMP.headers.length;c++){
+      if(c===m.date) continue;
+      const vals = sample.map(r=>parseAnyNumber(r[c])).filter(v=>v!==null && v!==0);
+      if(vals.length > bestScore){ bestScore = vals.length; best = c; }
+    }
+    if(bestScore >= Math.max(2, sample.length*0.4)) m.amount = best;
+  }
+  if(m.desc<0){
+    let best = -1, bestLen = 0;
+    for(let c=0;c<IMP.headers.length;c++){
+      if(c===m.date || c===m.amount) continue;
+      const avg = sample.reduce((s,r)=>s+String(r[c]||'').length,0)/(sample.length||1);
+      if(avg > bestLen){ bestLen = avg; best = c; }
+    }
+    if(bestLen > 4) m.desc = best;
+  }
+}
+
+function renderMapping(){
+  const opts = (sel) => `<option value="-1">— нет —</option>` +
+    IMP.headers.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${esc(h)}</option>`).join('');
+  document.getElementById('impMapBody').innerHTML = `
+    <div class="note">Колонки определены автоматически. Проверьте и поправьте, если что-то не так.</div>
+    <div class="f2">
+      <div class="f"><label>Дата операции *</label><select id="mpDate" onchange="rebuildRows()">${opts(IMP.map.date)}</select></div>
+      <div class="f"><label>Описание</label><select id="mpDesc" onchange="rebuildRows()">${opts(IMP.map.desc)}</select></div>
+    </div>
+    <div class="f"><label>Сумма (одна колонка со знаком)</label><select id="mpAmount" onchange="rebuildRows()">${opts(IMP.map.amount)}</select></div>
+    <div class="f2">
+      <div class="f"><label>Или: расход</label><select id="mpDebit" onchange="rebuildRows()">${opts(IMP.map.debit)}</select></div>
+      <div class="f"><label>Или: приход</label><select id="mpCredit" onchange="rebuildRows()">${opts(IMP.map.credit)}</select></div>
+    </div>
+    <label class="check"><input type="checkbox" id="mpInvert" onchange="rebuildRows()"> Поменять местами приход и расход</label>`;
+  document.getElementById('impMapCard').style.display = 'block';
+  rebuildRows();
+}
+
+function rebuildRows(){
+  const g = id => parseInt(document.getElementById(id).value, 10);
+  IMP.map = {date:g('mpDate'), desc:g('mpDesc'), amount:g('mpAmount'), debit:g('mpDebit'), credit:g('mpCredit')};
+  const invert = document.getElementById('mpInvert').checked;
+  const M = IMP.map;
+  const out = [];
+
+  for(const r of IMP.raw){
+    const date = M.date>=0 ? parseAnyDate(r[M.date]) : null;
+    if(!date) continue;
+    let amount = null, kind = null;
+
+    if(M.debit>=0 || M.credit>=0){
+      const d = M.debit>=0 ? parseAnyNumber(r[M.debit]) : null;
+      const c = M.credit>=0 ? parseAnyNumber(r[M.credit]) : null;
+      if(d && Math.abs(d)>0){ amount = Math.abs(d); kind = 'expense'; }
+      else if(c && Math.abs(c)>0){ amount = Math.abs(c); kind = 'income'; }
+    }
+    if(amount===null && M.amount>=0){
+      const v = parseAnyNumber(r[M.amount]);
+      if(v!==null && v!==0){ amount = Math.abs(v); kind = v<0 ? 'expense' : 'income'; }
+    }
+    if(amount===null || amount===0) continue;
+    if(invert) kind = kind==='expense' ? 'income' : 'expense';
+
+    out.push({ date, desc: M.desc>=0 ? String(r[M.desc]||'').trim().slice(0,120) : '', amount, kind });
+  }
+  IMP.rows = prepRows(out);
+  showPreview();
+}
+
+/* ---------------- подготовка строк: категории + дубли ---------------- */
+function prepRows(rows){
+  const existing = new Set(S.transactions.map(t => t.date+'|'+t.amount.toFixed(2)+'|'+(t.note||'').toLowerCase().slice(0,40)));
+  return rows.map(r=>{
+    const key = r.date+'|'+r.amount.toFixed(2)+'|'+r.desc.toLowerCase().slice(0,40);
+    return Object.assign({}, r, {
+      id: uid(),
+      categoryId: guessCategory(r.desc, r.kind),
+      dup: existing.has(key),
+      use: !existing.has(key)
+    });
+  });
+}
+function guessCategory(desc, kind){
+  const d = (desc||'').toLowerCase();
+  for(const rule of S.rules){
+    if(rule.match && d.includes(rule.match.toLowerCase())){
+      const c = cat(rule.categoryId);
+      if(c && c.kind===kind) return rule.categoryId;
+    }
+  }
+  return kind==='income' ? 'c_other_i' : 'c_other_e';
+}
+
+/* ---------------- предпросмотр ---------------- */
+function showPreview(){
+  if(!IMP || !IMP.rows){ return; }
+  const rows = IMP.rows;
+  const card = document.getElementById('impPreviewCard');
+  if(!rows.length){
+    card.style.display = 'block';
+    document.getElementById('impStats').innerHTML = `<div class="note err">Не найдено ни одной операции. Проверьте настройку колонок.</div>`;
+    document.getElementById('impTable').innerHTML = '';
+    return;
+  }
+  card.style.display = 'block';
+
+  const accSel = document.getElementById('impAccount');
+  const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
+  accSel.innerHTML = usable.length
+    ? usable.map(a=>`<option value="${a.id}">${ACC_TYPES[a.type].icon} ${esc(a.name)}</option>`).join('')
+    : `<option value="">— сначала добавьте счёт —</option>`;
+
+  const dups = rows.filter(r=>r.dup).length;
+  const inc = rows.filter(r=>r.kind==='income').reduce((s,r)=>s+r.amount,0);
+  const exp = rows.filter(r=>r.kind==='expense').reduce((s,r)=>s+r.amount,0);
+  const dates = rows.map(r=>r.date).sort();
+
+  document.getElementById('impStats').innerHTML = `
+    <div class="grid3">
+      <div class="stat"><div class="n" style="font-size:15px">${rows.length}</div><div class="l">Операций</div></div>
+      <div class="stat"><div class="n pos" style="font-size:15px">${moneyShort(inc)}</div><div class="l">Приход</div></div>
+      <div class="stat"><div class="n neg" style="font-size:15px">${moneyShort(exp)}</div><div class="l">Расход</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Период: ${dateLong(dates[0])} — ${dateLong(dates[dates.length-1])}</div>
+    ${dups ? `<div class="note warn" style="margin-top:8px">Найдено похожих на уже существующие: <b>${dups}</b>. Они сняты с отметки — снимите галочку «дубль», если хотите импортировать.</div>` : ''}`;
+
+  const catOpts = kind => S.categories.filter(c=>c.kind===kind)
+      .map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+  document.getElementById('impTable').innerHTML = `
+    <thead><tr>
+      <th style="width:28px"><input type="checkbox" checked onchange="toggleAllImp(this.checked)"></th>
+      <th>Дата</th><th>Описание</th><th class="r">Сумма</th><th>Категория</th>
+    </tr></thead>
+    <tbody>${rows.map((r,i)=>`
+      <tr class="${r.dup?'':''}" style="${r.dup?'opacity:.55':''}">
+        <td><input type="checkbox" ${r.use?'checked':''} onchange="IMP.rows[${i}].use=this.checked; updSel()"></td>
+        <td style="white-space:nowrap">${dateShort(r.date)}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.desc)||'<span class="mut">без описания</span>'}${r.dup?' <span class="chip bad">дубль</span>':''}</td>
+        <td class="r ${r.kind==='income'?'pos':'neg'}" style="white-space:nowrap">${r.kind==='income'?'+':'−'}${money(r.amount)}</td>
+        <td><select onchange="IMP.rows[${i}].categoryId=this.value" style="max-width:150px;padding:4px;border:1px solid var(--line);border-radius:6px;font-size:12px">
+          ${S.categories.filter(c=>c.kind===r.kind).map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}
+        </select></td>
+      </tr>`).join('')}</tbody>`;
+  updSel();
+}
+function toggleAllImp(v){
+  IMP.rows.forEach(r=>r.use = v);
+  document.querySelectorAll('#impTable tbody input[type=checkbox]').forEach(cb=>cb.checked=v);
+  updSel();
+}
+function updSel(){
+  const n = IMP.rows.filter(r=>r.use).length;
+  document.getElementById('impSelCount').value = n + ' из ' + IMP.rows.length;
+}
+function cancelImport(){
+  IMP = null;
+  document.getElementById('impPreviewCard').style.display = 'none';
+  document.getElementById('impMapCard').style.display = 'none';
+  document.getElementById('pasteArea').value = '';
+}
+function commitImport(){
+  if(!IMP || !IMP.rows) return;
+  const accountId = document.getElementById('impAccount').value;
+  if(!accountId){ toast('Выберите счёт для зачисления'); return; }
+  const sel = IMP.rows.filter(r=>r.use);
+  if(!sel.length){ toast('Не выбрано ни одной операции'); return; }
+
+  for(const r of sel){
+    S.transactions.push({
+      id: uid(), date: r.date, type: r.kind, accountId,
+      categoryId: r.categoryId, amount: r.amount, note: r.desc, source: 'import'
+    });
+  }
+  save(); cancelImport(); renderAll();
+  toast(`Импортировано операций: ${sel.length}`);
+  go('tx');
+}
+
+/* ---------------- правила автокатегоризации ---------------- */
+function renderRules(){
+  const box = document.getElementById('rulesList');
+  if(!S.rules.length){ box.innerHTML = `<div class="empty">Правил пока нет.</div>`; return; }
+  box.innerHTML = S.rules.map(r=>`
+    <div class="row" onclick="openRule('${r.id}')" style="cursor:pointer">
+      <div class="l"><div class="t">«${esc(r.match)}»</div><div class="s">→ ${esc(catName(r.categoryId))}</div></div>
+      <div class="v mut">›</div>
+    </div>`).join('');
+}
+function openRule(id){
+  const r = id ? S.rules.find(x=>x.id===id) : null;
+  document.getElementById('ovRuleBody').innerHTML = `
+    <h3>${r?'Правило':'Новое правило'}</h3>
+    <div class="f"><label>Если описание содержит</label>
+      <input type="text" id="rlMatch" value="${r?esc(r.match):''}" placeholder="напр. пятероч">
+      <div class="hint">Регистр не важен. Достаточно части слова.</div></div>
+    <div class="f"><label>Присвоить категорию</label>
+      <select id="rlCat">${S.categories.map(c=>`<option value="${c.id}" ${r&&r.categoryId===c.id?'selected':''}>${c.kind==='income'?'↑':'↓'} ${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="btnrow">
+      ${r?`<button class="btn btn-d" onclick="deleteRule('${r.id}')">Удалить</button>`:''}
+      <button class="btn btn-p" onclick="saveRule(${r?"'"+r.id+"'":'null'})">Сохранить</button>
+    </div>`;
+  openOv('ovRule');
+}
+function saveRule(id){
+  const match = document.getElementById('rlMatch').value.trim();
+  if(!match){ toast('Введите текст для поиска'); return; }
+  const categoryId = document.getElementById('rlCat').value;
+  if(id){ const r = S.rules.find(x=>x.id===id); r.match = match; r.categoryId = categoryId; }
+  else S.rules.push({id:uid(), match, categoryId});
+  save(); closeOv('ovRule'); renderRules(); toast('Правило сохранено');
+}
+function deleteRule(id){
+  S.rules = S.rules.filter(r=>r.id!==id);
+  save(); closeOv('ovRule'); renderRules(); toast('Удалено');
+}
+/* =========================================================================
+   ПЛАТЁЖНЫЙ КАЛЕНДАРЬ: регулярные платежи + прогноз по дням
+   ========================================================================= */
+
+const FREQ = {
+  monthly:  'Ежемесячно',
+  weekly:   'Еженедельно',
+  biweekly: 'Раз в 2 недели',
+  quarterly:'Раз в квартал',
+  yearly:   'Раз в год',
+  once:     'Однократно'
+};
+
+function openRecurring(id){
+  const r = id ? S.recurring.find(x=>x.id===id) : null;
+  if(!S.accounts.length){ toast('Сначала добавьте счёт'); go('accounts'); return; }
+  const accs = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
+  document.getElementById('ovRecBody').innerHTML = `
+    <h3>${r?'Регулярный платёж':'Новый регулярный платёж'}</h3>
+    <div class="seg sm" id="recSeg">
+      <button data-t="expense" onclick="recKind('expense')">Расход</button>
+      <button data-t="income"  onclick="recKind('income')">Доход</button>
+    </div>
+    <div class="f"><label>Название</label><input type="text" id="rcName" value="${r?esc(r.name):''}" placeholder="напр. Зарплата / ЖКХ / Подписка"></div>
+    <div class="f2">
+      <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" id="rcAmount" value="${r?r.amount:''}"></div>
+      <div class="f"><label>Периодичность</label>
+        <select id="rcFreq">${Object.entries(FREQ).map(([k,v])=>`<option value="${k}" ${r&&r.freq===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    </div>
+    <div class="f2">
+      <div class="f"><label>Первая дата</label><input type="date" id="rcStart" value="${r?r.startDate:today()}"></div>
+      <div class="f"><label>Действует до</label><input type="date" id="rcEnd" value="${r&&r.endDate?r.endDate:''}"></div>
+    </div>
+    <div class="f"><label>Счёт</label>
+      <select id="rcAcc">${accs.map(a=>`<option value="${a.id}" ${r&&r.accountId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
+    <div class="f"><label>Категория</label><select id="rcCat"></select></div>
+    <label class="check"><input type="checkbox" id="rcWork" ${r&&r.shiftWeekend?'checked':''}>
+      Переносить с выходных на ближайший будний день</label>
+    <div class="btnrow">
+      ${r?`<button class="btn btn-d" onclick="deleteRecurring('${r.id}')">Удалить</button>`:''}
+      <button class="btn btn-p" onclick="saveRecurring(${r?"'"+r.id+"'":'null'})">Сохранить</button>
+    </div>`;
+  recKind(r ? r.kind : 'expense', r);
+  openOv('ovRec');
+}
+let RECKIND = 'expense';
+function recKind(k, r){
+  RECKIND = k;
+  document.querySelectorAll('#recSeg button').forEach(b=>b.classList.toggle('on', b.dataset.t===k));
+  const sel = document.getElementById('rcCat');
+  sel.innerHTML = S.categories.filter(c=>c.kind===k)
+    .map(c=>`<option value="${c.id}">${esc(c.name)}${c.mandatory===false?' •':''}</option>`).join('');
+  if(r && r.categoryId) sel.value = r.categoryId;
+}
+function saveRecurring(id){
+  const name = document.getElementById('rcName').value.trim();
+  const amount = parseFloat(document.getElementById('rcAmount').value);
+  if(!name){ toast('Введите название'); return; }
+  if(!amount || amount<=0){ toast('Введите сумму'); return; }
+  const rec = {
+    id: id||uid(), name, amount, kind: RECKIND,
+    freq: document.getElementById('rcFreq').value,
+    startDate: document.getElementById('rcStart').value || today(),
+    endDate: document.getElementById('rcEnd').value || null,
+    accountId: document.getElementById('rcAcc').value,
+    categoryId: document.getElementById('rcCat').value,
+    shiftWeekend: document.getElementById('rcWork').checked,
+    active: true
+  };
+  if(id){ const i = S.recurring.findIndex(x=>x.id===id); S.recurring[i] = rec; }
+  else S.recurring.push(rec);
+  save(); closeOv('ovRec'); renderAll(); toast('Сохранено');
+}
+function deleteRecurring(id){
+  S.recurring = S.recurring.filter(r=>r.id!==id);
+  save(); closeOv('ovRec'); renderAll(); toast('Удалено');
+}
+
+/* Разворачиваем регулярный платёж в список дат */
+function expandRecurring(r, from, to){
+  const out = [];
+  let d = r.startDate;
+  if(d < from){
+    // проматываем вперёд
+    let guard = 0;
+    while(d < from && guard < 2000){ d = nextRecDate(d, r.freq); guard++; }
+  }
+  let guard = 0;
+  while(d <= to && guard < 800){
+    if(r.endDate && d > r.endDate) break;
+    let date = d;
+    if(r.shiftWeekend){
+      let w = parseISO(date).getDay();
+      if(w===6) date = addDays(date, 2);
+      else if(w===0) date = addDays(date, 1);
+    }
+    if(date >= from && date <= to) out.push({date, name:r.name, amount:r.amount, kind:r.kind, categoryId:r.categoryId, recId:r.id});
+    if(r.freq==='once') break;
+    d = nextRecDate(d, r.freq); guard++;
+  }
+  return out;
+}
+function nextRecDate(d, freq){
+  switch(freq){
+    case 'weekly':   return addDays(d, 7);
+    case 'biweekly': return addDays(d, 14);
+    case 'quarterly':return addMonths(d, 3);
+    case 'yearly':   return addMonths(d, 12);
+    case 'once':     return addDays(d, 99999);
+    default:         return addMonths(d, 1);
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Основной расчёт прогноза: день за днём
+   ------------------------------------------------------------------------- */
+function buildForecast(days){
+  const from = today(), to = addDays(from, days);
+  const events = {};
+  const push = e => { (events[e.date] = events[e.date] || []).push(e); };
+
+  // 1) регулярные платежи и доходы
+  for(const r of S.recurring){
+    if(r.active===false) continue;
+    for(const e of expandRecurring(r, from, to)) push(e);
+  }
+  // 2) обязательные платежи по долгам из графиков
+  for(const p of futureDebtPayments(to)) push({date:p.date, name:'Платёж: '+p.name, amount:p.amount, kind:'expense', debt:true});
+  // 3) закрытие вкладов
+  for(const a of S.accounts){
+    if(a.type==='deposit' && a.endDate && a.endDate>=from && a.endDate<=to && !a.archived){
+      push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:balance(a), kind:'income', deposit:true});
+    }
+  }
+  // 4) уже внесённые будущие операции (запланированы задним числом на будущее)
+  for(const t of S.transactions){
+    if(t.date > from && t.date <= to && t.type!=='transfer'){
+      push({date:t.date, name:(t.note||catName(t.categoryId)), amount:t.amount, kind:t.type, actual:true});
+    }
+  }
+
+  let bal = totalLiquid();
+  const out = [];
+  for(let i=0; i<=days; i++){
+    const date = addDays(from, i);
+    const items = (events[date]||[]).sort((a,b)=> (a.kind===b.kind?0:(a.kind==='income'?-1:1)));
+    const inc = items.filter(e=>e.kind==='income').reduce((s,e)=>s+e.amount,0);
+    const exp = items.filter(e=>e.kind==='expense').reduce((s,e)=>s+e.amount,0);
+    const open = bal;
+    bal = round2(bal + inc - exp);
+    out.push({date, items, inc, exp, open, close: bal});
+  }
+  return out;
+}
+
+/* ---------------- рендер календаря ---------------- */
+let calChart = null;
+function renderCalendar(){
+  const days = parseInt(document.getElementById('calHorizon').value, 10);
+  const buf  = parseFloat(document.getElementById('calMinBuf').value) || 0;
+  S.settings.minBuffer = buf; save();
+
+  const F = buildForecast(days);
+  const closes = F.map(d=>d.close);
+  const minVal = Math.min(...closes);
+  const minDay = F[closes.indexOf(minVal)];
+
+  document.getElementById('calStart').textContent = moneyShort(totalLiquid());
+  const mn = document.getElementById('calMin');
+  mn.textContent = moneyShort(minVal);
+  mn.className = 'n ' + (minVal < 0 ? 'neg' : minVal < buf ? '' : 'pos');
+  if(minVal>=0 && minVal<buf) mn.style.color = 'var(--amber)'; else mn.style.color = '';
+  const en = document.getElementById('calEnd');
+  en.textContent = moneyShort(F[F.length-1].close);
+  en.className = 'n ' + (F[F.length-1].close<0?'neg':'pos');
+
+  // предупреждение о кассовом разрыве
+  const gaps = F.filter(d=>d.close<0);
+  const lows = F.filter(d=>d.close>=0 && d.close<buf);
+  const noteBox = document.getElementById('calGapNote');
+  if(gaps.length){
+    const first = gaps[0];
+    const need = Math.abs(minVal) + buf;
+    noteBox.innerHTML = `<div class="note err">
+      <b>Кассовый разрыв.</b> Первый минус — ${dateLong(first.date)} (${money(first.close)}).
+      Дней в минусе: ${gaps.length}. Чтобы пройти период, не хватает примерно <b>${money(need)}</b>.
+      Посмотрите на вкладке «Анализ», какие необязательные расходы можно сдвинуть.</div>`;
+  } else if(lows.length){
+    noteBox.innerHTML = `<div class="note warn">
+      <b>Тонко, но без минуса.</b> ${lows.length} дн. остаток опускается ниже вашей подушки ${money(buf)}.
+      Минимум — ${money(minVal)} ${dateLong(minDay.date)}.</div>`;
+  } else {
+    noteBox.innerHTML = `<div class="note ok">
+      <b>Разрывов нет.</b> На горизонте ${days} дн. остаток не опускается ниже ${money(minVal)}.</div>`;
+  }
+
+  // график
+  const ctx = document.getElementById('calChart');
+  if(calChart) calChart.destroy();
+  if(window.Chart){
+    const step = Math.max(1, Math.floor(F.length/120));
+    const pts = F.filter((_,i)=> i%step===0);
+    calChart = new Chart(ctx, {
+      type:'line',
+      data:{ labels: pts.map(d=>dateShort(d.date)),
+        datasets:[
+          {label:'Остаток', data: pts.map(d=>d.close), borderColor:'#4a4844', backgroundColor:'rgba(74,72,68,.07)',
+           fill:true, tension:.25, pointRadius:0, borderWidth:2},
+          {label:'Подушка', data: pts.map(()=>buf), borderColor:'#9b8564', borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false},
+          {label:'Ноль', data: pts.map(()=>0), borderColor:'#9b6b5e', borderDash:[3,3], pointRadius:0, borderWidth:1, fill:false}
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false},
+          tooltip:{callbacks:{label: c=> c.dataset.label+': '+money(c.parsed.y)}}},
+        scales:{ y:{ ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:'#eeece8'} },
+                 x:{ ticks:{maxTicksLimit:8, font:{size:10}}, grid:{display:false} } } }
+    });
+  }
+
+  // регулярные платежи
+  const rbox = document.getElementById('recList');
+  if(!S.recurring.length){
+    rbox.innerHTML = `<div class="empty"><span class="big">▤</span>
+      Регулярных платежей ещё нет.<br>Добавьте зарплату, ЖКХ, подписки — и календарь начнёт прогнозировать остаток.</div>`;
+  } else {
+    const sorted = [...S.recurring].sort((a,b)=> a.kind===b.kind ? b.amount-a.amount : (a.kind==='income'?-1:1));
+    rbox.innerHTML = sorted.map(r=>`
+      <div class="row" onclick="openRecurring('${r.id}')" style="cursor:pointer">
+        <div class="l"><div class="t">${esc(r.name)} ${r.kind==='expense'&&!catMandatory(r.categoryId)?'<span class="chip opt">необяз</span>':''}</div>
+          <div class="s">${FREQ[r.freq]} · с ${dateShort(r.startDate)}${r.endDate?' до '+dateShort(r.endDate):''} · ${esc(accName(r.accountId))}</div></div>
+        <div class="v ${r.kind==='income'?'pos':'neg'}">${r.kind==='income'?'+':'−'}${money(r.amount)}</div>
+      </div>`).join('');
+  }
+
+  // по дням
+  const dbox = document.getElementById('calDays');
+  const shown = F.filter(d=> d.items.length>0 || d.close<buf).slice(0, 120);
+  if(!shown.length){
+    dbox.innerHTML = `<div class="empty">На горизонте нет запланированных движений.</div>`;
+  } else {
+    dbox.innerHTML = shown.map(d=>{
+      const cls = d.close<0 ? 'gap' : (d.close<buf ? 'low' : '') ;
+      const dt = parseISO(d.date);
+      const items = d.items.length ? d.items.map(e=>`
+          <div class="it"><span class="nm">${esc(e.name)}</span>
+            <span class="${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</span></div>`).join('')
+        : `<div class="none">нет операций</div>`;
+      return `<div class="day ${cls} ${isWeekend(d.date)?'wknd':''}">
+        <div class="dnum"><b>${dt.getDate()}</b><span>${DOW[dt.getDay()]} ${MONTHS[dt.getMonth()].slice(0,3)}</span></div>
+        <div class="items">${items}</div>
+        <div class="cls"><b class="${d.close<0?'neg':''}">${moneyShort(d.close)}</b><span>остаток</span></div>
+      </div>`;
+    }).join('');
+  }
+}
+
+/* =========================================================================
+   АНАЛИТИКА
+   ========================================================================= */
+let anTrend = null, anPie = null;
+
+function renderAnalytics(){
+  const [from,to] = periodRange(document.getElementById('anPeriod').value);
+  const kind = document.getElementById('anKind').value;
+  const list = txInRange(from,to).filter(t=>t.type===kind);
+
+  const req = list.filter(t=> catMandatory(t.categoryId)).reduce((s,t)=>s+t.amount,0);
+  const opt = list.filter(t=> !catMandatory(t.categoryId)).reduce((s,t)=>s+t.amount,0);
+  const total = req + opt;
+
+  document.getElementById('anReq').textContent = moneyShort(req);
+  document.getElementById('anOpt').textContent = moneyShort(opt);
+
+  const pct = total>0 ? opt/total*100 : 0;
+  const monthsSpan = Math.max(1, monthsBetween(from,to));
+  const noteBox = document.getElementById('anOptNote');
+  if(kind==='expense'){
+    if(total===0) noteBox.innerHTML = `<div class="empty">Расходов за период нет.</div>`;
+    else if(pct >= 30) noteBox.innerHTML = `<div class="note warn">
+      Необязательные траты — <b>${pct.toFixed(0)}%</b> расходов, это ${money(opt)} за период
+      (≈ ${money(opt/monthsSpan)} в месяц). Сокращение даже наполовину освободит около
+      <b>${money(opt/monthsSpan/2)}</b> в месяц на погашение долгов.</div>`;
+    else noteBox.innerHTML = `<div class="note ok">
+      Необязательные траты — <b>${pct.toFixed(0)}%</b> расходов (${money(opt)}). Структура достаточно жёсткая:
+      основная экономия возможна только за счёт обязательных статей или роста доходов.</div>`;
+  } else {
+    noteBox.innerHTML = `<div class="note">Для доходов отметка «необязательные» означает нерегулярные поступления —
+      на них не стоит рассчитывать в календаре.</div>`;
+  }
+
+  // по категориям
+  const byCat = {};
+  for(const t of list){
+    const k = t.categoryId || 'none';
+    byCat[k] = (byCat[k]||0) + t.amount;
+  }
+  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('anCatTitle').textContent = (kind==='expense'?'Расходы':'Доходы') + ' по категориям · ' + moneyShort(total);
+  document.getElementById('anCats').innerHTML = cats.length ? cats.map(([id,v])=>{
+    const p = total>0 ? v/total*100 : 0;
+    const optChip = kind==='expense' && !catMandatory(id) ? ' <span class="chip opt">необяз</span>' : '';
+    return `<div class="catrow">
+      <span class="dot" style="background:${catColor(id)}"></span>
+      <span class="nm">${esc(catName(id))}${optChip}<div class="bar" style="margin:4px 0 0;height:4px"><i style="width:${p}%;background:${catColor(id)}"></i></div></span>
+      <span class="amt">${money(v)}</span><span class="pct">${p.toFixed(0)}%</span>
+    </div>`;
+  }).join('') : `<div class="empty">Нет данных за период.</div>`;
+
+  // круговая диаграмма
+  if(window.Chart){
+    const pieCtx = document.getElementById('anPieChart');
+    if(anPie) anPie.destroy();
+    if(cats.length){
+      const top = cats.slice(0,10);
+      const restSum = cats.slice(10).reduce((s,c)=>s+c[1],0);
+      const labels = top.map(c=>catName(c[0])).concat(restSum>0?['Прочее']:[]);
+      const data = top.map(c=>c[1]).concat(restSum>0?[restSum]:[]);
+      const colors = top.map(c=>catColor(c[0])).concat(restSum>0?['#b8b5ae']:[]);
+      anPie = new Chart(pieCtx, {
+        type:'doughnut',
+        data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:'#fff'}]},
+        options:{responsive:true, maintainAspectRatio:false, cutout:'58%',
+          plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
+            tooltip:{callbacks:{label:c=>c.label+': '+money(c.parsed)+' ('+(c.parsed/total*100).toFixed(0)+'%)'}}}}
+      });
+    }
+
+    // тренд по месяцам
+    const trendCtx = document.getElementById('anTrendChart');
+    if(anTrend) anTrend.destroy();
+    const months = {};
+    for(const t of txInRange(from,to)){
+      if(t.type==='transfer') continue;
+      const k = monthKey(t.date);
+      months[k] = months[k] || {inc:0, exp:0, opt:0};
+      if(t.type==='income') months[k].inc += t.amount;
+      else { months[k].exp += t.amount; if(!catMandatory(t.categoryId)) months[k].opt += t.amount; }
+    }
+    const mk = Object.keys(months).sort();
+    if(mk.length){
+      anTrend = new Chart(trendCtx, {
+        type:'bar',
+        data:{ labels: mk.map(k=>monthLabel(k).replace(/ \d{4}/, m=>' '+m.trim().slice(2))),
+          datasets:[
+            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#6f7a6c', borderRadius:4},
+            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#9b6b5e', borderRadius:4},
+            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#c2ab84', borderRadius:4}
+          ]},
+        options:{responsive:true, maintainAspectRatio:false,
+          plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
+            tooltip:{callbacks:{label:c=>c.dataset.label+': '+money(c.parsed.y)}}},
+          scales:{y:{ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:'#eeece8'}},
+                  x:{grid:{display:false}, ticks:{font:{size:10}}}}}
+      });
+    }
+  }
+
+  // крупнейшие необязательные траты
+  const topOpt = txInRange(from,to)
+    .filter(t=>t.type==='expense' && !catMandatory(t.categoryId))
+    .sort((a,b)=>b.amount-a.amount).slice(0,12);
+  document.getElementById('anTopOptional').innerHTML = topOpt.length
+    ? topOpt.map(t=>`<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
+        <div class="l"><div class="t">${esc(t.note || catName(t.categoryId))}</div>
+          <div class="s">${dateLong(t.date)} · ${esc(catName(t.categoryId))}</div></div>
+        <div class="v neg">−${money(t.amount)}</div></div>`).join('')
+    : `<div class="empty">Необязательных трат за период не найдено.</div>`;
+}
+function monthsBetween(a,b){
+  const d1 = parseISO(a), d2 = parseISO(b);
+  return (d2.getFullYear()-d1.getFullYear())*12 + (d2.getMonth()-d1.getMonth()) + 1;
+}
+
+/* =========================================================================
+   ГЛАВНЫЙ ЭКРАН
+   ========================================================================= */
+function renderHome(){
+  const liq = totalLiquid(), debt = totalDebt();
+  document.getElementById('hNet').textContent = moneyShort(netWorth());
+  document.getElementById('kLiquid').textContent = moneyShort(liq);
+  document.getElementById('kLiquid').className = 'n ' + (liq<0?'neg':'pos');
+  document.getElementById('kDebt').textContent = moneyShort(debt);
+
+  const n = new Date();
+  const [f,t] = periodRange('thismonth');
+  const m = txInRange(f,t);
+  const inc = m.filter(x=>x.type==='income').reduce((s,x)=>s+x.amount,0);
+  const exp = m.filter(x=>x.type==='expense').reduce((s,x)=>s+x.amount,0);
+  const req = m.filter(x=>x.type==='expense' && catMandatory(x.categoryId)).reduce((s,x)=>s+x.amount,0);
+  const opt = exp - req;
+
+  document.getElementById('hSub').textContent = MONTHS_N[n.getMonth()] + ' ' + n.getFullYear();
+  document.getElementById('kInc').textContent = moneyShort(inc);
+  document.getElementById('kExp').textContent = moneyShort(exp);
+  const kn = document.getElementById('kNet');
+  kn.textContent = moneyShort(inc-exp);
+  kn.className = 'n ' + (inc-exp>=0?'pos':'neg');
+
+  const pct = exp>0 ? opt/exp*100 : 0;
+  document.getElementById('kOptBar').style.width = pct+'%';
+  document.getElementById('kOptPct').textContent = exp>0 ? pct.toFixed(0)+'% необязательных' : '—';
+  document.getElementById('kReqSum').textContent = moneyShort(req);
+  document.getElementById('kOptSum').textContent = moneyShort(opt);
+
+  // предупреждения
+  const alerts = [];
+  const F = buildForecast(60);
+  const buf = S.settings.minBuffer || 0;
+  const gap = F.find(d=>d.close<0);
+  if(gap) alerts.push({t:'Кассовый разрыв '+dateLong(gap.date), s:'Прогнозный остаток '+money(gap.close), cls:'bad', go:'calendar'});
+  else {
+    const low = F.find(d=>d.close<buf);
+    if(low) alerts.push({t:'Остаток ниже подушки '+dateShort(low.date), s:money(low.close)+' при подушке '+money(buf), cls:'opt', go:'calendar'});
+  }
+  for(const a of debtAccounts()){
+    if(a.type==='credit_card'){
+      /* Льготный период заканчивается — самое дорогое, что можно пропустить */
+      const left = graceDaysLeft(a);
+      if(left !== null && balance(a) > 0){
+        if(left > 0 && left <= 14){
+          alerts.push({t:'Льготный период истекает: '+a.name,
+            s:`Осталось ${left} ${plural(left,'день','дня','дней')}. Погасите ${money(balance(a))}, чтобы не платить проценты`,
+            cls:'bad', go:'debts'});
+        } else if(left <= 0){
+          alerts.push({t:'Льготный период истёк: '+a.name,
+            s:`Начисляются проценты по ставке ${a.rate||0}% годовых`, cls:'bad', go:'debts'});
+        }
+      }
+      if(a.limit){
+        const use = balance(a)/a.limit*100;
+        if(use>80) alerts.push({t:'Кредитка почти исчерпана: '+a.name, s:'Использовано '+use.toFixed(0)+'% лимита', cls:'bad', go:'debts'});
+      }
+    }
+    if(a.type==='debt' && a.dueDate && a.dueDate <= addDays(today(),90) && balance(a)>0)
+      alerts.push({t:'Приближается срок: '+a.name, s:money(balance(a))+' до '+dateLong(a.dueDate), cls:'opt', go:'debts'});
+  }
+  /* Вход — самое важное предупреждение: без него данные живут только здесь */
+  if(typeof sbUser !== 'undefined' && !sbUser && typeof syncCfg === 'function' && syncCfg()){
+    alerts.unshift({t:'Войдите в аккаунт', s:'Данные сохранятся и откроются на телефоне. Регистрация не нужна — имя и почта', cls:'opt', act:'openAccountSheet()'});
+  }
+  if(!S.accounts.length) alerts.push({t:'Добавьте счета', s:'Карты, наличные, вклады и кредиты — база для всех расчётов', cls:'info', go:'accounts'});
+  else if(!S.recurring.length) alerts.push({t:'Добавьте регулярные платежи', s:'Без них календарь не может прогнозировать остаток', cls:'info', go:'calendar'});
+
+  const ac = document.getElementById('cardAlerts');
+  if(alerts.length){
+    ac.style.display = 'block';
+    document.getElementById('alerts').innerHTML = alerts.map(a=>`
+      <div class="row" onclick="${a.act ? a.act : `go('${a.go}')`}" style="cursor:pointer">
+        <div class="l"><div class="t">${esc(a.t)} <span class="chip ${a.cls}">${a.cls==='bad'?'важно':a.cls==='opt'?'внимание':'совет'}</span></div>
+          <div class="s">${esc(a.s)}</div></div><div class="v mut">›</div></div>`).join('');
+  } else ac.style.display = 'none';
+
+  // ближайшие платежи
+  const up = [];
+  for(let i=0;i<F.length && up.length<6;i++) for(const e of F[i].items) if(up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
+  document.getElementById('upcoming').innerHTML = up.length
+    ? up.map(e=>`<div class="row"><div class="l"><div class="t">${esc(e.name)}</div>
+        <div class="s">${dateLong(e.date)}, ${DOW[parseISO(e.date).getDay()]}</div></div>
+        <div class="v ${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</div></div>`).join('')
+    : `<div class="empty">Запланированных платежей нет. Добавьте регулярные платежи в календаре.</div>`;
+
+  // счета
+  document.getElementById('homeAccounts').innerHTML = S.accounts.length
+    ? S.accounts.filter(a=>!a.archived).slice(0,5).map(accRow).join('')
+    : `<div class="empty"><span class="big">▦</span>Счетов пока нет.<br>
+       <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="event.stopPropagation();go('accounts')">Добавить счёт</button></div>`;
+
+  // последние операции
+  const recent = [...S.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  document.getElementById('homeTx').innerHTML = recent.length
+    ? recent.map(txRow).join('')
+    : `<div class="empty"><span class="big">☰</span>Операций пока нет.<br>
+       Добавьте вручную кнопкой «+» или загрузите выписку.</div>`;
+}
+
+/* =========================================================================
+   ОБЩИЙ РЕНДЕР + СТАРТ
+   ========================================================================= */
+function renderAll(){
+  try{
+    // фильтр счетов на вкладке операций
+    const fa = document.getElementById('fltAccount');
+    const cur = fa.value;
+    fa.innerHTML = `<option value="">Все счета</option>` +
+      S.accounts.filter(a=>!a.archived).map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+    if(cur) fa.value = cur;
+
+    renderHome();
+    renderAccounts();
+    renderTx();
+    renderDebts();
+    renderCategories();
+    renderRules();
+    if(typeof renderAvatar === 'function') renderAvatar();
+    if(typeof renderSync === 'function') renderSync();
+    if(CUR==='calendar') renderCalendar();
+    if(CUR==='analytics') renderAnalytics();
+  }catch(e){
+    console.error('Ошибка отрисовки:', e);
+  }
+}
+
+/* демо-данные для первого запуска не создаём: пользователь заполняет сам */
+renderAll();
+/* =========================================================================
+   ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ (Supabase)
+
+   Логика: локальное хранилище браузера остаётся основным — приложение
+   полностью работает офлайн. Облако — это зеркало: после каждого изменения
+   данные выгружаются, при входе на другом устройстве — загружаются.
+   Если на двух устройствах меняли данные независимо, пользователь сам
+   выбирает, какую версию оставить (молча ничего не перезаписываем).
+   ========================================================================= */
+
+/* Адрес проекта и ПУБЛИКУЕМЫЙ ключ. Их безопасно держать в открытом коде:
+   доступ к данным ограничен правилами на стороне базы (row level security),
+   а не секретностью ключа. Каждый пользователь видит только свою строку. */
+var SUPABASE_URL = 'https://rjvuleatdyvnvqgxrjno.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_d3QtwahCubeFrGPpkbomnQ_xX4trTv9';
+
+const SYNC_CFG_KEY  = 'finapp_sync_cfg';    // {url, key} — только если меняли вручную
+const SYNC_META_KEY = 'finapp_sync_meta';   // {syncedAt, dirty}
+
+var sb = null;              // клиент Supabase
+var sbUser = null;          // текущий пользователь
+var syncTimer = null;
+var syncBusy = false;
+
+/* ---------------- конфигурация ---------------- */
+function syncCfg(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(SYNC_CFG_KEY));
+    if(saved && saved.url && saved.key) return saved;
+  }catch(e){}
+  return (SUPABASE_URL && SUPABASE_KEY) ? {url:SUPABASE_URL, key:SUPABASE_KEY} : null;
+}
+function syncCfgSave(url, key){
+  localStorage.setItem(SYNC_CFG_KEY, JSON.stringify({url:url.trim().replace(/\/+$/,''), key:key.trim()}));
+}
+function syncCfgClear(){ localStorage.removeItem(SYNC_CFG_KEY); localStorage.removeItem(SYNC_META_KEY); }
+
+function syncMeta(){
+  try{ return JSON.parse(localStorage.getItem(SYNC_META_KEY)) || {syncedAt:null, dirty:false}; }
+  catch(e){ return {syncedAt:null, dirty:false}; }
+}
+function syncMetaSet(patch){
+  localStorage.setItem(SYNC_META_KEY, JSON.stringify(Object.assign(syncMeta(), patch)));
+}
+
+/* ---------------- статус в шапке ---------------- */
+function setSyncStatus(text, cls){
+  const el = document.getElementById('syncChip');
+  if(!el) return;
+  el.innerHTML = text ? `<span class="chip ${cls||'info'}">${esc(text)}</span>` : '';
+  el.style.cursor = 'pointer';
+  el.title = 'Открыть настройки аккаунта';
+}
+
+/* ---------------- инициализация ---------------- */
+async function syncInit(){
+  const cfg = syncCfg();
+  if(!cfg){ setSyncStatus('Вход не выполнен','req'); renderSync(); return; }
+  if(typeof window.supabase === 'undefined' || !window.supabase.createClient){
+    setSyncStatus('Нет связи','bad'); renderSync(); return;
+  }
+  try{
+    sb = window.supabase.createClient(cfg.url, cfg.key);
+    const { data } = await sb.auth.getSession();
+    sbUser = data && data.session ? data.session.user : null;
+
+    sb.auth.onAuthStateChange((event, session)=>{
+      sbUser = session ? session.user : null;
+      renderSync();
+      if(sbUser && event === 'SIGNED_IN'){ adoptServerName(); syncOnLogin(); }
+      if(!sbUser) setSyncStatus('Вход не выполнен','req');
+    });
+
+    if(sbUser){ adoptServerName(); await syncOnLogin(); }
+    else setSyncStatus('Вход не выполнен','req');
+  }catch(e){
+    console.error('Sync init', e);
+    setSyncStatus('Ошибка подключения','bad');
+  }
+  renderAll();   // модуль грузится последним — обновляем и главный экран
+}
+
+/* ---------------- вход по ссылке на почту ---------------- */
+async function syncSendLink(){
+  const email = (document.getElementById('syEmail').value||'').trim();
+  const nameEl = document.getElementById('syName');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if(!/.+@.+\..+/.test(email)){ toast('Введите корректный адрес почты'); return; }
+  if(!sb){ toast('Нет связи с сервером, попробуйте позже'); return; }
+  if(name){ profile().name = name; save(); }
+  const btn = document.getElementById('syLinkBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Отправляю…'; }
+  try{
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options:{ emailRedirectTo: location.origin + location.pathname, data: name ? {full_name: name} : undefined }
+    });
+    if(error) throw error;
+    toast('Письмо отправлено — откройте ссылку из него');
+    const box = document.getElementById('syHint');
+    if(box) box.innerHTML = `<div class="note ok">Письмо отправлено на <b>${esc(email)}</b>.
+      Откройте ссылку из письма на этом же устройстве. Если письма нет — проверьте папку «Спам».</div>`;
+  }catch(e){
+    toast('Не удалось отправить: ' + (e.message||e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Получить ссылку для входа'; }
+  }
+}
+async function syncSignOut(){
+  if(!sb) return;
+  if(!confirm('Выйти из аккаунта? Данные останутся на этом устройстве.')) return;
+  await sb.auth.signOut();
+  sbUser = null;
+  setSyncStatus('Вход не выполнен','req');
+  renderSync();
+  toast('Вы вышли из аккаунта');
+}
+
+/* ---------------- обмен данными ---------------- */
+async function syncPull(){
+  const { data, error } = await sb.from('app_state')
+    .select('data, updated_at').eq('user_id', sbUser.id).maybeSingle();
+  if(error) throw error;
+  return data || null;
+}
+async function syncPush(){
+  const now = new Date().toISOString();
+  const { error } = await sb.from('app_state')
+    .upsert({ user_id: sbUser.id, data: S, updated_at: now }, { onConflict:'user_id' });
+  if(error) throw error;
+  syncMetaSet({ syncedAt: now, dirty: false });
+  return now;
+}
+
+/* Первый обмен после входа: решаем, чьи данные новее */
+async function syncOnLogin(){
+  if(!sb || !sbUser) return;
+  setSyncStatus('Синхронизация…','info');
+  try{
+    const remote = await syncPull();
+    const meta = syncMeta();
+
+    // в облаке пусто — выгружаем то, что есть локально
+    if(!remote){
+      await syncPush();
+      setSyncStatus('Синхронизировано','ok');
+      renderSync();
+      return;
+    }
+
+    const localEmpty = !S.accounts.length && !S.transactions.length;
+    const remoteNewer = !meta.syncedAt || remote.updated_at > meta.syncedAt;
+
+    // локально пусто либо ничего не меняли — просто берём облако
+    if(localEmpty || !meta.dirty){
+      applyRemote(remote);
+      setSyncStatus('Синхронизировано','ok');
+      renderSync();
+      return;
+    }
+
+    // меняли и здесь, и там — спрашиваем
+    if(meta.dirty && remoteNewer){
+      showConflict(remote);
+      return;
+    }
+
+    await syncPush();
+    setSyncStatus('Синхронизировано','ok');
+  }catch(e){
+    console.error('syncOnLogin', e);
+    setSyncStatus('Ошибка синхронизации','bad');
+    toast('Синхронизация не удалась: ' + (e.message||e));
+  }
+  renderSync();
+}
+
+/* Имя из учётной записи, если пользователь не задал его в приложении */
+function adoptServerName(){
+  if(!sbUser) return;
+  const meta = sbUser.user_metadata || {};
+  if(!profile().name && meta.full_name){ profile().name = meta.full_name; save(); }
+}
+
+function applyRemote(remote){
+  S = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), remote.data || {});
+  localStorage.setItem(KEY, JSON.stringify(S));
+  syncMetaSet({ syncedAt: remote.updated_at, dirty:false });
+  renderAll();
+}
+
+/* Конфликт версий — решает пользователь, автоматически ничего не теряем */
+function showConflict(remote){
+  const rd = remote.data || {};
+  const rCount = (rd.transactions||[]).length, rAcc = (rd.accounts||[]).length;
+  const lCount = S.transactions.length, lAcc = S.accounts.length;
+  document.getElementById('ovSchedBody').innerHTML = `
+    <h3>Данные различаются</h3>
+    <div class="note warn">На этом устройстве и в облаке данные менялись независимо.
+      Выберите, какую версию оставить. Вторая будет заменена, поэтому сначала можно скачать копию.</div>
+    <div class="grid2">
+      <div class="stat">
+        <div class="n" style="font-size:15px">${lAcc} / ${lCount}</div>
+        <div class="l">Это устройство<br>счетов / операций</div>
+      </div>
+      <div class="stat">
+        <div class="n" style="font-size:15px">${rAcc} / ${rCount}</div>
+        <div class="l">Облако (${dateLong(remote.updated_at.slice(0,10))})<br>счетов / операций</div>
+      </div>
+    </div>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn btn-s" onclick="backupData()">Скачать копию</button>
+    </div>
+    <div class="btnrow" style="margin-top:8px">
+      <button class="btn btn-s" onclick='conflictKeepRemote(${JSON.stringify(JSON.stringify(remote))})'>Взять из облака</button>
+      <button class="btn btn-p" onclick="conflictKeepLocal()">Оставить это устройство</button>
+    </div>`;
+  openOv('ovSched');
+  setSyncStatus('Требуется выбор','bad');
+}
+function conflictKeepRemote(json){
+  const remote = JSON.parse(json);
+  applyRemote(remote);
+  closeOv('ovSched');
+  setSyncStatus('Синхронизировано','ok');
+  toast('Загружены данные из облака');
+  renderSync();
+}
+async function conflictKeepLocal(){
+  closeOv('ovSched');
+  try{
+    await syncPush();
+    setSyncStatus('Синхронизировано','ok');
+    toast('Данные этого устройства выгружены в облако');
+  }catch(e){ setSyncStatus('Ошибка синхронизации','bad'); toast('Не удалось выгрузить'); }
+  renderSync();
+}
+
+/* ---------------- автосохранение ---------------- */
+/* Вызывается из save() после каждой записи в локальное хранилище */
+function syncScheduleUpload(){
+  syncMetaSet({ dirty:true });
+  if(!sb || !sbUser) return;
+  setSyncStatus('Сохранение…','info');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncFlush, 1500);
+}
+async function syncFlush(){
+  if(!sb || !sbUser || syncBusy) return;
+  if(!navigator.onLine){ setSyncStatus('Офлайн — сохранится позже','req'); return; }
+  syncBusy = true;
+  try{
+    await syncPush();
+    setSyncStatus('Синхронизировано','ok');
+  }catch(e){
+    console.error('syncFlush', e);
+    setSyncStatus('Не сохранено в облако','bad');
+  }finally{
+    syncBusy = false;
+    renderSync();
+  }
+}
+/* вернулся интернет — дослать накопленное */
+window.addEventListener('online', ()=>{ if(syncMeta().dirty) syncFlush(); });
+window.addEventListener('offline', ()=>{ if(sbUser) setSyncStatus('Офлайн','req'); });
+
+async function syncNow(){
+  if(!sb){ toast('Синхронизация не настроена'); return; }
+  if(!sbUser){ toast('Сначала войдите'); return; }
+  await syncOnLogin();
+  toast('Готово');
+}
+
+
+/* старт */
+syncInit();
+
+/* -------------------------------------------------------------------------
+   Установка на телефон и работа без интернета.
+   Service worker регистрируется только на настоящем сайте (https),
+   при открытии файла с диска он невозможен — это нормально.
+   ------------------------------------------------------------------------- */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(e=>console.log('SW не зарегистрирован:', e.message));
+  });
+}
+
+/* =========================================================================
+   ПРОФИЛЬ: аватар в шапке, имя и фото, вход и выход
+   ========================================================================= */
+
+function profile(){
+  if(!S.profile) S.profile = {name:'', avatar:''};
+  return S.profile;
+}
+
+/* Инициалы из имени, иначе первая буква почты */
+function initials(){
+  const n = (profile().name||'').trim();
+  if(n){
+    const parts = n.split(/\s+/).filter(Boolean);
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+  if(sbUser && sbUser.email) return sbUser.email[0].toUpperCase();
+  return '?';
+}
+
+/* Аватар в шапке: фото, инициалы или приглашение войти */
+function renderAvatar(){
+  const btn = document.getElementById('avatarBtn');
+  if(!btn) return;
+  const p = profile();
+  const guest = !sbUser;
+
+  btn.className = 'avatar' + (guest && !p.avatar ? ' guest' : '');
+  btn.innerHTML = p.avatar
+    ? `<img src="${p.avatar}" alt="">`
+    : (guest ? '?' : esc(initials()));
+  btn.title = guest ? 'Войти в аккаунт' : (p.name || (sbUser && sbUser.email) || 'Аккаунт');
+}
+
+/* ---------------- окно аккаунта ---------------- */
+function openAccountSheet(){
+  renderAccountSheet();
+  openOv('ovAccount');
+}
+
+function renderAccountSheet(){
+  const box = document.getElementById('accountBody');
+  if(!box) return;
+  const p = profile();
+  const meta = syncMeta();
+
+  /* --- гость: вход, он же регистрация --- */
+  if(!sbUser){
+    box.innerHTML = `
+      <h3>Вход в аккаунт</h3>
+      <div class="note">Введите имя и почту — придёт письмо со ссылкой.
+        Отдельная регистрация не нужна: если вы здесь впервые, аккаунт создастся сам.
+        Пароль придумывать не придётся.</div>
+      <div class="f"><label>Как к вам обращаться</label>
+        <input type="text" id="syName" placeholder="Наталья" value="${esc(p.name||'')}" autocomplete="name"></div>
+      <div class="f"><label>Почта</label>
+        <input type="email" id="syEmail" placeholder="name@example.com" autocomplete="email"></div>
+      <button class="btn btn-p btn-blk" id="syLinkBtn" onclick="syncSendLink()">Получить ссылку для входа</button>
+      <div id="syHint"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6">
+        Без входа приложение тоже работает, но данные останутся только в этом браузере
+        и не откроются на телефоне.
+      </div>`;
+    return;
+  }
+
+  /* --- вошедший пользователь --- */
+  box.innerHTML = `
+    <h3>Профиль</h3>
+    <div style="text-align:center;margin-bottom:6px">
+      <div class="avatar-lg" id="avatarBig">${p.avatar ? `<img src="${p.avatar}" alt="">` : esc(initials())}</div>
+      <button class="btn btn-s btn-sm" onclick="pickAvatar()">${p.avatar ? 'Заменить фото' : 'Добавить фото'}</button>
+      ${p.avatar ? `<button class="btn btn-s btn-sm" onclick="removeAvatar()">Убрать</button>` : ''}
+    </div>
+    <div class="f" style="margin-top:14px"><label>Имя</label>
+      <input type="text" id="prName" value="${esc(p.name||'')}" placeholder="Ваше имя" onchange="saveProfileName()"></div>
+    <div class="row"><div class="l"><div class="t">Почта</div>
+      <div class="s">${esc(sbUser.email||'')}</div></div>
+      <span class="chip ok">вход выполнен</span></div>
+    <div class="row"><div class="l"><div class="t">Последняя синхронизация</div>
+      <div class="s">${meta.syncedAt ? dateLong(meta.syncedAt.slice(0,10))+', '+meta.syncedAt.slice(11,16) : 'ещё не было'}</div></div>
+      <button class="btn btn-s btn-sm" onclick="syncNow()">Обновить</button></div>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn btn-s" onclick="backupData()">Скачать копию данных</button>
+      <button class="btn btn-d" onclick="syncSignOut()">Выйти</button>
+    </div>`;
+}
+
+function saveProfileName(){
+  const el = document.getElementById('prName');
+  if(!el) return;
+  profile().name = el.value.trim();
+  save(); renderAvatar();
+  const big = document.getElementById('avatarBig');
+  if(big && !profile().avatar) big.textContent = initials();
+  toast('Имя сохранено');
+}
+
+/* ---------------- фото ---------------- */
+function pickAvatar(){ document.getElementById('avatarInput').click(); }
+
+function removeAvatar(){
+  profile().avatar = '';
+  save(); renderAvatar(); renderAccountSheet();
+  toast('Фото убрано');
+}
+
+/* Уменьшаем фото до 160 px и сжимаем — иначе оно раздует данные при синхронизации */
+document.getElementById('avatarInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  if(!/^image\//.test(file.type)){ toast('Нужен файл изображения'); return; }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const SIZE = 160;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      // вписываем по короткой стороне, центрируем
+      const side = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width-side)/2, (img.height-side)/2, side, side, 0, 0, SIZE, SIZE);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      if(dataUrl.length > 200000){ toast('Фото слишком большое'); return; }
+      profile().avatar = dataUrl;
+      save(); renderAvatar(); renderAccountSheet();
+      toast('Фото сохранено');
+    };
+    img.onerror = () => toast('Не удалось прочитать изображение');
+    img.src = reader.result;
+  };
+  reader.onerror = () => toast('Не удалось прочитать файл');
+  reader.readAsDataURL(file);
+});
+
+/* renderSync теперь обновляет аватар и открытое окно профиля */
+function renderSync(){
+  renderAvatar();
+  const ov = document.getElementById('ovAccount');
+  if(ov && ov.classList.contains('on')) renderAccountSheet();
+}
+</script>
+</body>
+</html>

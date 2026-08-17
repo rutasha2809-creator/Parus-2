@@ -1,0 +1,493 @@
+/* =========================================================================
+   КРЕДИТЫ И ГРАФИКИ ПОГАШЕНИЯ
+   ========================================================================= */
+
+/* Аннуитетный платёж: P·i / (1 − (1+i)^−n) */
+function annuity(principal, annualRate, months){
+  principal = Number(principal)||0; months = Number(months)||0;
+  const i = (Number(annualRate)||0)/100/12;
+  if(principal<=0 || months<=0) return 0;
+  if(i===0) return round2(principal/months);
+  return round2(principal * i / (1 - Math.pow(1+i, -months)));
+}
+function round2(n){ return Math.round(n*100)/100; }
+
+/* Фактические платежи по долговому счёту: переводы НА него + «доходы» на него */
+function actualPayments(accountId){
+  return S.transactions.filter(t =>
+      (t.type==='transfer' && t.toAccountId===accountId) ||
+      (t.type==='income'   && t.accountId===accountId)
+    ).map(t=>({date:t.date, amount:t.amount, note:t.note||'', txId:t.id}))
+     .sort((a,b)=>a.date.localeCompare(b.date));
+}
+/* Новые начисления по долгу: траты с этого счёта / переводы с него */
+function actualCharges(accountId){
+  return S.transactions.filter(t =>
+      (t.type==='transfer' && t.accountId===accountId) ||
+      (t.type==='expense'  && t.accountId===accountId)
+    ).map(t=>({date:t.date, amount:t.amount, note:t.note||''}))
+     .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+/* -------------------------------------------------------------------------
+   Остаток долга по кредиту с учётом начисления процентов.
+   Каждый внесённый платёж сначала покрывает проценты за период,
+   остаток идёт на погашение тела долга. Это тот же расчёт, что и в графике,
+   поэтому карточка долга и таблица графика всегда показывают одно число.
+   ------------------------------------------------------------------------- */
+function loanBalance(a){
+  let bal = Number(a.openingBalance) || 0;
+  const rate = (Number(a.rate)||0)/100/12;
+  const pays = actualPayments(a.id);
+  for(const p of pays){
+    const interest = round2(bal * rate);
+    const principal = p.amount - interest;
+    bal = round2(Math.max(0, bal - principal));
+    if(bal === 0) break;
+  }
+  for(const c of actualCharges(a.id)) bal = round2(bal + c.amount);
+  return bal;
+}
+
+/* -------------------------------------------------------------------------
+   Построение графика для КРЕДИТА.
+   Учитывает фактически внесённые платежи: они гасят долг, а остаток графика
+   пересчитывается от реального остатка. Переплата сверх графика сокращает срок.
+   ------------------------------------------------------------------------- */
+function loanSchedule(a){
+  const rows = [];
+  const rate = (Number(a.rate)||0)/100/12;
+  const pays = actualPayments(a.id);
+
+  /* --- ручной график банка: показываем как есть, отмечаем оплаченные --- */
+  if(a.scheduleMode==='manual' && Array.isArray(a.manualSchedule) && a.manualSchedule.length){
+    let bal = Number(a.openingBalance)||0;
+    const used = new Set();
+    for(const r of [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date))){
+      // ищем фактический платёж в пределах ±10 дней
+      const hit = pays.find((p,idx)=> !used.has(idx) && Math.abs(daysBetween(p.date, r.date))<=10 && !used.has(idx));
+      let paid = null;
+      if(hit){ const idx = pays.indexOf(hit); if(!used.has(idx)){ used.add(idx); paid = hit; } }
+      const amount = Number(r.amount)||0;
+      const interest = r.interest!=null ? Number(r.interest) : round2(bal*rate);
+      const principal = round2((paid ? paid.amount : amount) - interest);
+      bal = round2(Math.max(0, bal - principal));
+      rows.push({date:r.date, payment:amount, interest, principal, balance:bal,
+                 paid: !!paid, paidAmount: paid?paid.amount:null, paidDate: paid?paid.date:null});
+    }
+    // платежи, не попавшие ни в одну строку графика (досрочные)
+    pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
+      principal:p.amount, balance:null, paid:true, paidAmount:p.amount, extra:true, note:p.note}); });
+    rows.sort((x,y)=>x.date.localeCompare(y.date));
+    return rows;
+  }
+
+  /* --- автоматический аннуитет --- */
+  let bal = Number(a.openingBalance)||0;
+  let payment = Number(a.payment) || annuity(bal, a.rate, a.termMonths);
+  if(!payment || payment<=0) return rows;
+
+  // 1) сначала проводим фактические платежи
+  for(const p of pays){
+    const interest = round2(bal*rate);
+    const principal = round2(p.amount - interest);
+    bal = round2(Math.max(0, bal - principal));
+    rows.push({date:p.date, payment:p.amount, interest, principal, balance:bal,
+               paid:true, paidAmount:p.amount, note:p.note});
+  }
+
+  // 2) дальше — плановый график от текущего остатка
+  let d = a.nextPaymentDate || today();
+  if(pays.length){
+    const lastPay = pays[pays.length-1].date;
+    // следующий плановый — на месяц позже последнего платежа либо nextPaymentDate, что позже
+    d = addMonths(lastPay, 1);
+    if(a.nextPaymentDate && a.nextPaymentDate > d) d = a.nextPaymentDate;
+  }
+  let guard = 0;
+  while(bal > 0.01 && guard < 600){
+    const interest = round2(bal*rate);
+    let pay = payment;
+    if(pay <= interest && rate>0){ // платёж не покрывает проценты — некорректные данные
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true});
+      break;
+    }
+    let principal = round2(pay - interest);
+    if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
+    bal = round2(bal - principal);
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false});
+    d = addMonths(d, 1);
+    guard++;
+  }
+  return rows;
+}
+
+function daysBetween(a,b){ return Math.round((parseISO(a)-parseISO(b))/86400000); }
+
+/* Склонение: 1 день, 2 дня, 5 дней */
+function plural(n, one, few, many){
+  n = Math.abs(n) % 100;
+  const n1 = n % 10;
+  if(n > 10 && n < 20) return many;
+  if(n1 > 1 && n1 < 5) return few;
+  if(n1 === 1) return one;
+  return many;
+}
+
+/* -------------------------------------------------------------------------
+   КРЕДИТНАЯ КАРТА
+
+   Льготный период: пока он не закончился, проценты не начисляются — но только
+   если весь долг погашен до его окончания. Не успели — банк начисляет полную
+   ставку, и минимальный платёж считается как процент от долга
+   (но не меньше фиксированной суммы, если она задана).
+   ------------------------------------------------------------------------- */
+
+/* Дата окончания льготного периода (или null, если он не задан) */
+function graceEnd(a){
+  if(a.graceUntil) return a.graceUntil;
+  if(a.gracePeriodDays) return addDays(today(), Number(a.gracePeriodDays));
+  return null;
+}
+/* Сколько дней осталось: >0 — ещё действует, <=0 — истёк */
+function graceDaysLeft(a){
+  const g = graceEnd(a);
+  return g ? daysBetween(g, today()) : null;
+}
+/* Минимальный платёж при заданном остатке */
+function cardMinPayment(a, bal){
+  const share = (a.minPercent!=null ? Number(a.minPercent) : 5)/100;
+  const floor = Number(a.minPayment)||0;
+  return round2(Math.max(bal*share, floor, 100));  // 100 ₽ — технический минимум, чтобы долг гасился
+}
+
+/* mode: 'min'  — платим минимальный платёж (проценты после льготного периода)
+         'full' — гасим всё одной суммой до конца льготного периода            */
+function cardSchedule(a, mode){
+  mode = mode || 'min';
+  const rows = [];
+  let bal = balance(a);
+  if(bal<=0) return rows;
+
+  const rate = (Number(a.rate)||0)/100/12;
+  const gEnd = graceEnd(a);
+
+  if(mode==='full'){
+    const d = (gEnd && gEnd>=today()) ? gEnd : nextDayOfMonth(a.paymentDay || 25);
+    return [{date:d, payment:bal, interest:0, principal:bal, balance:0, grace:!!(gEnd && gEnd>=today()), full:true}];
+  }
+
+  let d = nextDayOfMonth(a.paymentDay || 25);
+  const LIMIT = 720;              // 60 лет — дальше считать бессмысленно
+  let guard = 0;
+  while(bal>0.01 && guard<LIMIT){
+    // проценты не начисляются, пока платёж приходится на льготный период
+    const inGrace = !!(gEnd && d <= gEnd);
+    const interest = inGrace ? 0 : round2(bal*rate);
+    let pay = cardMinPayment(a, bal);
+
+    if(pay <= interest){
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true});
+      break;
+    }
+    let principal = round2(pay - interest);
+    if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
+    bal = round2(bal - principal);
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, grace:inGrace});
+    d = addMonths(d,1); guard++;
+  }
+  // долг так и не погашен за 60 лет — минимальный платёж почти целиком уходит в проценты
+  if(bal > 0.01 && rows.length) rows[rows.length-1].truncated = true;
+  return rows;
+}
+
+/* «40 месяцев» → «3 года 4 месяца» */
+function formatTerm(months){
+  months = Math.round(months);
+  if(months < 24) return months + ' ' + plural(months,'месяц','месяца','месяцев');
+  const y = Math.floor(months/12), m = months%12;
+  let s = y + ' ' + plural(y,'год','года','лет');
+  if(m) s += ' ' + m + ' ' + plural(m,'месяц','месяца','месяцев');
+  return s;
+}
+function nextDayOfMonth(day){
+  const n = new Date();
+  let d = new Date(n.getFullYear(), n.getMonth(), Math.min(day, new Date(n.getFullYear(), n.getMonth()+1, 0).getDate()));
+  if(iso(d) < today()) d = parseISO(addMonths(iso(d),1));
+  return iso(d);
+}
+
+/* Единая точка: будущие обязательные платежи по всем долгам, от сегодня */
+function futureDebtPayments(untilDate){
+  const out = [];
+  for(const a of debtAccounts()){
+    if(balance(a) <= 0) continue;
+    let sched = [];
+    if(a.type==='loan') sched = loanSchedule(a).filter(r=>!r.paid && !r.error);
+    else if(a.type==='credit_card') sched = cardSchedule(a).filter(r=>!r.error);
+    else if(a.type==='debt' && a.dueDate) sched = [{date:a.dueDate, payment:balance(a)}];
+    for(const r of sched){
+      if(r.date >= today() && r.date <= untilDate)
+        out.push({date:r.date, name:a.name, amount:r.payment, accountId:a.id, kind:'debt'});
+    }
+  }
+  return out;
+}
+
+/* ---------------- рендер экрана «Долги» ---------------- */
+function renderDebts(){
+  const list = debtAccounts();
+  const box = document.getElementById('debtList');
+
+  const total = list.reduce((s,a)=>s+Math.max(0,balance(a)),0);
+  document.getElementById('dTotal').textContent = moneyShort(total);
+
+  const horizon = addDays(today(), 31);
+  const monthly = futureDebtPayments(horizon).reduce((s,p)=>s+p.amount,0);
+  document.getElementById('dMonthly').textContent = moneyShort(monthly);
+
+  if(!list.length){
+    box.innerHTML = `<div class="card"><div class="empty"><span class="big">✓</span>
+      Долговых счетов нет.<br>Добавьте кредит, ипотеку или кредитную карту на вкладке «Счета», чтобы видеть график погашения.</div></div>`;
+    return;
+  }
+
+  box.innerHTML = list.map(a=>{
+    const bal = balance(a);
+    const start = Number(a.openingBalance)||0;
+    const paidOff = Math.max(0, start - bal);
+    const pct = start>0 ? Math.min(100, paidOff/start*100) : 0;
+
+    let sched = [];
+    if(a.type==='loan') sched = loanSchedule(a);
+    else if(a.type==='credit_card') sched = cardSchedule(a);
+
+    const future = sched.filter(r=>!r.paid && !r.error);
+    const nextPay = future[0];
+    const totalInterest = future.reduce((s,r)=>s+(r.interest||0),0);
+    const neverPaid = sched.some(r=>r.truncated);
+    const payoffDate = future.length ? future[future.length-1].date : (a.dueDate||null);
+
+    let meta = '';
+    if(a.type==='loan' || a.type==='credit_card'){
+      meta = `<div class="grid3" style="margin:10px 0">
+        <div class="stat"><div class="n" style="font-size:14px">${nextPay?money(nextPay.payment):'—'}</div><div class="l">След. платёж</div></div>
+        <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(payoffDate?dateShort(payoffDate)+' '+parseISO(payoffDate).getFullYear():'—')}</div><div class="l">Закрытие</div></div>
+        <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(totalInterest>0?moneyShort(totalInterest):'—')}</div><div class="l">Переплата</div></div>
+      </div>`;
+    }
+    if(a.type==='credit_card'){
+      /* Льготный период: статус и обратный отсчёт */
+      const left = graceDaysLeft(a);
+      const gEnd = graceEnd(a);
+      if(gEnd){
+        if(left > 0){
+          const full = cardSchedule(a,'full')[0];
+          const minSched = cardSchedule(a,'min').filter(r=>!r.error);
+          const minInterest = minSched.reduce((s,r)=>s+(r.interest||0),0);
+          const cls = left<=10 ? 'warn' : '';
+          meta += `<div class="note ${cls}" style="margin-top:10px">
+            <b>Льготный период: осталось ${left} ${plural(left,'день','дня','дней')}</b> — до ${dateLong(gEnd)}.<br>
+            Погасите <b>${money(full.payment)}</b> до этой даты — процентов не будет.
+            ${minInterest>0?`Если платить только минимальный платёж, переплата составит около <b>${money(minInterest)}</b>.`:''}
+          </div>`;
+        } else {
+          meta += `<div class="note err" style="margin-top:10px">
+            <b>Льготный период истёк</b> ${dateLong(gEnd)}.
+            Начисляется полная ставка${a.rate?' '+pct(a.rate)+'% годовых':''}, минимальный платёж —
+            ${pct(a.minPercent!=null?a.minPercent:5)}% от долга${a.minPayment?', но не менее '+money(a.minPayment):''}.
+          </div>`;
+        }
+      }
+      if(a.limit){
+        const use = a.limit>0 ? bal/a.limit*100 : 0;
+        meta += `<div style="font-size:12px;color:var(--muted);margin-top:6px">Использовано ${use.toFixed(0)}% лимита · доступно ${money(Math.max(0,a.limit-bal))}</div>`;
+      }
+    }
+    if(a.type==='debt'){
+      meta = `<div style="font-size:12.5px;color:var(--muted);margin:8px 0">
+        ${a.dueDate ? 'Срок возврата: <b>'+dateLong(a.dueDate)+'</b>' : 'Срок не указан'}</div>`;
+    }
+
+    const T = ACC_TYPES[a.type];
+    const barCls = pct>66?'g':pct>33?'a':'r';
+    return `<div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div class="acc" style="padding:0;border:none;flex:1">
+          <div class="ico" style="background:${T.bg}">${T.icon}</div>
+          <div class="l"><div class="nm">${esc(a.name)}</div><div class="sb">${T.label}${a.rate?' · '+a.rate+'%':''}</div></div>
+          <div class="bal neg">${money(bal)}</div>
+        </div>
+      </div>
+      <div class="bar ${barCls}"><i style="width:${pct}%"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)">
+        <span>Погашено ${money(paidOff)} (${pct.toFixed(0)}%)</span><span>Изначально ${money(start)}</span>
+      </div>
+      ${meta}
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn btn-p btn-sm" onclick="quickPay('${a.id}')">Внести платёж</button>
+        ${(a.type==='loan'||a.type==='credit_card')?`<button class="btn btn-s btn-sm" onclick="showSchedule('${a.id}')">График</button>`:''}
+        <button class="btn btn-s btn-sm" onclick="openAccount('${a.id}')">Настроить</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* Быстрое внесение платежа = перевод с ликвидного счёта на долговой */
+function quickPay(debtId){
+  const a = acc(debtId);
+  const froms = liquidAccounts();
+  if(!froms.length){ toast('Сначала добавьте карту или наличные'); return; }
+
+  let suggested = '';
+  if(a.type==='loan'){
+    const s = loanSchedule(a).filter(r=>!r.paid && !r.error);
+    if(s.length) suggested = s[0].payment;
+  } else if(a.type==='credit_card'){
+    const s = cardSchedule(a);
+    if(s.length) suggested = s[0].payment;
+  }
+
+  document.getElementById('ovTxBody').innerHTML = `
+    <h3>Платёж: ${esc(a.name)}</h3>
+    <div class="note">Текущий долг ${money(balance(a))}. Платёж уменьшит долг и спишется с выбранного счёта.</div>
+    <div class="f2">
+      <div class="f"><label>Дата</label><input type="date" id="qpDate" value="${today()}"></div>
+      <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" id="qpAmount" value="${suggested}"></div>
+    </div>
+    <div class="f"><label>Откуда списать</label>
+      <select id="qpFrom">${froms.map(x=>`<option value="${x.id}">${esc(x.name)} · ${money(balance(x))}</option>`).join('')}</select></div>
+    <div class="f"><label>Комментарий</label><input type="text" id="qpNote" placeholder="напр. досрочное погашение"></div>
+    <button class="btn btn-p btn-blk" onclick="saveQuickPay('${debtId}')">Внести платёж</button>`;
+  openOv('ovTx');
+}
+function saveQuickPay(debtId){
+  const amount = parseFloat(document.getElementById('qpAmount').value);
+  if(!amount || amount<=0){ toast('Введите сумму'); return; }
+  S.transactions.push({
+    id: uid(), date: document.getElementById('qpDate').value || today(),
+    type:'transfer', accountId: document.getElementById('qpFrom').value,
+    toAccountId: debtId, amount, note: document.getElementById('qpNote').value.trim() || 'Платёж по долгу',
+    source:'manual'
+  });
+  save(); closeOv('ovTx'); renderAll(); toast('Платёж учтён, график пересчитан');
+}
+
+/* ---------------- окно графика ---------------- */
+function showSchedule(id){
+  const a = acc(id);
+  const rows = a.type==='loan' ? loanSchedule(a) : cardSchedule(a);
+  const paidCount = rows.filter(r=>r.paid).length;
+  const totalPay = rows.reduce((s,r)=>s+(r.payment||0),0);
+  const totalInt = rows.reduce((s,r)=>s+(r.interest||0),0);
+
+  const manualBlock = a.type==='loan' ? `
+    <div class="note warn" style="margin-top:12px">
+      <b>График банка.</b> Если у вас есть официальный график — вставьте его сюда,
+      и расчёт будет вестись по нему. Формат строки: <code>дата;платёж;проценты</code> (проценты необязательны).
+      <br>Пример: <code>05.09.2026;79 315;9 200</code>
+    </div>
+    <div class="f"><textarea id="schedPaste" rows="4" placeholder="05.09.2026;79315&#10;05.10.2026;79315"></textarea></div>
+    <div class="btnrow">
+      <button class="btn btn-s btn-sm" onclick="applyManualSchedule('${id}')">Загрузить график банка</button>
+      ${a.scheduleMode==='manual'?`<button class="btn btn-s btn-sm" onclick="switchToAuto('${id}')">Вернуться к авторасчёту</button>`:''}
+    </div>` : '';
+
+  /* Для кредитки — сравнение двух сценариев */
+  let graceBlock = '';
+  if(a.type==='credit_card'){
+    const gEnd = graceEnd(a), left = graceDaysLeft(a);
+    const full = cardSchedule(a,'full')[0];
+    if(gEnd && left > 0 && full){
+      graceBlock = `
+        <div class="note ok" style="margin-bottom:12px">
+          <b>Вариант 1 — погасить в льготный период.</b><br>
+          Внести ${money(full.payment)} до ${dateLong(gEnd)} (осталось ${left} ${plural(left,'день','дня','дней')}).
+          Проценты — <b>0 ₽</b>.
+        </div>
+        <div class="note ${(rows.some(r=>r.truncated) || rows.length>120)?'err':'warn'}" style="margin-bottom:12px">
+          <b>Вариант 2 — платить минимальный платёж.</b><br>
+          По ${pct(a.minPercent!=null?a.minPercent:5)}% от долга${a.minPayment?' (но не менее '+money(a.minPayment)+')':''}.
+          ${rows.some(r=>r.truncated)
+            ? `За 60 лет долг так и не закроется: почти весь платёж уходит на проценты.
+               Минимальный платёж ${pct(a.minPercent)}% не перекрывает ставку ${pct(a.rate)}% годовых.`
+            : `Долг закроется за <b>${formatTerm(rows.length)}</b>, переплата <b>${money(totalInt)}</b>.` +
+              (rows.length>120
+                ? ` Это ловушка минимального платежа: он лишь немного превышает проценты,
+                    поэтому долг тает крайне медленно, а переплата в ${(totalInt/Math.max(1,balance(a))).toFixed(1).replace('.',',')} раза
+                    превысит сам долг. Вносите больше минимума, когда возможно.`
+                : '')}
+        </div>`;
+    } else if(gEnd){
+      graceBlock = `<div class="note err" style="margin-bottom:12px">
+        <b>Льготный период истёк ${dateLong(gEnd)}.</b> Проценты начисляются по ставке
+        ${pct(a.rate||0)}% годовых. Минимальный платёж — ${pct(a.minPercent!=null?a.minPercent:5)}% от долга${a.minPayment?', но не менее '+money(a.minPayment):''}.
+        ${rows.some(r=>r.truncated)
+          ? 'Платить только минимальный платёж бессмысленно: он почти целиком уходит на проценты, долг не уменьшается. Нужно вносить больше.'
+          : `Долг закроется за <b>${formatTerm(rows.length)}</b>, переплата составит <b>${money(totalInt)}</b>.`}
+      </div>`;
+    }
+  }
+
+  const modeNote = a.type==='credit_card'
+    ? `<div class="note">Минимальный платёж: <b>${pct(a.minPercent!=null?a.minPercent:5)}%</b> от долга${a.minPayment?`, но не менее <b>${money(a.minPayment)}</b>`:''}.
+        Строки внутри льготного периода отмечены — по ним проценты не начисляются.</div>`
+    : `<div class="note">Режим: <b>${a.scheduleMode==='manual'?'график банка':'автоматический аннуитет'}</b>.
+        Внесённые платежи подсвечены, остаток графика пересчитан от реального долга.</div>`;
+
+  document.getElementById('ovSchedBody').innerHTML = `
+    <h3>График: ${esc(a.name)}</h3>
+    <div class="grid3" style="margin-bottom:12px">
+      <div class="stat"><div class="n" style="font-size:14px">${rows.length}</div><div class="l">Платежей всего</div></div>
+      <div class="stat"><div class="n pos" style="font-size:14px">${paidCount}</div><div class="l">Уже внесено</div></div>
+      <div class="stat"><div class="n" style="font-size:14px">${moneyShort(totalInt)}</div><div class="l">Проценты</div></div>
+    </div>
+    ${graceBlock}
+    ${modeNote}
+    <div class="scrollx scrolly">
+      <table class="tbl">
+        <thead><tr><th>Дата</th><th class="r">Платёж</th><th class="r">Проценты</th><th class="r">Тело долга</th><th class="r">Остаток</th><th></th></tr></thead>
+        <tbody>${rows.map(schedRow).join('')}</tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Всего к выплате: <b>${money(totalPay)}</b></div>
+    ${manualBlock}`;
+  openOv('ovSched');
+}
+function schedRow(r){
+  const cls = r.paid ? 'paid' : (r.date<=addDays(today(),7) && r.date>=today() ? 'today' : '');
+  const mark = r.error ? '<span class="chip bad">платёж меньше процентов</span>'
+             : r.extra ? '<span class="chip info">досрочно</span>'
+             : r.paid  ? '<span class="chip ok">внесён</span>'
+             : r.grace ? '<span class="chip ok">льготный</span>' : '';
+  return `<tr class="${cls}">
+    <td>${dateShort(r.date)} ${parseISO(r.date).getFullYear()}</td>
+    <td class="r">${money(r.paidAmount!=null?r.paidAmount:r.payment)}</td>
+    <td class="r mut">${r.interest?money(r.interest):'—'}</td>
+    <td class="r">${r.principal?money(r.principal):'—'}</td>
+    <td class="r">${r.balance!=null?money(r.balance):'—'}</td>
+    <td>${mark}</td></tr>`;
+}
+function applyManualSchedule(id){
+  const txt = document.getElementById('schedPaste').value.trim();
+  if(!txt){ toast('Вставьте строки графика'); return; }
+  const rows = [];
+  for(const line of txt.split(/\r?\n/)){
+    if(!line.trim()) continue;
+    const parts = line.split(/[;\t|]/).map(s=>s.trim());
+    const d = parseAnyDate(parts[0]);
+    const amt = parseAnyNumber(parts[1]);
+    if(!d || amt===null) continue;
+    const int = parts[2] ? parseAnyNumber(parts[2]) : null;
+    rows.push({date:d, amount:Math.abs(amt), interest: int!=null?Math.abs(int):null});
+  }
+  if(!rows.length){ toast('Не удалось разобрать ни одной строки'); return; }
+  const a = acc(id);
+  a.manualSchedule = rows; a.scheduleMode = 'manual';
+  save(); showSchedule(id); renderAll();
+  toast(`Загружено строк графика: ${rows.length}`);
+}
+function switchToAuto(id){
+  const a = acc(id); a.scheduleMode = 'auto';
+  save(); showSchedule(id); renderAll(); toast('Переключено на авторасчёт');
+}
