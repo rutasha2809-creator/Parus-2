@@ -1201,6 +1201,29 @@ function openTx(id){
     </div>
     <div class="f" id="txCatWrap"><label>Категория</label><select id="txCategory"></select></div>
     <div class="f"><label>Описание</label><input type="text" id="txNote" value="${t?esc(t.note||''):''}" placeholder="необязательно"></div>
+
+    <label class="check" id="txRepeatWrap">
+      <input type="checkbox" id="txRepeat" onchange="txRepeatToggle()">
+      Регулярный платёж — повторять дальше
+    </label>
+    <div id="txRepeatBox" style="display:none">
+      <div class="f2">
+        <div class="f"><label>Как часто</label>
+          <select id="txRepeatFreq">
+            <option value="monthly">Ежемесячно</option>
+            <option value="biweekly">Раз в 2 недели</option>
+            <option value="weekly">Еженедельно</option>
+            <option value="quarterly">Раз в квартал</option>
+            <option value="yearly">Раз в год</option>
+          </select></div>
+        <div class="f"><label>Повторять до</label>
+          <input type="date" id="txRepeatUntil">
+          <div class="hint">Пусто — бессрочно</div></div>
+      </div>
+      <label class="check"><input type="checkbox" id="txRepeatShift">
+        Переносить с выходных на будний день</label>
+      <div class="hint" id="txRepeatHint" style="margin:-6px 0 12px"></div>
+    </div>
     <div class="btnrow" style="margin-top:6px">
       ${t?`<button class="btn btn-d" onclick="deleteTx('${t.id}')">Удалить</button>`:''}
       <button class="btn btn-p" onclick="saveTx(${t?"'"+t.id+"'":'null'})">Сохранить</button>
@@ -1208,6 +1231,10 @@ function openTx(id){
   txKind(t ? t.type : 'expense', t);
   const amtEl = document.getElementById('txAmount');
   if(amtEl) amtEl.addEventListener('input', txCurrencyCheck);
+  const dEl = document.getElementById('txDate');
+  if(dEl) dEl.addEventListener('change', txRepeatToggle);
+  const fEl = document.getElementById('txRepeatFreq');
+  if(fEl) fEl.addEventListener('change', txRepeatToggle);
   const toAmtEl = document.getElementById('txToAmount');
   if(toAmtEl) toAmtEl.addEventListener('input', ()=>{ toAmtEl.dataset.touched = '1'; });
   const accEl = document.getElementById('txAccount');
@@ -1217,6 +1244,21 @@ function openTx(id){
     if(f){ f.value = t.toAmount; f.dataset.touched = '1'; }
   }
   openOv('ovTx');
+}
+
+/* Показать настройки повторения и подсказать, с какой даты оно начнётся */
+function txRepeatToggle(){
+  const on = document.getElementById('txRepeat').checked;
+  const box = document.getElementById('txRepeatBox');
+  box.style.display = on ? 'block' : 'none';
+  if(!on) return;
+
+  const d = document.getElementById('txDate').value || today();
+  const freq = document.getElementById('txRepeatFreq').value;
+  const next = nextRecDate(d, freq);
+  const hint = document.getElementById('txRepeatHint');
+  if(hint) hint.textContent =
+    `Эта операция уже записана на ${dateLong(d)}. Повторы начнутся со следующего раза — ${dateLong(next)}.`;
 }
 
 /* Открыть окно операции сразу на переводе между своими счетами */
@@ -1244,7 +1286,13 @@ function txKind(k, t){
     document.getElementById('txCatWrap').style.display = 'none';
     document.getElementById('txToHint').textContent =
       'Перевод на кредит или кредитку = погашение долга. Перевод с кредитки на карту = снятие в долг.';
+    const rw = document.getElementById('txRepeatWrap');
+    const rb = document.getElementById('txRepeatBox');
+    if(rw) rw.style.display = 'none';
+    if(rb) rb.style.display = 'none';
   } else {
+    const rw = document.getElementById('txRepeatWrap');
+    if(rw) rw.style.display = 'flex';
     document.getElementById('txAccLabel').textContent = k==='income' ? 'Куда зачислено' : 'Чем оплачено';
     accSel.innerHTML = opts(S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card')));
     document.getElementById('txToWrap').style.display = 'none';
@@ -1320,8 +1368,34 @@ function saveTx(id){
   } else {
     S.transactions.push(rec);
   }
+
+  /* Отмечена галочка «регулярный» — заводим повторяющееся начисление.
+     Первый повтор ставим на следующий период: сама операция уже записана,
+     иначе она посчиталась бы в календаре дважды. */
+  let repeated = null;
+  const repEl = document.getElementById('txRepeat');
+  if(!id && repEl && repEl.checked && TXKIND !== 'transfer'){
+    const freq = document.getElementById('txRepeatFreq').value;
+    const until = document.getElementById('txRepeatUntil').value || null;
+    const startDate = nextRecDate(date, freq);
+    if(!until || startDate <= until){
+      repeated = {
+        id: uid(),
+        name: note || catName(rec.categoryId),
+        amount, kind: TXKIND, freq,
+        startDate, endDate: until,
+        accountId, categoryId: rec.categoryId,
+        shiftWeekend: document.getElementById('txRepeatShift').checked,
+        active: true,
+        fromTxId: rec.id
+      };
+      S.recurring.push(repeated);
+    }
+  }
+
   save(); closeOv('ovTx'); renderAll();
-  toast(id ? 'Операция обновлена' : 'Операция добавлена');
+  toast(id ? 'Операция обновлена'
+           : (repeated ? 'Добавлено, повтор с ' + dateLong(repeated.startDate) : 'Операция добавлена'));
 }
 
 function deleteTx(id){
