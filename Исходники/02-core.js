@@ -83,6 +83,7 @@ const DEFAULT = {
   ],
   recurring: [],
   profile: { name: '', avatar: '' },   // имя и фото пользователя
+  planOverrides: {},                   // ручные правки плановых платежей
   settings: {
     minBuffer: 10000,
     /* Ориентировочные курсы — проверьте и поправьте в настройках.
@@ -186,6 +187,26 @@ function monthKey(s){ return s.slice(0,7); }
 function monthLabel(k){ const [y,m] = k.split('-'); return MONTHS_N[+m-1]+' '+y; }
 function isWeekend(s){ const w = parseISO(s).getDay(); return w===0 || w===6; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- ручные правки плановых платежей ----------------
+   Плановые строки никогда не исчезают сами. Пользователь может сдвинуть
+   дату или изменить сумму конкретного платежа — правка живёт здесь. */
+function planKey(kind, refId, date){ return kind + ':' + refId + '|' + date; }
+
+function planOverride(key){
+  if(!S.planOverrides) S.planOverrides = {};
+  return S.planOverrides[key] || null;
+}
+function setPlanOverride(key, patch){
+  if(!S.planOverrides) S.planOverrides = {};
+  S.planOverrides[key] = Object.assign({}, S.planOverrides[key], patch);
+  save(); renderAll();
+}
+function clearPlanOverride(key){
+  if(S.planOverrides) delete S.planOverrides[key];
+  save(); renderAll();
+  toast('Правка отменена');
+}
 
 /* ---------------- срок кредита ---------------- */
 /* Сколько платежей укладывается между первым и последним включительно */

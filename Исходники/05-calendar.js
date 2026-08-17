@@ -76,6 +76,20 @@ function deleteRecurring(id){
   save(); closeOv('ovRec'); renderAll(); toast('Удалено');
 }
 
+/* Ищем реальную операцию, которая закрывает плановое начисление.
+   Совпадение по счёту, виду и категории, дата — в пределах нескольких дней:
+   банк может провести платёж не день в день. */
+const MATCH_DAYS = 4;
+function matchActual(rule, date, used){
+  return S.transactions.find(t =>
+    !used.has(t.id) &&
+    t.type === rule.kind &&
+    t.accountId === rule.accountId &&
+    (!rule.categoryId || t.categoryId === rule.categoryId) &&
+    Math.abs(daysBetween(t.date, date)) <= MATCH_DAYS
+  ) || null;
+}
+
 /* Разворачиваем регулярный платёж в список дат */
 function expandRecurring(r, from, to){
   const out = [];
@@ -119,10 +133,34 @@ function buildForecast(days){
   const events = {};
   const push = e => { (events[e.date] = events[e.date] || []).push(e); };
 
-  // 1) регулярные платежи и доходы
+  /* 1) регулярные платежи и доходы.
+     Если на эту дату уже есть реальная операция по тому же счёту и категории —
+     значит, платёж прошёл: плановую строку не показываем, иначе посчитаем дважды. */
+  const usedTx = new Set();
   for(const r of S.recurring){
     if(r.active===false) continue;
-    for(const e of expandRecurring(r, from, to)) push(Object.assign({}, e, {amount: toBase(e.amount, accCurrency(r.accountId))}));
+    for(const e of expandRecurring(r, from, to)){
+      const key = planKey('rec', r.id, e.date);
+      const ov  = planOverride(key);
+
+      /* ручная правка даты или суммы имеет приоритет */
+      const date   = (ov && ov.date)   ? ov.date   : e.date;
+      const amount = (ov && ov.amount != null) ? ov.amount : e.amount;
+      if(date < from || date > to) continue;
+
+      /* платёж найден среди реальных операций: строку НЕ убираем,
+         помечаем «оплачено» и не считаем в сумме дня */
+      const hit = matchActual(r, date, usedTx);
+      if(hit) usedTx.add(hit.id);
+
+      push({
+        date, name: e.name, kind: e.kind, categoryId: e.categoryId,
+        amount: toBase(amount, accCurrency(r.accountId)),
+        recId: r.id, planKey: key, planned: true,
+        done: !!hit, paidNote: hit ? 'оплачено' : null,
+        edited: !!(ov && (ov.date || ov.amount != null))
+      });
+    }
   }
   // 2) обязательные платежи по долгам из графиков
   for(const p of futureDebtPayments(to)) push({date:p.date, name:'Платёж: '+p.name, amount:p.amount, kind:'expense', debt:true});
@@ -285,10 +323,20 @@ function renderCalendar(){
     dbox.innerHTML = shown.map(d=>{
       const cls = d.close<0 ? 'gap' : (d.close<buf ? 'low' : '') ;
       const dt = parseISO(d.date);
-      const items = d.items.length ? d.items.map(e=>`
-          <div class="it" ${e.done?'style="opacity:.6"':''}>
-            <span class="nm">${esc(e.name)}${e.done?' <span class="chip req">проведено</span>':''}</span>
-            <span class="${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</span></div>`).join('')
+      const items = d.items.length ? d.items.map(e=>{
+          const marks =
+            (e.paidNote ? ' <span class="chip ok">оплачено</span>' : '') +
+            (e.done && !e.paidNote ? ' <span class="chip req">проведено</span>' : '') +
+            (e.edited ? ' <span class="chip info">изменён</span>' : '');
+          const actions = (e.planned && !e.done)
+            ? ` <button class="chip info" style="border:none;cursor:pointer"
+                  onclick="confirmPlanned('${e.recId}','${d.date}')">внести</button>
+               <button class="chip req" style="border:none;cursor:pointer"
+                  onclick="editPlanned('${e.planKey}','${d.date}',${e.amount})">изменить</button>` : '';
+          return `<div class="it" ${e.done?'style="opacity:.55"':''}>
+            <span class="nm">${esc(e.name)}${marks}${actions}</span>
+            <span class="${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</span></div>`;
+        }).join('')
         : `<div class="none">нет операций</div>`;
       return `<div class="day ${cls} ${isWeekend(d.date)?'wknd':''}">
         <div class="dnum"><b>${dt.getDate()}</b><span>${DOW[dt.getDay()]} ${MONTHS[dt.getMonth()].slice(0,3)}</span></div>
@@ -487,6 +535,8 @@ function renderHome(){
   if(!S.accounts.length) alerts.push({t:'Добавьте счета', s:'Карты, наличные, вклады и кредиты — база для всех расчётов', cls:'info', go:'accounts'});
   else if(!S.recurring.length) alerts.push({t:'Добавьте регулярные платежи', s:'Без них календарь не может прогнозировать остаток', cls:'info', go:'calendar'});
 
+  if(typeof renderDebtReminders === 'function') renderDebtReminders();
+
   const ac = document.getElementById('cardAlerts');
   if(alerts.length){
     ac.style.display = 'block';
@@ -500,7 +550,8 @@ function renderHome(){
   const up = [];
   for(let i=0;i<F.length && up.length<6;i++)
     for(const e of F[i].items)
-      if(!e.done && up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
+      /* платежи по долгам показаны отдельной карточкой с кнопкой «Внести» */
+      if(!e.done && !e.debt && up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
   document.getElementById('upcoming').innerHTML = up.length
     ? up.map(e=>`<div class="row"><div class="l"><div class="t">${esc(e.name)}</div>
         <div class="s">${dateLong(e.date)}, ${DOW[parseISO(e.date).getDay()]}</div></div>
@@ -551,3 +602,65 @@ function renderAll(){
 
 /* демо-данные для первого запуска не создаём: пользователь заполняет сам */
 renderAll();
+
+
+/* =========================================================================
+   ПОДТВЕРЖДЕНИЕ ПЛАНОВОГО ПЛАТЕЖА
+   Открывает окно операции с уже заполненными полями: остаётся проверить
+   сумму (банк мог списать иначе) и сохранить.
+   ========================================================================= */
+function confirmPlanned(recId, date){
+  const r = S.recurring.find(x => x.id === recId);
+  if(!r){ toast('Правило не найдено'); return; }
+
+  openTx();
+  txKind(r.kind);
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  set('txDate', date);
+  set('txAmount', r.amount);
+  set('txAccount', r.accountId);
+  set('txCategory', r.categoryId);
+  set('txNote', r.name);
+
+  const box = document.getElementById('txRepeatBox');
+  if(box) box.style.display = 'none';
+  const rep = document.getElementById('txRepeat');
+  if(rep) rep.checked = false;      // повтор уже есть, второй не нужен
+
+  toast('Проверьте сумму и сохраните');
+}
+
+
+/* =========================================================================
+   РУЧНАЯ ПРАВКА ПЛАНОВОГО ПЛАТЕЖА
+   Строка из плана никогда не пропадает сама — её можно только сдвинуть
+   по дате или изменить сумму. Здесь это и делается.
+   ========================================================================= */
+function editPlanned(key, date, amount){
+  const ov = planOverride(key);
+  document.getElementById('ovSchedBody').innerHTML = `
+    <h3>Правка планового платежа</h3>
+    <div class="note">Меняется только этот платёж. Само правило и остальные
+      повторы останутся как есть.</div>
+    <div class="f2">
+      <div class="f"><label>Дата</label>
+        <input type="date" id="poDate" value="${(ov && ov.date) || date}"></div>
+      <div class="f"><label>Сумма, ₽</label>
+        <input type="number" step="0.01" id="poAmount" value="${(ov && ov.amount != null) ? ov.amount : Math.round(amount)}"></div>
+    </div>
+    <div class="btnrow">
+      ${ov ? `<button class="btn btn-s" onclick="clearPlanOverride('${key}'); closeOv('ovSched')">Вернуть как было</button>` : ''}
+      <button class="btn btn-p" onclick="savePlanEdit('${key}')">Сохранить</button>
+    </div>`;
+  openOv('ovSched');
+}
+
+function savePlanEdit(key){
+  const d = document.getElementById('poDate').value;
+  const a = parseFloat(document.getElementById('poAmount').value);
+  if(!d){ toast('Укажите дату'); return; }
+  if(!a || a <= 0){ toast('Укажите сумму'); return; }
+  setPlanOverride(key, {date: d, amount: a});
+  closeOv('ovSched');
+  toast('Платёж изменён');
+}

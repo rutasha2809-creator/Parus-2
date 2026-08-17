@@ -426,13 +426,14 @@ function renderDebts(){
 }
 
 /* Быстрое внесение платежа = перевод с ликвидного счёта на долговой */
-function quickPay(debtId){
+function quickPay(debtId, presetAmount, presetDate){
   const a = acc(debtId);
   const froms = liquidAccounts();
   if(!froms.length){ toast('Сначала добавьте карту или наличные'); return; }
 
-  let suggested = '';
-  if(a.type==='loan'){
+  let suggested = presetAmount != null ? presetAmount : '';
+  if(presetAmount != null){ /* сумма пришла из напоминания */ }
+  else if(a.type==='loan'){
     const s = loanSchedule(a).filter(r=>!r.paid && !r.error);
     if(s.length) suggested = s[0].payment;
   } else if(a.type==='credit_card'){
@@ -447,7 +448,7 @@ function quickPay(debtId){
     <h3>Платёж: ${esc(a.name)}</h3>
     <div class="note">Текущий долг ${money(balance(a))}. Платёж уменьшит долг и спишется с выбранного счёта.</div>
     <div class="f2">
-      <div class="f"><label>Дата</label><input type="date" id="qpDate" value="${today()}"></div>
+      <div class="f"><label>Дата</label><input type="date" id="qpDate" value="${presetDate && presetDate <= today() ? presetDate : today()}"></div>
       <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" id="qpAmount" value="${suggested}"></div>
     </div>
     <div class="f"><label>Откуда списать</label>
@@ -695,4 +696,109 @@ function extractScheduleRows(lines){
     out.push({date, amount: nums[0]});
   }
   return out;
+}
+
+
+/* =========================================================================
+   НАПОМИНАНИЯ О ПЛАТЕЖАХ ПО ДОЛГАМ
+   Смотрим и вперёд, и назад: просроченный платёж выпадал из прогноза
+   и о нём никто не напоминал.
+   ========================================================================= */
+
+function debtReminders(daysAhead){
+  const ahead = daysAhead == null ? 7 : daysAhead;
+  const T = today();
+  const limit = addDays(T, ahead);
+  const out = [];
+
+  for(const a of debtAccounts()){
+    if(balance(a) <= 0) continue;
+
+    let sched = [];
+    if(a.type==='loan')             sched = loanSchedule(a).filter(r=>!r.paid && !r.error);
+    else if(a.type==='credit_card') sched = cardSchedule(a).filter(r=>!r.error);
+    else if(a.type==='installment') sched = installmentSchedule(a);
+    else if(a.type==='debt' && a.dueDate) sched = [{date:a.dueDate, payment:balance(a)}];
+
+    const used = new Set();
+    for(const r of sched){
+      const key = planKey('debt', a.id, r.date);
+      const ov  = planOverride(key);
+      const date   = (ov && ov.date) ? ov.date : r.date;
+      const amount = (ov && ov.amount != null) ? ov.amount : r.payment;
+      if(date > limit) continue;
+
+      /* Платёж найден среди операций — строку НЕ убираем, помечаем оплаченной.
+         Пользователь должен видеть, что именно было запланировано. */
+      const hit = actualPayments(a.id, limit).find(p =>
+        !used.has(p.txId) && Math.abs(daysBetween(p.date, date)) <= MATCH_DAYS);
+      if(hit) used.add(hit.txId);
+
+      const late = daysBetween(T, date);            // >0 — сколько дней просрочено
+      out.push({
+        accountId: a.id,
+        name: a.name,
+        type: a.type,
+        date, amount,
+        planKey: key,
+        currency: accCurrency(a),
+        paid: !!hit,
+        paidAmount: hit ? hit.amount : null,
+        edited: !!(ov && (ov.date || ov.amount != null)),
+        status: hit ? 'paid' : (date < T ? 'overdue' : (date === T ? 'today' : 'soon')),
+        daysLate: late
+      });
+    }
+  }
+  out.sort((x,y)=>x.date.localeCompare(y.date));
+  return out;
+}
+
+function renderDebtReminders(){
+  const card = document.getElementById('cardDebtDue');
+  const box  = document.getElementById('debtDue');
+  if(!box || !card) return;
+
+  const list = debtReminders(7);
+  if(!list.length){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const overdue = list.filter(x=>x.status==='overdue').length;
+  const head = document.getElementById('debtDueHead');
+  if(head) head.textContent = overdue
+    ? `Платежи по долгам · просрочено ${overdue}`
+    : 'Платежи по долгам';
+
+  box.innerHTML = list.map(x=>{
+    const chip = x.status==='paid'
+        ? '<span class="chip ok">оплачено</span>'
+      : x.status==='overdue'
+        ? `<span class="chip bad">просрочен на ${x.daysLate} ${plural(x.daysLate,'день','дня','дней')}</span>`
+      : x.status==='today'
+        ? '<span class="chip opt">сегодня</span>'
+        : `<span class="chip req">через ${Math.abs(x.daysLate)} ${plural(Math.abs(x.daysLate),'день','дня','дней')}</span>`;
+    const editMark = x.edited ? ' <span class="chip info">изменён</span>' : '';
+
+    /* Оплаченный платёж остаётся в списке — исчезать ничего не должно.
+       Разница между планом и фактом видна сразу. */
+    const factNote = (x.paid && Math.abs(x.paidAmount - x.amount) > 0.5)
+      ? `<div class="s">По плану ${money(x.amount,{cur:x.currency})}, фактически ${money(x.paidAmount,{cur:x.currency})}</div>` : '';
+
+    const actions = x.paid
+      ? `<button class="btn btn-s btn-sm" onclick="editPlanned('${x.planKey}','${x.date}',${x.amount})">Изменить</button>`
+      : `<button class="btn btn-s btn-sm" onclick="editPlanned('${x.planKey}','${x.date}',${x.amount})">Изменить</button>
+         <button class="btn btn-p btn-sm" onclick="quickPay('${x.accountId}', ${x.amount}, '${x.date}')">Внести</button>`;
+
+    return `<div class="row" ${x.paid?'style="opacity:.6"':''}>
+      <div class="l">
+        <div class="t">${esc(x.name)} ${chip}${editMark}</div>
+        <div class="s">${dateLong(x.date)} · ${ACC_TYPES[x.type].label}</div>
+        ${factNote}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <div class="v neg">${money(x.amount,{cur:x.currency})}</div>
+        ${actions}
+      </div>
+    </div>`;
+  }).join('');
 }
