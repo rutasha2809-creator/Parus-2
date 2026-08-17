@@ -1299,7 +1299,27 @@ function openTx(id){
     const f = document.getElementById('txToAmount');
     if(f){ f.value = t.toAmount; f.dataset.touched = '1'; }
   }
+  /* Операция уже отмечена регулярной — показываем это состояние,
+     иначе галочка выглядела бы снятой и правка терялась. */
+  const linked = t ? recForTx(t.id) : null;
+  if(linked){
+    const cb = document.getElementById('txRepeat');
+    if(cb) cb.checked = true;
+    const f1 = document.getElementById('txRepeatFreq');
+    if(f1 && linked.freq) f1.value = linked.freq;
+    const f2 = document.getElementById('txRepeatUntil');
+    if(f2 && linked.endDate) f2.value = linked.endDate;
+    const f3 = document.getElementById('txRepeatShift');
+    if(f3) f3.checked = !!linked.shiftWeekend;
+    txRepeatToggle();
+  }
   openOv('ovTx');
+}
+
+/* Повторяющееся начисление, заведённое из этой операции */
+function recForTx(txId){
+  if(!txId) return null;
+  return S.recurring.find(r => r.fromTxId === txId) || null;
 }
 
 /* Показать настройки повторения и подсказать, с какой даты оно начнётся */
@@ -1427,16 +1447,20 @@ function saveTx(id){
 
   /* Отмечена галочка «регулярный» — заводим повторяющееся начисление.
      Первый повтор ставим на следующий период: сама операция уже записана,
-     иначе она посчиталась бы в календаре дважды. */
-  let repeated = null;
+     иначе она посчиталась бы в календаре дважды.
+     Работает и при правке уже сохранённой операции: галочку можно
+     поставить позже, а изменённые сумма и дата подхватятся повтором. */
+  let repeated = null, dropped = false;
   const repEl = document.getElementById('txRepeat');
-  if(!id && repEl && repEl.checked && TXKIND !== 'transfer'){
+  const wantRepeat = repEl && repEl.checked && TXKIND !== 'transfer';
+  const linked = recForTx(rec.id);
+
+  if(wantRepeat){
     const freq = document.getElementById('txRepeatFreq').value;
     const until = document.getElementById('txRepeatUntil').value || null;
     const startDate = nextRecDate(date, freq);
     if(!until || startDate <= until){
-      repeated = {
-        id: uid(),
+      const body = {
         name: note || catName(rec.categoryId),
         amount, kind: TXKIND, freq,
         startDate, endDate: until,
@@ -1445,18 +1469,30 @@ function saveTx(id){
         active: true,
         fromTxId: rec.id
       };
-      S.recurring.push(repeated);
+      if(linked){ repeated = Object.assign(linked, body); }
+      else { repeated = Object.assign({ id: uid() }, body); S.recurring.push(repeated); }
+    } else if(linked){
+      S.recurring = S.recurring.filter(r => r !== linked); dropped = true;
     }
+  } else if(linked){
+    /* галочку сняли вручную — повтор убираем, сама операция остаётся */
+    S.recurring = S.recurring.filter(r => r !== linked); dropped = true;
   }
 
   save(); closeOv('ovTx'); renderAll();
-  toast(id ? 'Операция обновлена'
-           : (repeated ? 'Добавлено, повтор с ' + dateLong(repeated.startDate) : 'Операция добавлена'));
+  toast(repeated ? (linked ? 'Сохранено, повтор с ' : 'Добавлено, повтор с ') + dateLong(repeated.startDate)
+      : dropped ? 'Сохранено, повтор отменён'
+      : id ? 'Операция обновлена' : 'Операция добавлена');
 }
 
 function deleteTx(id){
   if(!confirm('Удалить операцию?')) return;
   S.transactions = S.transactions.filter(t=>t.id!==id);
+  /* Осиротевший повтор продолжал бы наполнять календарь без видимой причины */
+  const linked = recForTx(id);
+  if(linked && confirm('У этой операции был регулярный повтор «' + linked.name + '».\nУбрать его тоже?')){
+    S.recurring = S.recurring.filter(r => r !== linked);
+  }
   save(); closeOv('ovTx'); renderAll(); toast('Удалено');
 }
 
