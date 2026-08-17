@@ -32,7 +32,7 @@ function openRecurring(id){
       <div class="f"><label>Действует до</label><input type="date" id="rcEnd" value="${r&&r.endDate?r.endDate:''}"></div>
     </div>
     <div class="f"><label>Счёт</label>
-      <select id="rcAcc">${accs.map(a=>`<option value="${a.id}" ${r&&r.accountId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
+      <select id="rcAcc">${accs.map(a=>`<option value="${a.id}" ${r&&r.accountId===a.id?'selected':''}>${esc(accLabel(a))}</option>`).join('')}</select></div>
     <div class="f"><label>Категория</label><select id="rcCat"></select></div>
     <label class="check"><input type="checkbox" id="rcWork" ${r&&r.shiftWeekend?'checked':''}>
       Переносить с выходных на ближайший будний день</label>
@@ -122,20 +122,20 @@ function buildForecast(days){
   // 1) регулярные платежи и доходы
   for(const r of S.recurring){
     if(r.active===false) continue;
-    for(const e of expandRecurring(r, from, to)) push(e);
+    for(const e of expandRecurring(r, from, to)) push(Object.assign({}, e, {amount: toBase(e.amount, accCurrency(r.accountId))}));
   }
   // 2) обязательные платежи по долгам из графиков
   for(const p of futureDebtPayments(to)) push({date:p.date, name:'Платёж: '+p.name, amount:p.amount, kind:'expense', debt:true});
   // 3) закрытие вкладов
   for(const a of S.accounts){
     if(a.type==='deposit' && a.endDate && a.endDate>=from && a.endDate<=to && !a.archived){
-      push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:balance(a), kind:'income', deposit:true});
+      push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:toBase(balance(a), accCurrency(a)), kind:'income', deposit:true});
     }
   }
   // 4) уже внесённые будущие операции (запланированы задним числом на будущее)
   for(const t of S.transactions){
     if(t.date > from && t.date <= to && t.type!=='transfer'){
-      push({date:t.date, name:(t.note||catName(t.categoryId)), amount:t.amount, kind:t.type, actual:true});
+      push({date:t.date, name:(t.note||catName(t.categoryId)), amount:txBase(t), kind:t.type, actual:true});
     }
   }
 
@@ -264,8 +264,8 @@ function renderAnalytics(){
   const kind = document.getElementById('anKind').value;
   const list = txInRange(from,to).filter(t=>t.type===kind);
 
-  const req = list.filter(t=> catMandatory(t.categoryId)).reduce((s,t)=>s+t.amount,0);
-  const opt = list.filter(t=> !catMandatory(t.categoryId)).reduce((s,t)=>s+t.amount,0);
+  const req = list.filter(t=> catMandatory(t.categoryId)).reduce((s,t)=>s+txBase(t),0);
+  const opt = list.filter(t=> !catMandatory(t.categoryId)).reduce((s,t)=>s+txBase(t),0);
   const total = req + opt;
 
   document.getElementById('anReq').textContent = moneyShort(req);
@@ -292,7 +292,7 @@ function renderAnalytics(){
   const byCat = {};
   for(const t of list){
     const k = t.categoryId || 'none';
-    byCat[k] = (byCat[k]||0) + t.amount;
+    byCat[k] = (byCat[k]||0) + txBase(t);
   }
   const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
   document.getElementById('anCatTitle').textContent = (kind==='expense'?'Расходы':'Доходы') + ' по категориям · ' + moneyShort(total);
@@ -333,8 +333,9 @@ function renderAnalytics(){
       if(t.type==='transfer') continue;
       const k = monthKey(t.date);
       months[k] = months[k] || {inc:0, exp:0, opt:0};
-      if(t.type==='income') months[k].inc += t.amount;
-      else { months[k].exp += t.amount; if(!catMandatory(t.categoryId)) months[k].opt += t.amount; }
+      const v = txBase(t);
+      if(t.type==='income') months[k].inc += v;
+      else { months[k].exp += v; if(!catMandatory(t.categoryId)) months[k].opt += v; }
     }
     const mk = Object.keys(months).sort();
     if(mk.length){
@@ -363,7 +364,7 @@ function renderAnalytics(){
     ? topOpt.map(t=>`<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
         <div class="l"><div class="t">${esc(t.note || catName(t.categoryId))}</div>
           <div class="s">${dateLong(t.date)} · ${esc(catName(t.categoryId))}</div></div>
-        <div class="v neg">−${money(t.amount)}</div></div>`).join('')
+        <div class="v neg">−${money(t.amount,{cur:accCurrency(t.accountId)})}</div></div>`).join('')
     : `<div class="empty">Необязательных трат за период не найдено.</div>`;
 }
 function monthsBetween(a,b){
@@ -384,9 +385,9 @@ function renderHome(){
   const n = new Date();
   const [f,t] = periodRange('thismonth');
   const m = txInRange(f,t);
-  const inc = m.filter(x=>x.type==='income').reduce((s,x)=>s+x.amount,0);
-  const exp = m.filter(x=>x.type==='expense').reduce((s,x)=>s+x.amount,0);
-  const req = m.filter(x=>x.type==='expense' && catMandatory(x.categoryId)).reduce((s,x)=>s+x.amount,0);
+  const inc = m.filter(x=>x.type==='income').reduce((s,x)=>s+txBase(x),0);
+  const exp = m.filter(x=>x.type==='expense').reduce((s,x)=>s+txBase(x),0);
+  const req = m.filter(x=>x.type==='expense' && catMandatory(x.categoryId)).reduce((s,x)=>s+txBase(x),0);
   const opt = exp - req;
 
   document.getElementById('hSub').textContent = MONTHS_N[n.getMonth()] + ' ' + n.getFullYear();
@@ -482,7 +483,7 @@ function renderAll(){
     const fa = document.getElementById('fltAccount');
     const cur = fa.value;
     fa.innerHTML = `<option value="">Все счета</option>` +
-      S.accounts.filter(a=>!a.archived).map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+      S.accounts.filter(a=>!a.archived).map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('');
     if(cur) fa.value = cur;
 
     renderHome();
@@ -491,6 +492,7 @@ function renderAll(){
     renderDebts();
     renderCategories();
     renderRules();
+    if(typeof renderRates === 'function') renderRates();
     if(typeof renderAvatar === 'function') renderAvatar();
     if(typeof renderSync === 'function') renderSync();
     if(CUR==='calendar') renderCalendar();

@@ -4,13 +4,29 @@
 const KEY = 'finapp_v2';
 
 const ACC_TYPES = {
-  debit:   {label:'Дебетовая карта', icon:'▭', bg:'#ecebe7', asset:true},
-  cash:    {label:'Наличные',        icon:'≡', bg:'#eaeee9', asset:true},
-  deposit: {label:'Вклад / накопительный', icon:'◫', bg:'#e9ebee', asset:true},
-  credit_card:{label:'Кредитная карта', icon:'▤', bg:'#f0e8e5', asset:false},
-  loan:    {label:'Кредит / ипотека',  icon:'⌂', bg:'#f0ece2', asset:false},
-  debt:    {label:'Прочий долг',       icon:'§', bg:'#eceaee', asset:false}
+  debit:   {label:'Дебетовая карта', short:'дебетовая', icon:'▭', bg:'#ecebe7', asset:true},
+  cash:    {label:'Наличные',        short:'наличные',  icon:'≡', bg:'#eaeee9', asset:true},
+  deposit: {label:'Вклад / накопительный', short:'вклад', icon:'◫', bg:'#e9ebee', asset:true},
+  credit_card:{label:'Кредитная карта', short:'кредитная', icon:'▤', bg:'#f0e8e5', asset:false},
+  loan:    {label:'Кредит / ипотека',  short:'кредит',   icon:'⌂', bg:'#f0ece2', asset:false},
+  installment:{label:'Рассрочка / сплит', short:'рассрочка', icon:'⊞', bg:'#ece9e4', asset:false},
+  debt:    {label:'Прочий долг',       short:'долг',     icon:'§', bg:'#eceaee', asset:false}
 };
+
+/* Десять основных валют. Курс — сколько рублей за единицу. */
+const CURRENCIES = {
+  RUB: {sym:'₽',   name:'Рубль'},
+  USD: {sym:'$',   name:'Доллар США'},
+  EUR: {sym:'€',   name:'Евро'},
+  CNY: {sym:'CN¥', name:'Китайский юань'},
+  GBP: {sym:'£',   name:'Фунт стерлингов'},
+  CHF: {sym:'CHF', name:'Швейцарский франк'},
+  JPY: {sym:'¥',   name:'Японская иена'},
+  KZT: {sym:'₸',   name:'Казахстанский тенге'},
+  TRY: {sym:'₺',   name:'Турецкая лира'},
+  AED: {sym:'AED', name:'Дирхам ОАЭ'}
+};
+const BASE = 'RUB';
 
 /* Приглушённая палитра категорий: тона одной насыщенности, без кислотных цветов */
 const PALETTE = ['#4a4844','#6f7a6c','#9b8564','#9b6b5e','#6d6a7d','#5f7378','#8a7080','#77806a',
@@ -67,7 +83,13 @@ const DEFAULT = {
   ],
   recurring: [],
   profile: { name: '', avatar: '' },   // имя и фото пользователя
-  settings: { minBuffer: 10000 }
+  settings: {
+    minBuffer: 10000,
+    /* Ориентировочные курсы — проверьте и поправьте в настройках.
+       Приложение считает итоги, переводя всё в рубли. */
+    rates: { RUB:1, USD:80, EUR:93, CNY:11, GBP:108, CHF:99, JPY:0.55, KZT:0.16, TRY:2.0, AED:22 },
+    ratesUpdated: null
+  }
 };
 
 var S = load();   // доступно в консоли браузера для отладки
@@ -102,7 +124,31 @@ function money(n, opts){
   const dec = opts.cents ? 2 : 0;
   let s = abs.toLocaleString('ru-RU',{minimumFractionDigits:dec, maximumFractionDigits:dec});
   const sign = n<0 ? '−' : (opts.plus ? '+' : '');
-  return sign + s + ' ₽';
+  const cur = opts.cur || BASE;
+  const sym = (CURRENCIES[cur] || {}).sym || cur;
+  return sign + s + ' ' + sym;
+}
+
+/* ---------------- валюты ---------------- */
+function rates(){
+  const r = (S.settings && S.settings.rates) || {};
+  return Object.assign({RUB:1}, r);
+}
+function rateOf(cur){
+  const r = rates()[cur || BASE];
+  return (typeof r === 'number' && r > 0) ? r : 1;
+}
+function accCurrency(a){
+  if(typeof a === 'string') a = acc(a);
+  return (a && a.currency) || BASE;
+}
+/* Перевод суммы в рубли — итоги считаются в одной валюте */
+function toBase(amount, cur){
+  return round2((Number(amount)||0) * rateOf(cur));
+}
+/* Сумма операции в рублях: валюта берётся у счёта */
+function txBase(t){
+  return toBase(t.amount, accCurrency(t.accountId));
 }
 /* Проценты по-русски: 3.9 → «3,9» */
 function pct(n){
@@ -141,9 +187,41 @@ function monthLabel(k){ const [y,m] = k.split('-'); return MONTHS_N[+m-1]+' '+y;
 function isWeekend(s){ const w = parseISO(s).getDay(); return w===0 || w===6; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+/* ---------------- срок кредита ---------------- */
+/* Сколько платежей укладывается между первым и последним включительно */
+function monthsUntil(from, to){
+  if(!from || !to) return null;
+  const a = parseISO(from), b = parseISO(to);
+  const n = (b.getFullYear()-a.getFullYear())*12 + (b.getMonth()-a.getMonth()) + 1;
+  return n > 0 ? n : null;
+}
+/* Обратная задача: за сколько месяцев закроется долг при известном платеже */
+function termFromPayment(principal, annualRate, payment){
+  principal = Number(principal)||0; payment = Number(payment)||0;
+  if(principal <= 0 || payment <= 0) return null;
+  const i = (Number(annualRate)||0)/100/12;
+  if(i === 0) return Math.ceil(principal/payment);
+  if(payment <= principal*i) return null;           // платёж не покрывает проценты
+  return Math.ceil(-Math.log(1 - principal*i/payment) / Math.log(1+i));
+}
+/* Дата закрытия для показа в форме */
+function payoffDateOf(a){
+  if(!a) return '';
+  if(a.payoffDate) return a.payoffDate;
+  if(a.termMonths && a.nextPaymentDate) return addMonths(a.nextPaymentDate, a.termMonths - 1);
+  return '';
+}
+
 /* ---------------- справочники ---------------- */
 function acc(id){ return S.accounts.find(a=>a.id===id); }
 function accName(id){ const a = acc(id); return a ? a.name : '—'; }
+/* Название с типом: в одном банке бывают и карта, и вклад, и кредитка */
+function accLabel(a){
+  if(typeof a === 'string') a = acc(a);
+  if(!a) return '—';
+  const t = ACC_TYPES[a.type];
+  return a.name + (t ? ' · ' + t.short : '');
+}
 function cat(id){ return S.categories.find(c=>c.id===id); }
 function catName(id){ const c = cat(id); return c ? c.name : 'Без категории'; }
 function catMandatory(id){ const c = cat(id); return c ? c.mandatory !== false : true; }
@@ -184,9 +262,10 @@ function balance(a){
    - расход, оплаченный с долгового счёта   = долг растёт
    - «доход» на долговой счёт (редко)       = уменьшение долга                       */
 
-function totalLiquid(){ return liquidAccounts().reduce((s,a)=>s+balance(a),0); }
-function totalAssets(){ return assetAccounts().reduce((s,a)=>s+balance(a),0); }
-function totalDebt(){ return debtAccounts().reduce((s,a)=>s+Math.max(0,balance(a)),0); }
+/* Итоги — всегда в рублях: счета могут быть в разных валютах */
+function totalLiquid(){ return liquidAccounts().reduce((s,a)=>s+toBase(balance(a), accCurrency(a)),0); }
+function totalAssets(){ return assetAccounts().reduce((s,a)=>s+toBase(balance(a), accCurrency(a)),0); }
+function totalDebt(){ return debtAccounts().reduce((s,a)=>s+Math.max(0,toBase(balance(a), accCurrency(a))),0); }
 function netWorth(){ return totalAssets() - totalDebt(); }
 
 /* ---------------- периоды ---------------- */
@@ -246,9 +325,18 @@ function openAccount(id){
         ${Object.entries(ACC_TYPES).map(([k,v])=>`<option value="${k}" ${k===t?'selected':''}>${v.icon} ${v.label}</option>`).join('')}
       </select>
     </div>
-    <div class="f">
-      <label>Название</label>
-      <input type="text" id="acName" value="${a?esc(a.name):''}" placeholder="Например: Сбер зарплатная">
+    <div class="f2">
+      <div class="f">
+        <label>Название</label>
+        <input type="text" id="acName" value="${a?esc(a.name):''}" placeholder="Например: Сбер зарплатная">
+      </div>
+      <div class="f">
+        <label>Валюта</label>
+        <select id="acCurrency">
+          ${Object.entries(CURRENCIES).map(([code,c])=>
+            `<option value="${code}" ${((a&&a.currency)||BASE)===code?'selected':''}>${code} · ${c.name}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div id="acFields"></div>
     <div class="btnrow" style="margin-top:14px">
@@ -323,17 +411,41 @@ function accTypeFields(a){
         <div class="f"><label>Ставка, % годовых</label><input type="number" step="0.01" id="acRate" value="${v('rate')||0}"></div>
       </div>
       <div class="f2">
-        <div class="f"><label>Осталось платежей, мес.</label><input type="number" id="acTerm" value="${v('termMonths')||''}"></div>
+        <div class="f"><label>Дата закрытия кредита</label>
+          <input type="date" id="acPayoffDate" value="${payoffDateOf(a)}">
+          <div class="hint">Когда внесёте последний платёж</div></div>
         <div class="f"><label>День платежа</label><input type="number" min="1" max="31" id="acPayDay" value="${v('paymentDay')||1}"></div>
       </div>
       <div class="f"><label>Дата ближайшего платежа</label><input type="date" id="acNextDate" value="${v('nextPaymentDate')||today()}"></div>
       <div class="f"><label>Ежемесячный платёж, ₽</label><input type="number" step="0.01" id="acPayment" value="${v('payment')||''}">
-        <div class="hint">Оставьте пустым — рассчитаю аннуитет по ставке и сроку.</div></div>
+        <div class="hint">Достаточно заполнить что-то одно: дату закрытия или платёж — второе посчитается само.</div></div>
       <div class="f"><label>Источник графика</label>
         <select id="acSchedMode">
           <option value="auto" ${v('scheduleMode')!=='manual'?'selected':''}>Рассчитывать автоматически</option>
           <option value="manual" ${v('scheduleMode')==='manual'?'selected':''}>Использовать график банка (введу вручную)</option>
         </select></div>`;
+  }
+  else if(type==='installment'){
+    html = `<div class="f2">
+        <div class="f"><label>Остаток долга, ₽</label><input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}"></div>
+        <div class="f"><label>Осталось платежей</label><input type="number" min="1" id="acParts" value="${v('partsLeft')||''}" placeholder="напр. 4"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Периодичность</label>
+          <select id="acFreq">
+            <option value="biweekly" ${v('freq')==='biweekly'?'selected':''}>Раз в 2 недели</option>
+            <option value="monthly" ${v('freq')!=='biweekly'?'selected':''}>Ежемесячно</option>
+          </select></div>
+        <div class="f"><label>Дата ближайшего платежа</label>
+          <input type="date" id="acNextDate" value="${v('nextPaymentDate')||today()}"></div>
+      </div>
+      <div class="f"><label>Размер платежа, ₽</label>
+        <input type="number" step="0.01" id="acPayment" value="${v('payment')||''}">
+        <div class="hint">Оставьте пустым — поделю остаток на число платежей поровну.</div></div>
+      <div class="hint" style="margin:-4px 0 12px">
+        Рассрочка обычно без процентов: платежи равные, переплаты нет.
+        Если банк берёт комиссию, впишите её в размер платежа.
+      </div>`;
   }
   else if(type==='debt'){
     html = `<div class="f"><label>Сумма долга, ₽</label><input type="number" step="0.01" id="acOpening" value="${v('openingBalance')||0}"></div>
@@ -354,6 +466,7 @@ function saveAccount(id){
 
   let a = id ? acc(id) : {id:uid(), type, archived:false};
   a.name = name;
+  a.currency = g('acCurrency') || BASE;
   a.openingBalance = gn('acOpening') || 0;
   a.note = g('acNote');
 
@@ -373,13 +486,33 @@ function saveAccount(id){
     if(!a.graceUntil && a.gracePeriodDays) a.graceUntil = addDays(today(), a.gracePeriodDays);
   }
   if(type==='loan'){
-    a.rate = gn('acRate'); a.termMonths = gn('acTerm');
+    a.rate = gn('acRate');
     a.paymentDay = gn('acPayDay') || 1;
     a.nextPaymentDate = g('acNextDate') || today();
+    a.payoffDate = g('acPayoffDate') || null;
     a.payment = gn('acPayment');
     a.scheduleMode = g('acSchedMode');
     if(!a.manualSchedule) a.manualSchedule = [];
-    if(!a.payment && a.rate!=null && a.termMonths) a.payment = annuity(a.openingBalance, a.rate, a.termMonths);
+
+    // срок в месяцах выводим из даты закрытия — она понятнее пользователю
+    a.termMonths = a.payoffDate ? monthsUntil(a.nextPaymentDate, a.payoffDate) : null;
+
+    // что не заполнили — посчитаем: платёж из срока или срок из платежа
+    if(!a.payment && a.rate!=null && a.termMonths) {
+      a.payment = annuity(a.openingBalance, a.rate, a.termMonths);
+    } else if(a.payment && !a.termMonths) {
+      a.termMonths = termFromPayment(a.openingBalance, a.rate, a.payment);
+      if(a.termMonths) a.payoffDate = addMonths(a.nextPaymentDate, a.termMonths - 1);
+    }
+  }
+  if(type==='installment'){
+    a.partsLeft = gn('acParts');
+    a.freq = g('acFreq') || 'monthly';
+    a.nextPaymentDate = g('acNextDate') || today();
+    a.payment = gn('acPayment');
+    // без процентов: чего не хватает — досчитаем
+    if(!a.payment && a.partsLeft) a.payment = round2(a.openingBalance / a.partsLeft);
+    if(!a.partsLeft && a.payment) a.partsLeft = Math.ceil(a.openingBalance / a.payment);
   }
   if(type==='debt'){ a.dueDate = g('acDueDate'); }
 
@@ -411,7 +544,7 @@ function renderAccounts(){
   box.innerHTML = groups.map(([title, types])=>{
     const list = S.accounts.filter(a=>types.includes(a.type) && !a.archived);
     if(!list.length) return '';
-    const sum = list.reduce((s,a)=>s+balance(a),0);
+    const sum = list.reduce((s,a)=>s+toBase(balance(a), accCurrency(a)),0);
     return `<div class="sec-title">${title} · <span style="text-transform:none;letter-spacing:0">${money(sum)}</span></div>
       <div class="card">${list.map(accRow).join('')}</div>`;
   }).join('');
@@ -423,12 +556,19 @@ function accRow(a){
   let sub = T.label;
   if(a.type==='credit_card' && a.limit) sub += ` · доступно ${money(Math.max(0,a.limit-b))}`;
   if(a.type==='loan' && a.payment) sub += ` · платёж ${money(a.payment)}`;
+  if(a.type==='loan'){ const pd = payoffDateOf(a); if(pd) sub += ` · до ${dateShort(pd)} ${parseISO(pd).getFullYear()}`; }
   if(a.type==='deposit' && a.rate) sub += ` · ${pct(a.rate)}% годовых`;
+  if(a.type==='installment'){
+    const left = installmentPartsLeft(a);
+    if(left) sub += ` · ${left} ${plural(left,'платёж','платежа','платежей')} по ${money(a.payment||0)}`;
+  }
   if(a.type==='debt' && a.dueDate) sub += ` · до ${dateShort(a.dueDate)}`;
+  const cur = accCurrency(a);
+  const inBase = cur !== BASE ? `<div style="font-size:11px;color:var(--muted);font-weight:500">${money(toBase(b,cur))}</div>` : '';
   return `<div class="acc" onclick="openAccount('${a.id}')">
     <div class="ico" style="background:${T.bg}">${T.icon}</div>
     <div class="l"><div class="nm">${esc(a.name)}</div><div class="sb">${sub}</div></div>
-    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b)}</div>
+    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b,{cur})}${inBase}</div>
   </div>`;
 }
 
@@ -470,7 +610,7 @@ function txKind(k, t){
   document.querySelectorAll('#txSeg button').forEach(b=>b.classList.toggle('on', b.dataset.t===k));
   const accSel = document.getElementById('txAccount');
   const toSel  = document.getElementById('txTo');
-  const opts = list => list.map(a=>`<option value="${a.id}">${ACC_TYPES[a.type].icon} ${esc(a.name)}</option>`).join('');
+  const opts = list => list.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('');
 
   if(k==='transfer'){
     document.getElementById('txAccLabel').textContent = 'Откуда';
@@ -542,8 +682,8 @@ function renderTx(){
     (t.note||'').toLowerCase().includes(q) || catName(t.categoryId).toLowerCase().includes(q));
   list.sort((a,b)=> b.date.localeCompare(a.date) || (b.id>a.id?1:-1));
 
-  const inc = list.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const exp = list.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const inc = list.filter(t=>t.type==='income').reduce((s,t)=>s+txBase(t),0);
+  const exp = list.filter(t=>t.type==='expense').reduce((s,t)=>s+txBase(t),0);
   document.getElementById('txInc').textContent = moneyShort(inc);
   document.getElementById('txExp').textContent = moneyShort(exp);
   const net = document.getElementById('txNet');
@@ -581,7 +721,7 @@ function txRow(t){
   const optChip = (t.type==='expense' && !catMandatory(t.categoryId)) ? ' <span class="chip opt">необяз</span>' : '';
   return `<div class="row" onclick="openTx('${t.id}')" style="cursor:pointer">
     <div class="l"><div class="t">${esc(title)}${optChip}</div><div class="s">${sub}</div></div>
-    <div class="v ${cls}">${sign}${money(t.amount)}</div>
+    <div class="v ${cls}">${sign}${money(t.amount,{cur:accCurrency(t.accountId)})}</div>
   </div>`;
 }
 
@@ -698,4 +838,67 @@ function wipeData(){
   if(!confirm('Точно? Сделайте резервную копию, если ещё не сделали.')) return;
   localStorage.removeItem(KEY);
   S = load(); renderAll(); toast('Данные очищены');
+}
+
+
+/* =========================================================================
+   КУРСЫ ВАЛЮТ
+   ========================================================================= */
+function renderRates(){
+  const box = document.getElementById('ratesBody');
+  if(!box) return;
+  const r = rates();
+  const upd = S.settings && S.settings.ratesUpdated;
+
+  box.innerHTML = Object.entries(CURRENCIES)
+    .filter(([code]) => code !== BASE)
+    .map(([code,c])=>`
+      <div class="row">
+        <div class="l"><div class="t">${code} · ${esc(c.name)}</div>
+          <div class="s">1 ${c.sym} = столько рублей</div></div>
+        <input type="number" step="0.0001" style="width:110px;padding:7px;border:1px solid var(--line);
+          border-radius:8px;background:#faf9f7;text-align:right"
+          value="${r[code] != null ? r[code] : ''}" onchange="saveRate('${code}', this.value)">
+      </div>`).join('') +
+    `<div style="font-size:12px;color:var(--muted);margin-top:10px">
+       ${upd ? 'Обновлено: ' + dateLong(upd.slice(0,10)) : 'Курсы заданы примерно — проверьте перед расчётами.'}
+     </div>`;
+}
+
+function saveRate(code, value){
+  const v = parseFloat(String(value).replace(',','.'));
+  if(!S.settings.rates) S.settings.rates = {};
+  if(!isFinite(v) || v <= 0){ toast('Курс должен быть больше нуля'); renderRates(); return; }
+  S.settings.rates[code] = v;
+  save(); renderAll();
+  toast(code + ': курс сохранён');
+}
+
+/* Свежие курсы из открытого источника. Не получилось — правим вручную. */
+async function fetchRates(){
+  toast('Запрашиваю курсы…');
+  try{
+    const res = await fetch('https://open.er-api.com/v6/latest/RUB');
+    if(!res.ok) throw new Error('источник недоступен');
+    const data = await res.json();
+    if(!data || !data.rates) throw new Error('пустой ответ');
+
+    if(!S.settings.rates) S.settings.rates = {};
+    let n = 0;
+    for(const code of Object.keys(CURRENCIES)){
+      if(code === BASE) continue;
+      const perRub = data.rates[code];          // сколько валюты за 1 рубль
+      if(perRub && perRub > 0){
+        S.settings.rates[code] = round2(1 / perRub);   // сколько рублей за единицу
+        n++;
+      }
+    }
+    S.settings.rates.RUB = 1;
+    S.settings.ratesUpdated = new Date().toISOString();
+    save(); renderAll();
+    toast(`Обновлено курсов: ${n}`);
+  }catch(e){
+    console.error('rates', e);
+    toast('Не удалось получить курсы — впишите вручную');
+  }
 }

@@ -172,6 +172,29 @@ function cardSchedule(a, mode){
   const rate = (Number(a.rate)||0)/100/12;
   const gEnd = graceEnd(a);
 
+  /* Загружен график банка — считаем по нему, свои формулы не навязываем */
+  if(a.scheduleMode === 'manual' && Array.isArray(a.manualSchedule) && a.manualSchedule.length){
+    const pays = actualPayments(a.id);
+    const used = new Set();
+    let left = bal;
+    for(const r of [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date))){
+      let paid = null;
+      pays.forEach((p,idx)=>{
+        if(!paid && !used.has(idx) && Math.abs(daysBetween(p.date, r.date)) <= 10){ used.add(idx); paid = p; }
+      });
+      const amount = Number(r.amount)||0;
+      const interest = r.interest!=null ? Number(r.interest) : 0;
+      const principal = round2((paid ? paid.amount : amount) - interest);
+      left = round2(Math.max(0, left - principal));
+      rows.push({date:r.date, payment:amount, interest, principal, balance:left,
+                 paid: !!paid, paidAmount: paid?paid.amount:null});
+    }
+    pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
+      principal:p.amount, balance:null, paid:true, paidAmount:p.amount, extra:true}); });
+    rows.sort((x,y)=>x.date.localeCompare(y.date));
+    return rows;
+  }
+
   if(mode==='full'){
     const d = (gEnd && gEnd>=today()) ? gEnd : nextDayOfMonth(a.paymentDay || 25);
     return [{date:d, payment:bal, interest:0, principal:bal, balance:0, grace:!!(gEnd && gEnd>=today()), full:true}];
@@ -217,6 +240,46 @@ function nextDayOfMonth(day){
   return iso(d);
 }
 
+/* -------------------------------------------------------------------------
+   РАССРОЧКА / СПЛИТ
+   Обычно без процентов: равные платежи через равные промежутки.
+   Считаем от текущего остатка, поэтому досрочные взносы сокращают график.
+   ------------------------------------------------------------------------- */
+
+/* Сколько платежей осталось при текущем остатке */
+function installmentPartsLeft(a){
+  const bal = balance(a);
+  if(bal <= 0) return 0;
+  const pay = Number(a.payment) || 0;
+  if(pay > 0) return Math.ceil(round2(bal) / pay);
+  return Number(a.partsLeft) || 0;
+}
+
+function installmentSchedule(a){
+  const rows = [];
+  let bal = balance(a);
+  if(bal <= 0) return rows;
+
+  let pay = Number(a.payment) || 0;
+  if(pay <= 0){
+    const n = Number(a.partsLeft) || 0;
+    if(n <= 0) return rows;
+    pay = round2(bal / n);
+  }
+
+  let d = a.nextPaymentDate || today();
+  if(d < today()) d = today();
+  let guard = 0;
+  while(bal > 0.01 && guard < 240){
+    const amount = Math.min(pay, bal);
+    bal = round2(bal - amount);
+    rows.push({date:d, payment:amount, interest:0, principal:amount, balance:bal, paid:false});
+    d = (a.freq === 'biweekly') ? addDays(d, 14) : addMonths(d, 1);
+    guard++;
+  }
+  return rows;
+}
+
 /* Единая точка: будущие обязательные платежи по всем долгам, от сегодня */
 function futureDebtPayments(untilDate){
   const out = [];
@@ -225,10 +288,11 @@ function futureDebtPayments(untilDate){
     let sched = [];
     if(a.type==='loan') sched = loanSchedule(a).filter(r=>!r.paid && !r.error);
     else if(a.type==='credit_card') sched = cardSchedule(a).filter(r=>!r.error);
+    else if(a.type==='installment') sched = installmentSchedule(a);
     else if(a.type==='debt' && a.dueDate) sched = [{date:a.dueDate, payment:balance(a)}];
     for(const r of sched){
       if(r.date >= today() && r.date <= untilDate)
-        out.push({date:r.date, name:a.name, amount:r.payment, accountId:a.id, kind:'debt'});
+        out.push({date:r.date, name:a.name, amount:toBase(r.payment, accCurrency(a)), accountId:a.id, kind:'debt'});
     }
   }
   return out;
@@ -261,6 +325,7 @@ function renderDebts(){
     let sched = [];
     if(a.type==='loan') sched = loanSchedule(a);
     else if(a.type==='credit_card') sched = cardSchedule(a);
+    else if(a.type==='installment') sched = installmentSchedule(a);
 
     const future = sched.filter(r=>!r.paid && !r.error);
     const nextPay = future[0];
@@ -269,7 +334,18 @@ function renderDebts(){
     const payoffDate = future.length ? future[future.length-1].date : (a.dueDate||null);
 
     let meta = '';
-    if(a.type==='loan' || a.type==='credit_card'){
+    if(a.type==='installment'){
+      const left = installmentPartsLeft(a);
+      const last = sched.length ? sched[sched.length-1].date : null;
+      meta = `<div class="grid3" style="margin:10px 0">
+        <div class="stat"><div class="n" style="font-size:14px">${nextPay?money(nextPay.payment):'—'}</div><div class="l">След. платёж</div></div>
+        <div class="stat"><div class="n" style="font-size:14px">${left||'—'}</div><div class="l">Осталось платежей</div></div>
+        <div class="stat"><div class="n" style="font-size:14px">${last?dateShort(last)+' '+parseISO(last).getFullYear():'—'}</div><div class="l">Закрытие</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">
+        ${a.freq==='biweekly'?'Раз в 2 недели':'Ежемесячно'} · без процентов</div>`;
+    }
+    else if(a.type==='loan' || a.type==='credit_card'){
       meta = `<div class="grid3" style="margin:10px 0">
         <div class="stat"><div class="n" style="font-size:14px">${nextPay?money(nextPay.payment):'—'}</div><div class="l">След. платёж</div></div>
         <div class="stat"><div class="n" style="font-size:14px">${neverPaid?'—':(payoffDate?dateShort(payoffDate)+' '+parseISO(payoffDate).getFullYear():'—')}</div><div class="l">Закрытие</div></div>
@@ -326,7 +402,7 @@ function renderDebts(){
       ${meta}
       <div class="btnrow" style="margin-top:10px">
         <button class="btn btn-p btn-sm" onclick="quickPay('${a.id}')">Внести платёж</button>
-        ${(a.type==='loan'||a.type==='credit_card')?`<button class="btn btn-s btn-sm" onclick="showSchedule('${a.id}')">График</button>`:''}
+        ${(a.type==='loan'||a.type==='credit_card'||a.type==='installment')?`<button class="btn btn-s btn-sm" onclick="showSchedule('${a.id}')">График</button>`:''}
         <button class="btn btn-s btn-sm" onclick="openAccount('${a.id}')">Настроить</button>
       </div>
     </div>`;
@@ -346,6 +422,9 @@ function quickPay(debtId){
   } else if(a.type==='credit_card'){
     const s = cardSchedule(a);
     if(s.length) suggested = s[0].payment;
+  } else if(a.type==='installment'){
+    const s = installmentSchedule(a);
+    if(s.length) suggested = s[0].payment;
   }
 
   document.getElementById('ovTxBody').innerHTML = `
@@ -356,7 +435,7 @@ function quickPay(debtId){
       <div class="f"><label>Сумма, ₽</label><input type="number" step="0.01" id="qpAmount" value="${suggested}"></div>
     </div>
     <div class="f"><label>Откуда списать</label>
-      <select id="qpFrom">${froms.map(x=>`<option value="${x.id}">${esc(x.name)} · ${money(balance(x))}</option>`).join('')}</select></div>
+      <select id="qpFrom">${froms.map(x=>`<option value="${x.id}">${esc(accLabel(x))} — ${money(balance(x))}</option>`).join('')}</select></div>
     <div class="f"><label>Комментарий</label><input type="text" id="qpNote" placeholder="напр. досрочное погашение"></div>
     <button class="btn btn-p btn-blk" onclick="saveQuickPay('${debtId}')">Внести платёж</button>`;
   openOv('ovTx');
@@ -376,22 +455,31 @@ function saveQuickPay(debtId){
 /* ---------------- окно графика ---------------- */
 function showSchedule(id){
   const a = acc(id);
-  const rows = a.type==='loan' ? loanSchedule(a) : cardSchedule(a);
+  const rows = a.type==='loan' ? loanSchedule(a)
+             : a.type==='installment' ? installmentSchedule(a)
+             : cardSchedule(a);
   const paidCount = rows.filter(r=>r.paid).length;
   const totalPay = rows.reduce((s,r)=>s+(r.payment||0),0);
   const totalInt = rows.reduce((s,r)=>s+(r.interest||0),0);
 
-  const manualBlock = a.type==='loan' ? `
-    <div class="note warn" style="margin-top:12px">
-      <b>График банка.</b> Если у вас есть официальный график — вставьте его сюда,
-      и расчёт будет вестись по нему. Формат строки: <code>дата;платёж;проценты</code> (проценты необязательны).
-      <br>Пример: <code>05.09.2026;79 315;9 200</code>
-    </div>
-    <div class="f"><textarea id="schedPaste" rows="4" placeholder="05.09.2026;79315&#10;05.10.2026;79315"></textarea></div>
-    <div class="btnrow">
-      <button class="btn btn-s btn-sm" onclick="applyManualSchedule('${id}')">Загрузить график банка</button>
+  const manualBlock = (a.type==='loan' || a.type==='credit_card') ? `
+    <div class="sec-title" style="margin-top:18px">Свой график погашения</div>
+    <div class="note">Если банк присылает точный график — внесите его, и расчёт пойдёт по нему.
+      Можно вписать строки вручную или распознать скриншот из приложения банка.</div>
+
+    <div class="btnrow" style="margin-bottom:10px">
+      <button class="btn btn-s btn-sm" onclick="pickScheduleImage('${id}')">Распознать скриншот</button>
       ${a.scheduleMode==='manual'?`<button class="btn btn-s btn-sm" onclick="switchToAuto('${id}')">Вернуться к авторасчёту</button>`:''}
-    </div>` : '';
+    </div>
+    <div id="ocrStatus"></div>
+
+    <div class="f"><label>Строки графика: дата, сумма, проценты (проценты необязательны)</label>
+      <textarea id="schedPaste" rows="6" placeholder="05.09.2026;79315&#10;05.10.2026;79315;9200">${
+        (a.scheduleMode==='manual' && Array.isArray(a.manualSchedule))
+          ? a.manualSchedule.map(r=>`${r.date};${r.amount}${r.interest!=null?';'+r.interest:''}`).join('\n')
+          : ''}</textarea>
+      <div class="hint">Разделитель — точка с запятой. Даты в любом привычном виде.</div></div>
+    <button class="btn btn-p btn-sm btn-blk" onclick="applyManualSchedule('${id}')">Сохранить график</button>` : '';
 
   /* Для кредитки — сравнение двух сценариев */
   let graceBlock = '';
@@ -429,7 +517,10 @@ function showSchedule(id){
     }
   }
 
-  const modeNote = a.type==='credit_card'
+  const modeNote = a.type==='installment'
+    ? `<div class="note">Рассрочка без процентов: ${a.freq==='biweekly'?'платёж раз в 2 недели':'платёж раз в месяц'}.
+        Внесёте больше — график сократится сам.</div>`
+    : a.type==='credit_card'
     ? `<div class="note">Минимальный платёж: <b>${pct(a.minPercent!=null?a.minPercent:5)}%</b> от долга${a.minPayment?`, но не менее <b>${money(a.minPayment)}</b>`:''}.
         Строки внутри льготного периода отмечены — по ним проценты не начисляются.</div>`
     : `<div class="note">Режим: <b>${a.scheduleMode==='manual'?'график банка':'автоматический аннуитет'}</b>.
@@ -490,4 +581,102 @@ function applyManualSchedule(id){
 function switchToAuto(id){
   const a = acc(id); a.scheduleMode = 'auto';
   save(); showSchedule(id); renderAll(); toast('Переключено на авторасчёт');
+}
+
+
+/* =========================================================================
+   РАСПОЗНАВАНИЕ СКРИНШОТА ГРАФИКА
+   Библиотека распознавания загружается только когда она понадобилась,
+   чтобы не замедлять запуск приложения.
+   ========================================================================= */
+
+var OCR_TARGET = null;
+
+function pickScheduleImage(accountId){
+  OCR_TARGET = accountId;
+  document.getElementById('schedImageInput').click();
+}
+
+function ocrSay(html){
+  const el = document.getElementById('ocrStatus');
+  if(el) el.innerHTML = html;
+}
+
+/* Подгружаем библиотеку по требованию */
+function loadOcrEngine(){
+  if(window.Tesseract) return Promise.resolve();
+  return new Promise((resolve, reject)=>{
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js';
+    sc.onload = resolve;
+    sc.onerror = () => reject(new Error('не удалось загрузить модуль распознавания'));
+    document.head.appendChild(sc);
+  });
+}
+
+document.getElementById('schedImageInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file || !OCR_TARGET) return;
+
+  ocrSay('<div class="note">Загружаю модуль распознавания… Первый раз это занимает до минуты.</div>');
+  try{
+    await loadOcrEngine();
+    ocrSay('<div class="note">Распознаю текст на изображении…</div>');
+
+    const res = await Tesseract.recognize(file, 'rus+eng', {
+      logger: m => {
+        if(m.status === 'recognizing text'){
+          ocrSay(`<div class="note">Распознаю: ${Math.round((m.progress||0)*100)}%</div>`);
+        }
+      }
+    });
+
+    const lines = (res.data.text || '').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    const found = extractScheduleRows(lines);
+
+    if(!found.length){
+      ocrSay(`<div class="note warn">Не нашла строк вида «дата — сумма».
+        Попробуйте скриншот покрупнее или впишите строки вручную.</div>`);
+      return;
+    }
+
+    const box = document.getElementById('schedPaste');
+    if(box){
+      const text = found.map(r=>`${r.date};${r.amount}`).join('\n');
+      box.value = box.value.trim() ? box.value.trim() + '\n' + text : text;
+    }
+    ocrSay(`<div class="note ok">Распознано строк: <b>${found.length}</b>.
+      Проверьте их в поле ниже и нажмите «Сохранить график».</div>`);
+    toast('Распознано строк: ' + found.length);
+
+  }catch(err){
+    console.error('OCR', err);
+    ocrSay(`<div class="note err">Не получилось распознать: ${esc(err.message||String(err))}.
+      Впишите строки вручную — это надёжнее.</div>`);
+  }
+});
+
+/* Достаём из текста пары «дата — сумма» */
+function extractScheduleRows(lines){
+  const out = [];
+  const dateRe = /(\d{1,2}[.\-\/\s]\d{1,2}[.\-\/\s]\d{2,4}|\d{1,2}\s+[а-яё]{3,}\.?\s*\d{0,4})/i;
+  for(const line of lines){
+    const dm = line.match(dateRe);
+    if(!dm) continue;
+    const date = parseAnyDate(dm[1].replace(/\s+/g,' ').trim());
+    if(!date) continue;
+
+    const rest = line.slice(line.indexOf(dm[1]) + dm[1].length);
+    const nums = [];
+    const re = /(\d[\d\s ]*(?:[.,]\d{1,2})?)/g;
+    let m;
+    while((m = re.exec(rest)) !== null){
+      const v = parseAnyNumber(m[1]);
+      if(v !== null && Math.abs(v) >= 10) nums.push(Math.abs(v));
+    }
+    if(!nums.length) continue;
+    out.push({date, amount: nums[0]});
+  }
+  return out;
 }

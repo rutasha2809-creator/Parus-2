@@ -371,7 +371,7 @@ function showPreview(){
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
   accSel.innerHTML = usable.length
-    ? usable.map(a=>`<option value="${a.id}">${ACC_TYPES[a.type].icon} ${esc(a.name)}</option>`).join('')
+    ? usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
     : `<option value="">— сначала добавьте счёт —</option>`;
 
   const dups = rows.filter(r=>r.dup).length;

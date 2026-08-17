@@ -347,6 +347,11 @@ nav button.on{color:var(--brand);font-weight:650}
 
 <!-- ============ ИМПОРТ ============ -->
 <section class="screen" id="s-import">
+  <div class="btnrow" style="margin-bottom:12px">
+    <button class="btn btn-s" onclick="go('tx')">← К операциям</button>
+    <button class="btn btn-p" onclick="openTx()">+ Ввести вручную</button>
+  </div>
+
   <div class="card">
     <h2>Загрузка выписки</h2>
     <div class="note">Поддерживаются <b>CSV</b>, <b>Excel</b> (.xlsx/.xls) и <b>PDF</b>. Файл обрабатывается прямо в браузере и никуда не отправляется.</div>
@@ -519,6 +524,13 @@ nav button.on{color:var(--brand);font-weight:650}
   </div>
 
   <div class="card">
+    <h2>Курсы валют <button class="act" onclick="fetchRates()">Обновить из интернета</button></h2>
+    <div class="note">Итоги считаются в рублях. Если у счёта другая валюта, остаток
+      переводится по курсу ниже. Курсы можно поправить вручную.</div>
+    <div id="ratesBody"></div>
+  </div>
+
+  <div class="card">
     <h2>Данные</h2>
     <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
       <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
@@ -563,6 +575,7 @@ nav button.on{color:var(--brand);font-weight:650}
 <div class="ov" id="ovRule"><div class="sheet"><button class="xbtn" onclick="closeOv('ovRule')">✕</button><div id="ovRuleBody"></div></div></div>
 <div class="ov" id="ovAccount"><div class="sheet"><button class="xbtn" onclick="closeOv('ovAccount')">✕</button><div id="accountBody"></div></div></div>
 <input type="file" id="avatarInput" accept="image/*" style="display:none">
+<input type="file" id="schedImageInput" accept="image/*" style="display:none">
 <div class="ov" id="ovSched"><div class="sheet wide"><button class="xbtn" onclick="closeOv('ovSched')">✕</button><div id="ovSchedBody"></div></div></div>
 
 <script>
