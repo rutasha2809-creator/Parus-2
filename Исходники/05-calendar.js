@@ -505,6 +505,36 @@ function renderCalendar(){
 
   const MO = forecastMonths(F);
 
+  // график доходов и расходов
+  if(calChart) calChart.destroy(); calChart = null;
+  if(window.Chart && CAL_VIEW === 'chart'){
+    calChart = new Chart(document.getElementById('calChart'), {
+      data:{ labels: MO.map(m=>m.short),
+        datasets:[
+          {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
+           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+          {type:'bar', label:'Расходы', data: MO.map(m=>-(m.debt+m.other)),
+           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
+          {type:'line', label:'Остаток', data: MO.map(m=>m.close),
+           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{display:true, position:'bottom',
+            labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11, usePointStyle:true, pointStyle:'rectRounded'}},
+          tooltip:{callbacks:{label: c=> c.dataset.label + ': ' +
+            (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
+        scales:{
+          y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
+              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+          x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
+    });
+  }
+  // таблица
+  if(CAL_VIEW === 'table') renderCalTable(F);
+
   // регулярные платежи
   const rbox = document.getElementById('recList');
   if(!S.recurring.length){

@@ -485,6 +485,40 @@ nav button.on{color:var(--brand);font-weight:650}
 
   <div id="calGapNote"></div>
 
+  <div class="card">
+    <div class="f2" style="margin:0 0 12px">
+      <div class="f" style="margin:0">
+        <label>Доходы и расходы</label>
+        <div class="seg sm" id="calView">
+          <button class="on" onclick="calSetView('chart')">График</button>
+          <button onclick="calSetView('table')">Таблица</button>
+        </div>
+      </div>
+      <div class="f2" id="calGranWrap" style="display:none;margin:0">
+        <div class="f" style="margin:0">
+          <label>Разбивка</label>
+          <select id="calGran" onchange="renderCalendar()">
+            <option value="month" selected>По месяцам</option>
+            <option value="quarter">По кварталам</option>
+            <option value="year">По годам</option>
+          </select>
+        </div>
+        <div class="f" style="margin:0">
+          <label>Подробность</label>
+          <select id="calDetail" onchange="renderCalendar()">
+            <option value="full" selected>По статьям</option>
+            <option value="short">Только итоги</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="calChartWrap" class="chartbox tall"><canvas id="calChart"></canvas></div>
+    <div id="calTableWrap" style="display:none">
+      <div class="tblwrap"><table class="fintbl" id="calTable"></table></div>
+      <div class="hint" style="margin-top:9px">Прокрутите таблицу вбок, если периодов больше, чем помещается.</div>
+    </div>
+  </div>
+
   <div class="card pad0">
     <h2 style="padding:15px 15px 0">Платежи по дням</h2>
     <div id="calDays"></div>
