@@ -3524,6 +3524,24 @@ function forecastMonths(F){
     m.close = d.close;
     if(d.close < m.min) m.min = d.close;
   }
+  /* Дополняем первый месяц фактическими операциями за прошедшие дни
+     (до today), которые не попали в прогноз. Без этого текущий месяц
+     показывает только остаток периода и занижает доходы/расходы. */
+  if(out.length && F.length){
+    const t0 = F[0].date;
+    const mStart = t0.slice(0,8) + '01';
+    if(mStart < t0){
+      const past = txInRange(mStart, addDays(t0, -1));
+      const m0 = out[0];
+      for(const t of past){
+        if(t.type === 'transfer') continue;
+        const v = txBase(t);
+        if(t.type === 'income') m0.inc += v;
+        else m0.exp += v;
+        m0.moves++;
+      }
+    }
+  }
   for(const m of out){
     m.inc = round2(m.inc); m.exp = round2(m.exp); m.debt = round2(m.debt);
     m.other = round2(m.exp - m.debt);
