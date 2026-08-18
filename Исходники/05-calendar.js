@@ -446,7 +446,7 @@ function forecastCatShare(F){
   const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({
     id, v,
     name:  id==='__debt' ? 'Платежи по долгам' : id==='__none' ? 'Без категории' : catName(id),
-    color: id==='__debt' ? '#9b5f52'          : id==='__none' ? '#b6b3ac'       : catColor(id),
+    color: id==='__debt' ? '#c62828'          : id==='__none' ? '#b6b3ac'       : catColor(id),
     opt:   id!=='__debt' && id!=='__none' && !catMandatory(id)
   }));
   return { rows, total: round2(total) };
@@ -549,8 +549,6 @@ function renderCalendar(){
         <span class="mname">
           <b>${m.label}</b>
           <em>${sub}</em>
-          <span class="mbar"><i style="width:${m.inc/scale*100}%;background:var(--green)"></i></span>
-          <span class="mbar"><i style="width:${m.debt/scale*100}%;background:var(--red)"></i><i style="width:${m.other/scale*100}%;background:var(--ink)"></i></span>
         </span>
         <span class="msum">
           <span class="a-inc">+${moneyShort(m.inc)}</span><br>
@@ -678,9 +676,9 @@ function renderAnalytics(){
         type:'bar',
         data:{ labels: mk.map(k=>monthLabel(k).replace(/ \d{4}/, m=>' '+m.trim().slice(2))),
           datasets:[
-            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#6f7a6c', borderRadius:4},
-            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#9b6b5e', borderRadius:4},
-            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#c2ab84', borderRadius:4}
+            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#2e7d32', borderRadius:4},
+            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#c62828', borderRadius:4},
+            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#ef9a9a', borderRadius:4}
           ]},
         options:{responsive:true, maintainAspectRatio:false,
           plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
@@ -714,11 +712,9 @@ function renderAnalytics(){
       data:{ labels: fcMO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: fcMO.map(m=>m.inc),
-           backgroundColor:'#5c6f5a', borderRadius:3, stack:'bars', order:3},
-          {type:'bar', label:'Платежи по долгам', data: fcMO.map(m=>-m.debt),
-           backgroundColor:'#9b5f52', borderRadius:3, stack:'bars', order:3},
-          {type:'bar', label:'Прочие расходы', data: fcMO.map(m=>-m.other),
-           backgroundColor:'#3a3936', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+          {type:'bar', label:'Расходы', data: fcMO.map(m=>-(m.debt+m.other)),
+           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток', data: fcMO.map(m=>m.close),
            borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
            tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}

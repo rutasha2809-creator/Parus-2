@@ -22,9 +22,9 @@
      Акценты приглушённые — различимы, но не режут глаз. */
   --bg:#f2f1ef; --card:#fff; --ink:#1c1c1a; --muted:#8a8880; --line:#e3e1dd;
   --brand:#2f2e2b; --brand-d:#111110; --brand-l:#f0efec;   /* акцент = графит */
-  --green:#5c6f5a; --green-l:#f0f2ef;                       /* приглушённый шалфей */
-  --red:#9b5f52;   --red-l:#f7f0ee;                         /* приглушённая терракота */
-  --amber:#806b48; --amber-l:#f6f3ec;                       /* приглушённая охра */
+  --green:#2e7d32; --green-l:#e8f5e9;                       /* классический зелёный */
+  --red:#c62828;   --red-l:#ffebee;                         /* классический красный */
+  --amber:#e65100; --amber-l:#fff3e0;                       /* предупреждение */
   --violet:#6b6478;
   --r:12px;
 }
@@ -194,10 +194,10 @@ nav button.on{color:var(--brand);font-weight:650}
 .mon.open .mon-b{display:block}
 .mbar{display:flex;height:3px;border-radius:2px;overflow:hidden;background:#eae8e4;margin-top:4px}
 .mbar i{display:block;height:100%}
-/* цвета сумм: доход зелёный, долг красный, обычный расход чёрный */
+/* цвета сумм: доход зелёный, расход красный */
 .a-inc{color:var(--green)}
 .a-debt{color:var(--red);font-weight:600}
-.a-exp{color:var(--ink)}
+.a-exp{color:var(--red)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted);padding:0 15px 11px}
 .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
 
@@ -486,12 +486,7 @@ nav button.on{color:var(--brand);font-weight:650}
   <div id="calGapNote"></div>
 
   <div class="card pad0">
-    <h2 style="padding:15px 15px 0">Прогноз по месяцам</h2>
-    <div class="legend">
-      <span><i style="background:var(--green)"></i>доходы</span>
-      <span><i style="background:var(--red)"></i>платежи по долгам</span>
-      <span><i style="background:var(--ink)"></i>прочие расходы</span>
-    </div>
+    <h2 style="padding:15px 15px 0">Платежи по дням</h2>
     <div id="calDays"></div>
   </div>
 
@@ -3659,7 +3654,7 @@ function forecastCatShare(F){
   const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({
     id, v,
     name:  id==='__debt' ? 'Платежи по долгам' : id==='__none' ? 'Без категории' : catName(id),
-    color: id==='__debt' ? '#9b5f52'          : id==='__none' ? '#b6b3ac'       : catColor(id),
+    color: id==='__debt' ? '#c62828'          : id==='__none' ? '#b6b3ac'       : catColor(id),
     opt:   id!=='__debt' && id!=='__none' && !catMandatory(id)
   }));
   return { rows, total: round2(total) };
@@ -3762,8 +3757,6 @@ function renderCalendar(){
         <span class="mname">
           <b>${m.label}</b>
           <em>${sub}</em>
-          <span class="mbar"><i style="width:${m.inc/scale*100}%;background:var(--green)"></i></span>
-          <span class="mbar"><i style="width:${m.debt/scale*100}%;background:var(--red)"></i><i style="width:${m.other/scale*100}%;background:var(--ink)"></i></span>
         </span>
         <span class="msum">
           <span class="a-inc">+${moneyShort(m.inc)}</span><br>
@@ -3891,9 +3884,9 @@ function renderAnalytics(){
         type:'bar',
         data:{ labels: mk.map(k=>monthLabel(k).replace(/ \d{4}/, m=>' '+m.trim().slice(2))),
           datasets:[
-            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#6f7a6c', borderRadius:4},
-            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#9b6b5e', borderRadius:4},
-            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#c2ab84', borderRadius:4}
+            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#2e7d32', borderRadius:4},
+            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#c62828', borderRadius:4},
+            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#ef9a9a', borderRadius:4}
           ]},
         options:{responsive:true, maintainAspectRatio:false,
           plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
@@ -3927,11 +3920,9 @@ function renderAnalytics(){
       data:{ labels: fcMO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: fcMO.map(m=>m.inc),
-           backgroundColor:'#5c6f5a', borderRadius:3, stack:'bars', order:3},
-          {type:'bar', label:'Платежи по долгам', data: fcMO.map(m=>-m.debt),
-           backgroundColor:'#9b5f52', borderRadius:3, stack:'bars', order:3},
-          {type:'bar', label:'Прочие расходы', data: fcMO.map(m=>-m.other),
-           backgroundColor:'#3a3936', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+          {type:'bar', label:'Расходы', data: fcMO.map(m=>-(m.debt+m.other)),
+           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток', data: fcMO.map(m=>m.close),
            borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
            tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
