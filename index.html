@@ -433,7 +433,7 @@ nav button.on{color:var(--brand);font-weight:650}
     <div class="f2" style="margin:10px 0">
       <div class="f" style="margin:0">
         <label>Зачислить на счёт</label>
-        <select id="impAccount"></select>
+        <select id="impAccount" onchange="showPreview()"></select>
       </div>
       <div class="f" style="margin:0">
         <label>Строк выбрано</label>
@@ -2785,25 +2785,58 @@ function parseAnyDate(v){
   if(!s) return null;
   s = s.replace(/\s*(г\.|года)\s*$/i,'').trim();
 
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                       // 2026-08-05
-  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);         // 05.08.2026
-  if(m){
-    let [_,d,mo,y] = m;
-    if(y.length===2) y = (+y > 60 ? '19' : '20') + y;
+  let m = s.match(/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);         // 2026-08-05, 2026/08/05
+  if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+
+  /* Месяцы словом: русские и английские.
+     Английские нужны для выписок иностранных банков — там почти всегда
+     «5 Aug 2026» или «Aug 5, 2026», а не цифрами. */
+  const MN = {
+    'янв':1,'фев':2,'мар':3,'апр':4,'мая':5,'май':5,'июн':6,'июл':7,
+    'авг':8,'сен':9,'окт':10,'ноя':11,'дек':12,
+    'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,
+    'aug':8,'sep':9,'oct':10,'nov':11,'dec':12
+  };
+  const mk = (y, mo, d) => {
+    y = y || String(new Date().getFullYear());
+    if(String(y).length===2) y = (+y > 60 ? '19' : '20') + y;
     return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-  const MN = {'янв':1,'фев':2,'мар':3,'апр':4,'мая':5,'май':5,'июн':6,'июл':7,'авг':8,'сен':9,'окт':10,'ноя':11,'дек':12};
-  m = s.match(/^(\d{1,2})\s+([а-яё]{3,})\.?\s*(\d{4})?/i);           // 5 августа 2026
+  };
+
+  // 5 августа 2026 · 5 Aug 2026 · 05-Aug-2026
+  m = s.match(/^(\d{1,2})[\s\-.]+([a-zа-яё]{3,})\.?[\s\-.,]*(\d{2,4})?/i);
   if(m){
     const k = m[2].toLowerCase().slice(0,3);
-    if(MN[k]){
-      const y = m[3] || String(new Date().getFullYear());
-      return `${y}-${String(MN[k]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
-    }
+    if(MN[k]) return mk(m[3], MN[k], m[1]);
+  }
+  // Aug 5, 2026 · August 5 2026
+  m = s.match(/^([a-zа-яё]{3,})\.?[\s\-.]+(\d{1,2})[\s\-.,]*(\d{2,4})?/i);
+  if(m){
+    const k = m[1].toLowerCase().slice(0,3);
+    if(MN[k]) return mk(m[3], MN[k], m[2]);
+  }
+
+  // Только цифры: 05.08.2026 · 05/08/2026 · 08-05-2026
+  m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);
+  if(m){
+    let [_,a,b,y] = m;
+    if(y.length===2) y = (+y > 60 ? '19' : '20') + y;
+    /* Порядок день/месяц зависит от страны: 05/08 — это 5 августа в Европе
+       и 8 мая в США. Если первое число больше 12, порядок однозначен.
+       Иначе следуем настройке (по умолчанию — день первым, как в России). */
+    let d = +a, mo = +b;
+    if(d <= 12 && mo <= 12 && IMP_DATE_ORDER === 'mdy'){ d = +b; mo = +a; }
+    else if(d > 12 && mo > 12) return null;
+    else if(mo > 12){ d = +b; mo = +a; }
+    if(mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    return mk(y, mo, d);
   }
   return null;
 }
+
+/* Порядок дня и месяца в числовых датах: 'dmy' — 05/08 = 5 августа (Европа,
+   Россия), 'mdy' — 05/08 = 8 мая (США). Переключается в интерфейсе импорта. */
+var IMP_DATE_ORDER = 'dmy';
 
 function parseAnyNumber(v){
   if(v==null || v==='') return null;
@@ -3057,8 +3090,19 @@ function renderMapping(){
       <div class="f"><label>Или: расход</label><select id="mpDebit" onchange="rebuildRows()">${opts(IMP.map.debit)}</select></div>
       <div class="f"><label>Или: приход</label><select id="mpCredit" onchange="rebuildRows()">${opts(IMP.map.credit)}</select></div>
     </div>
+    <div class="f"><label>Формат даты, если в файле только цифры</label>
+      <select id="mpDateOrder" onchange="setDateOrder(this.value)">
+        <option value="dmy" ${IMP_DATE_ORDER==='dmy'?'selected':''}>05/08 — это 5 августа (Россия, Европа)</option>
+        <option value="mdy" ${IMP_DATE_ORDER==='mdy'?'selected':''}>05/08 — это 8 мая (США)</option>
+      </select></div>
     <label class="check"><input type="checkbox" id="mpInvert" onchange="rebuildRows()"> Поменять местами приход и расход</label>`;
   document.getElementById('impMapCard').style.display = 'block';
+  rebuildRows();
+}
+
+/* Переключение порядка день/месяц — даты надо разобрать заново */
+function setDateOrder(v){
+  IMP_DATE_ORDER = v;
   rebuildRows();
 }
 
@@ -3132,22 +3176,39 @@ function showPreview(){
 
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
+  /* Сохраняем выбор пользователя — иначе при каждой перерисовке
+     список сбрасывался бы на первый счёт. */
+  const prevAcc = accSel.value;
   accSel.innerHTML = usable.length
     ? usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
     : `<option value="">— сначала добавьте счёт —</option>`;
+  if(prevAcc && usable.some(a=>a.id===prevAcc)) accSel.value = prevAcc;
 
   const dups = rows.filter(r=>r.dup).length;
   const inc = rows.filter(r=>r.kind==='income').reduce((s,r)=>s+r.amount,0);
   const exp = rows.filter(r=>r.kind==='expense').reduce((s,r)=>s+r.amount,0);
   const dates = rows.map(r=>r.date).sort();
 
+  /* В какой валюте запишутся суммы. Своей валюты у операции нет —
+     она берётся у счёта. Показываем это явно, иначе долларовая выписка
+     на рублёвом счёте молча превратится в рубли. */
+  const impAcc = S.accounts.find(a=>a.id===accSel.value) || usable[0];
+  const impCur = impAcc ? accCurrency(impAcc) : BASE;
+  const curName = (CURRENCIES[impCur]||{}).name || impCur;
+
   document.getElementById('impStats').innerHTML = `
     <div class="grid3">
       <div class="stat"><div class="n" style="font-size:15px">${rows.length}</div><div class="l">Операций</div></div>
-      <div class="stat"><div class="n pos" style="font-size:15px">${moneyShort(inc)}</div><div class="l">Приход</div></div>
-      <div class="stat"><div class="n neg" style="font-size:15px">${moneyShort(exp)}</div><div class="l">Расход</div></div>
+      <div class="stat"><div class="n pos" style="font-size:15px">${money(inc,{cur:impCur})}</div><div class="l">Приход</div></div>
+      <div class="stat"><div class="n neg" style="font-size:15px">${money(exp,{cur:impCur})}</div><div class="l">Расход</div></div>
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:8px">Период: ${dateLong(dates[0])} — ${dateLong(dates[dates.length-1])}</div>
+    <div class="note ${impCur===BASE?'':'warn'}" style="margin-top:8px">
+      Суммы будут записаны в валюте счёта: <b>${impCur} · ${esc(curName)}</b>.
+      ${impCur===BASE
+        ? 'Если выписка в другой валюте — выберите счёт в этой валюте или заведите новый.'
+        : `Проверьте, что выписка действительно в ${impCur}. Пересчёт в рубли идёт по курсу из настроек.`}
+    </div>
     ${dups ? `<div class="note warn" style="margin-top:8px">Найдено похожих на уже существующие: <b>${dups}</b>. Они сняты с отметки — снимите галочку «дубль», если хотите импортировать.</div>` : ''}`;
 
   const catOpts = kind => S.categories.filter(c=>c.kind===kind)
@@ -3163,7 +3224,7 @@ function showPreview(){
         <td><input type="checkbox" ${r.use?'checked':''} onchange="IMP.rows[${i}].use=this.checked; updSel()"></td>
         <td style="white-space:nowrap">${dateShort(r.date)}</td>
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.desc)||'<span class="mut">без описания</span>'}${r.dup?' <span class="chip bad">дубль</span>':''}</td>
-        <td class="r ${r.kind==='income'?'pos':'neg'}" style="white-space:nowrap">${r.kind==='income'?'+':'−'}${money(r.amount)}</td>
+        <td class="r ${r.kind==='income'?'pos':'neg'}" style="white-space:nowrap">${r.kind==='income'?'+':'−'}${money(r.amount,{cur:impCur})}</td>
         <td><select onchange="IMP.rows[${i}].categoryId=this.value" style="max-width:150px;padding:4px;border:1px solid var(--line);border-radius:6px;font-size:12px">
           ${S.categories.filter(c=>c.kind===r.kind).map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}
         </select></td>
