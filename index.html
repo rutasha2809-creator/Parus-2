@@ -2177,8 +2177,11 @@ function installmentSchedule(a){
     pay = round2(bal / n);
   }
 
+  /* Дату ближайшего платежа берём как есть, даже если она уже в прошлом
+     (например, 17-е указали, а сегодня 24-е) — иначе число месяца съезжает
+     на сегодняшний день и весь график идёт вразнобой. Совпадает с тем,
+     как считается график по кредиту. */
   let d = a.nextPaymentDate || today();
-  if(d < today()) d = today();
   let guard = 0;
   while(bal > 0.01 && guard < 240){
     const amount = Math.min(pay, bal);
