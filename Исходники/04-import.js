@@ -396,10 +396,17 @@ function prepRows(rows){
     });
   });
 }
+/* Приводим текст к виду, в котором мелкие различия написания не мешают
+   сравнению: регистр, «ё» против «е» (банки в выписках пишут «ПЯТЕРОЧКА»,
+   а человек в описании — «Пятёрочка») и лишние пробелы. */
+function ruleNorm(s){
+  return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+}
+
 function guessCategory(desc, kind){
-  const d = (desc||'').toLowerCase();
+  const d = ruleNorm(desc);
   for(const rule of S.rules){
-    if(rule.match && d.includes(rule.match.toLowerCase())){
+    if(rule.match && d.includes(ruleNorm(rule.match))){
       const c = cat(rule.categoryId);
       if(c && c.kind===kind) return rule.categoryId;
     }
@@ -512,10 +519,26 @@ function commitImport(){
   go('accounts');
 }
 
-/* ---------------- правила автокатегоризации ---------------- */
+/* ---------------- правила автокатегоризации ----------------
+   Живут в профиле, рядом с категориями. Применяются везде:
+   при импорте выписки и при ручном вводе операции. */
+var RULES_OPEN = false;
+function toggleRulesSection(){
+  RULES_OPEN = !RULES_OPEN;
+  const body = document.getElementById('rulesSecBody');
+  const arw  = document.getElementById('rulesArw');
+  if(body) body.style.display = RULES_OPEN ? 'block' : 'none';
+  if(arw)  arw.style.transform = RULES_OPEN ? 'rotate(90deg)' : 'none';
+  if(RULES_OPEN) renderRules();
+}
 function renderRules(){
   const box = document.getElementById('rulesList');
-  if(!S.rules.length){ box.innerHTML = `<div class="empty">Правил пока нет.</div>`; return; }
+  if(!box) return;
+  if(!S.rules.length){
+    box.innerHTML = `<div class="empty">Правил пока нет.<br>
+      Они появятся сами: после новой операции приложение спросит, запомнить ли связку.</div>`;
+    return;
+  }
   box.innerHTML = S.rules.map(r=>`
     <div class="row" onclick="openRule('${r.id}')" style="cursor:pointer">
       <div class="l"><div class="t">«${esc(r.match)}»</div><div class="s">→ ${esc(catName(r.categoryId))}</div></div>

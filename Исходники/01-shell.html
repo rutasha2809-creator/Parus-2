@@ -469,11 +469,6 @@ nav button.on{color:var(--brand);font-weight:650}
     </div>
   </div>
 
-  <div class="card">
-    <h2>Правила автокатегоризации <button class="act" onclick="openRule()">+ Правило</button></h2>
-    <div class="note">Если описание операции содержит указанный текст — категория подставится автоматически при импорте.</div>
-    <div id="rulesList"></div>
-  </div>
 </section>
 
 <!-- ============ КАЛЕНДАРЬ ============ -->
@@ -588,6 +583,12 @@ nav button.on{color:var(--brand);font-weight:650}
         </select>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Как менялся капитал <span class="act" id="anCapDelta" style="cursor:default"></span></h2>
+    <div class="note" id="anCapNote">Активы минус долги на конец каждого месяца. Показывает, движетесь ли вы в плюс.</div>
+    <div class="chartbox tall" id="anCapWrap"><canvas id="anCapChart"></canvas></div>
   </div>
 
   <div class="card">

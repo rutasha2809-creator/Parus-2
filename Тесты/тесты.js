@@ -62,6 +62,7 @@ function reset(W, patch){
   W.S.accounts = [];
   W.S.transactions = [];
   W.S.recurring = [];
+  W.S.rules = [];
   W.S.planOverrides = {};
   W.S.settings.minBuffer = 0;
   if(patch) Object.assign(W.S, patch);
@@ -311,6 +312,106 @@ function reset(W, patch){
   const moT = W.forecastMonths(W.buildForecast(30));
   check('перевод не попал в расходы месяца', moT[0] && moT[0].exp, 0);
   check('перевод не попал в доходы месяца',  moT[0] && moT[0].inc, 0);
+
+  /* ======================================================================
+     Правила «описание → категория».
+     Раньше работали только при импорте. Теперь и при ручном вводе.
+     ====================================================================== */
+  group('Правила подстановки категорий');
+
+  reset(W, {
+    accounts: [{id:'a1',type:'debit',name:'Карта',currency:'RUB',openingBalance:50000}],
+    rules: [{ id:'r1', match:'пятероч', categoryId:'c_food' }]
+  });
+
+  check('правило срабатывает по части слова',
+        W.guessCategory('Пятёрочка у дома', 'expense'), 'c_food');
+  check('регистр не важен',
+        W.guessCategory('ПЯТЕРОЧ №123', 'expense'), 'c_food');
+  /* Банки в выписках пишут «ПЯТЕРОЧКА» без ё, человек — «Пятёрочка».
+     Без этого правило молча не срабатывало бы на половине операций. */
+  check('«ё» и «е» считаются одинаковыми',
+        W.guessCategory('ПЯТЕРОЧКА №5', 'expense'), 'c_food');
+  check('и в обратную сторону тоже',
+        W.guessCategory('пятёрочка', 'expense'), 'c_food');
+  check('лишние пробелы не мешают',
+        W.guessCategory('  Пятёрочка   у   дома  ', 'expense'), 'c_food');
+  check('чужое описание — категория по умолчанию',
+        W.guessCategory('Аптека', 'expense'), 'c_other_e');
+  check('правило расхода не лезет в доходы',
+        W.guessCategory('Пятёрочка', 'income'), 'c_other_i');
+
+  W.openTx(null, 'a1');
+  const noteEl = D.getElementById('txNote');
+  const catEl  = D.getElementById('txCategory');
+  noteEl.value = 'Пятёрочка';
+  W.txApplyRule();
+  check('при ручном вводе категория подставилась', catEl.value, 'c_food');
+
+  /* Осознанный выбор пользователя правило перебивать не должно */
+  catEl.value = 'c_fun';
+  catEl.dataset.touched = '1';
+  noteEl.value = 'Пятёрочка снова';
+  W.txApplyRule();
+  check('ручной выбор категории не перебивается', catEl.value, 'c_fun');
+  W.closeOv('ovTx');
+
+  /* При правке существующей операции её категория сохраняется */
+  reset(W, {
+    accounts: [{id:'a1',type:'debit',name:'Карта',currency:'RUB',openingBalance:50000}],
+    rules: [{ id:'r1', match:'пятероч', categoryId:'c_food' }],
+    transactions: [{id:'t1',date:T,type:'expense',accountId:'a1',
+                    categoryId:'c_fun',amount:500,note:'Пятёрочка'}]
+  });
+  W.openTx('t1');
+  check('у сохранённой операции категория не меняется',
+        D.getElementById('txCategory').value, 'c_fun');
+  W.closeOv('ovTx');
+
+  /* ======================================================================
+     История капитала за 12 месяцев.
+     ====================================================================== */
+  group('История капитала');
+
+  reset(W);
+  check('без данных история пустая', W.capitalHistory(12).length, 0);
+
+  /* Копим три месяца: счёт плюс доходы, долг гасится */
+  const m0 = T.slice(0,8) + '01';
+  const back = (n) => {
+    const d = W.parseISO(m0);
+    d.setMonth(d.getMonth() - n);
+    return W.iso(d);
+  };
+  reset(W, {
+    accounts: [
+      {id:'a1', type:'debit', name:'Карта', currency:'RUB', openingBalance:0},
+      {id:'d1', type:'debt',  name:'Долг другу', currency:'RUB', openingBalance:30000}
+    ],
+    transactions: [
+      {id:'i1', date: back(3), type:'income',  accountId:'a1', categoryId:'c_salary', amount:50000},
+      {id:'i2', date: back(2), type:'income',  accountId:'a1', categoryId:'c_salary', amount:50000},
+      {id:'e1', date: back(2), type:'expense', accountId:'a1', categoryId:'c_food',   amount:20000},
+      {id:'i3', date: back(1), type:'income',  accountId:'a1', categoryId:'c_salary', amount:50000}
+    ]
+  });
+
+  const hist = W.capitalHistory(12);
+  checkTrue('история построилась', hist.length >= 3);
+  checkTrue('месяцы идут по возрастанию',
+            hist.every((h,i) => i === 0 || h.date > hist[i-1].date));
+  checkTrue('в каждой точке есть активы, долги и итог',
+            hist.every(h => typeof h.assets === 'number' &&
+                            typeof h.debt === 'number' &&
+                            typeof h.net === 'number'));
+  check('чистый капитал = активы минус долги',
+        hist.every(h => Math.abs(h.net - (h.assets - h.debt)) < 0.01), true);
+  checkTrue('капитал вырос за период', hist[hist.length-1].net > hist[0].net);
+  check('долг учтён со знаком минус в капитале',
+        hist[hist.length-1].net, W.round2(hist[hist.length-1].assets - 30000));
+
+  check('остаток на прошлую дату не включает будущие операции',
+        W.netWorthAt(back(3)) < W.netWorthAt(back(1)), true);
 
   /* ======================================================================
      ИТОГ

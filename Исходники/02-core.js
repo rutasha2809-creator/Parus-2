@@ -335,6 +335,47 @@ function totalAssets(){ return assetAccounts().reduce((s,a)=>s+toBase(balance(a)
 function totalDebt(){ return debtAccounts().reduce((s,a)=>s+Math.max(0,toBase(balance(a), accCurrency(a))),0); }
 function netWorth(){ return totalAssets() - totalDebt(); }
 
+/* Те же итоги, но на произвольную дату в прошлом — для графика истории.
+   Считаются из тех же операций: остаток на дату = начальный остаток
+   плюс все движения по счёту до этой даты включительно. */
+function totalAssetsAt(date){
+  return assetAccounts().reduce((s,a)=> s + toBase(balance(a, date), accCurrency(a)), 0);
+}
+function totalDebtAt(date){
+  return debtAccounts().reduce((s,a)=> s + Math.max(0, toBase(balance(a, date), accCurrency(a))), 0);
+}
+function netWorthAt(date){ return round2(totalAssetsAt(date) - totalDebtAt(date)); }
+
+/* История капитала по месяцам: последний день каждого месяца.
+   Показываем только те месяцы, где данные уже были — иначе график
+   начинался бы с плоского нуля и вводил в заблуждение. */
+function capitalHistory(months){
+  if(!S.transactions.length && !S.accounts.length) return [];
+
+  const n = new Date();
+  const out = [];
+  const firstTx = S.transactions.length
+    ? S.transactions.map(t=>t.date).sort()[0]
+    : null;
+
+  for(let i = months - 1; i >= 0; i--){
+    /* Нулевой день следующего месяца = последний день нужного */
+    const d = new Date(n.getFullYear(), n.getMonth() - i + 1, 0);
+    let date = iso(d);
+    if(date > today()) date = today();      // текущий месяц — по сегодня
+    if(firstTx && date < firstTx) continue; // до первой операции данных нет
+
+    out.push({
+      date,
+      label:  MONTHS_N[d.getMonth()].slice(0,3) + ' ' + String(d.getFullYear()).slice(2),
+      assets: round2(totalAssetsAt(date)),
+      debt:   round2(totalDebtAt(date)),
+      net:    netWorthAt(date)
+    });
+  }
+  return out;
+}
+
 /* ---------------- периоды ---------------- */
 function periodRange(code){
   const n = new Date(), y = n.getFullYear(), m = n.getMonth();
@@ -720,11 +761,15 @@ function openTx(id, presetAccountId){
       <input type="number" step="0.01" id="txToAmount" placeholder="0">
       <div class="hint">Счета в разных валютах — укажите, сколько пришло на второй счёт.</div>
     </div>
-    <div class="f" id="txCatWrap"><label>Категория</label><select id="txCategory"></select>
+    <div class="f" id="txCatWrap"><label>Категория</label>
+      <select id="txCategory" onchange="this.dataset.touched='1'"></select>
+      <div class="hint" id="txRuleHint" style="display:none;color:var(--green)"></div>
       <div class="hint" id="txDebtHint" style="display:none">Платите по кредиту или кредитке?
         Выберите вверху «Перевод» и укажите этот долг — тогда платёж зачтётся в график погашения.
         Если внести его расходом, сумма посчитается дважды.</div></div>
-    <div class="f"><label>Описание</label><input type="text" id="txNote" value="${t?esc(t.note||''):''}" placeholder="необязательно"></div>
+    <div class="f"><label>Описание</label>
+      <input type="text" id="txNote" value="${t?esc(t.note||''):''}" placeholder="например: Пятёрочка">
+      <div class="hint">Если для этого текста есть правило, категория подставится сама.</div></div>
 
     <label class="check" id="txRepeatWrap">
       <input type="checkbox" id="txRepeat" onchange="txRepeatToggle()">
@@ -754,6 +799,13 @@ function openTx(id, presetAccountId){
     </div>`;
   txKind(t ? t.type : 'expense', t);
 
+  /* Правим существующую операцию — её категория уже выбрана осознанно.
+     Помечаем поле как тронутое, чтобы правило её не перебило. */
+  if(t){
+    const catEl = document.getElementById('txCategory');
+    if(catEl) catEl.dataset.touched = '1';
+  }
+
   /* Открыто изнутри конкретного счёта — сразу подставляем его,
      чтобы не искать в списке вручную. Только для новой операции:
      при редактировании существующей счёт задаёт сама операция. */
@@ -775,6 +827,13 @@ function openTx(id, presetAccountId){
   if(toAmtEl) toAmtEl.addEventListener('input', ()=>{ toAmtEl.dataset.touched = '1'; });
   const accEl = document.getElementById('txAccount');
   if(accEl) accEl.addEventListener('change', txCurrencyCheck);
+
+  /* Правила «если описание содержит X — категория Y» работают и здесь,
+     а не только при импорте: один раз задали «пятероч → Продукты»,
+     и категория подставляется сама, где бы вы ни вносили операцию. */
+  const noteEl = document.getElementById('txNote');
+  if(noteEl) noteEl.addEventListener('input', txApplyRule);
+
   if(t && t.toAmount != null){
     const f = document.getElementById('txToAmount');
     if(f){ f.value = t.toAmount; f.dataset.touched = '1'; }
@@ -800,6 +859,29 @@ function openTx(id, presetAccountId){
 function recForTx(txId){
   if(!txId) return null;
   return S.recurring.find(r => r.fromTxId === txId) || null;
+}
+
+/* Подставить категорию по правилу, когда пользователь печатает описание.
+   Не трогаем выбор, если человек уже сам поменял категорию руками —
+   иначе правило перебивало бы осознанное решение. */
+function txApplyRule(){
+  const noteEl = document.getElementById('txNote');
+  const catEl  = document.getElementById('txCategory');
+  if(!noteEl || !catEl || TXKIND === 'transfer') return;
+  if(catEl.dataset.touched === '1') return;
+
+  const guess = guessCategory(noteEl.value, TXKIND);
+  const isFallback = guess === 'c_other_e' || guess === 'c_other_i';
+  if(isFallback) return;                       // правило не сработало — не мешаем
+
+  if([...catEl.options].some(o => o.value === guess) && catEl.value !== guess){
+    catEl.value = guess;
+    const hint = document.getElementById('txRuleHint');
+    if(hint){
+      hint.textContent = 'Категория подставлена по вашему правилу. Можно поменять.';
+      hint.style.display = 'block';
+    }
+  }
 }
 
 /* Показать настройки повторения и подсказать, с какой даты оно начнётся */
@@ -968,6 +1050,29 @@ function saveTx(id){
   toast(repeated ? (linked ? 'Сохранено, повтор с ' : 'Добавлено, повтор с ') + dateLong(repeated.startDate)
       : dropped ? 'Сохранено, повтор отменён'
       : id ? 'Операция обновлена' : 'Операция добавлена');
+
+  if(!id) offerRule(note, rec.categoryId, TXKIND);
+}
+
+/* После новой операции предлагаем запомнить связку «описание → категория».
+   Спрашиваем один раз и только когда это осмысленно: есть описание,
+   выбрана конкретная категория и правила для неё ещё нет. */
+function offerRule(note, categoryId, kind){
+  if(kind === 'transfer' || !note || note.length < 3) return;
+  if(!categoryId || categoryId === 'c_other_e' || categoryId === 'c_other_i') return;
+
+  const key = note.slice(0, 24).trim();
+  const already = S.rules.some(r => ruleNorm(key).includes(ruleNorm(r.match)));
+  if(already) return;
+
+  setTimeout(() => {
+    if(!confirm(`Запомнить: «${note}» — это «${catName(categoryId)}»?\n\n` +
+                'В следующий раз категория подставится сама — и при вводе вручную, и при импорте выписки.')) return;
+    S.rules.push({ id: uid(), match: key, categoryId });
+    save();
+    if(typeof renderRules === 'function') renderRules();
+    toast('Правило сохранено');
+  }, 400);
 }
 
 function deleteTx(id){

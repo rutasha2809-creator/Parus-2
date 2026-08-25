@@ -345,6 +345,20 @@ function settingsBlockHtml(){
       <div id="catList"></div>
     </div>
 
+    <div class="row" onclick="toggleRulesSection()" style="cursor:pointer">
+      <div class="l"><div class="t">Правила подстановки</div>
+        <div class="s">«Пятёрочка» — это «Продукты»: категория подставится сама</div></div>
+      <span class="arw" id="rulesArw" style="display:inline-block;width:9px;color:var(--muted);font-size:9px;transition:transform .15s">▶</span>
+    </div>
+    <div id="rulesSecBody" style="display:none">
+      <div style="text-align:right;margin:6px 0 8px">
+        <button class="act" onclick="openRule()">+ Правило</button>
+      </div>
+      <div class="note">Если описание операции содержит указанный текст, категория подставится
+        автоматически — и при ручном вводе, и при загрузке выписки.</div>
+      <div id="rulesList"></div>
+    </div>
+
     <div class="sec-title" style="margin-top:18px">Курсы валют</div>
     <div class="row" onclick="toggleRatesSection()" style="cursor:pointer">
       <div class="l"><div class="t">Курсы к рублю</div>
@@ -379,6 +393,7 @@ function renderAccountSheet(){
   const meta = syncMeta();
   CAT_OPEN = false;
   RATES_OPEN = false;
+  RULES_OPEN = false;
 
   /* --- гость: вход, он же регистрация --- */
   if(!sbUser){
@@ -406,7 +421,7 @@ function renderAccountSheet(){
       <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
         <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
       ${settingsBlockHtml()}`;
-    renderCategories(); renderRates();
+    renderCategories(); renderRates(); renderRules();
     return;
   }
 
@@ -439,7 +454,7 @@ function renderAccountSheet(){
     <div class="btnrow" style="margin-top:14px">
       <button class="btn btn-d btn-blk" onclick="syncSignOut()">Выйти из аккаунта</button>
     </div>`;
-  renderCategories(); renderRates();
+  renderCategories(); renderRates(); renderRules();
 }
 
 function saveProfileName(){

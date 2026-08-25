@@ -655,9 +655,82 @@ function renderDay(d, buf){
 /* =========================================================================
    АНАЛИТИКА
    ========================================================================= */
-let anTrend = null, anPie = null;
+let anTrend = null, anPie = null, anCap = null;
+
+/* График «как менялся капитал»: активы минус долги на конец каждого месяца.
+   Отвечает на вопрос, который не виден ни в остатке, ни в прогнозе:
+   человек вообще движется в плюс или топчется на месте. */
+function renderCapitalHistory(){
+  const wrap = document.getElementById('anCapWrap');
+  const note = document.getElementById('anCapNote');
+  const delta = document.getElementById('anCapDelta');
+  if(!wrap || !note) return;
+
+  const H = capitalHistory(12);
+  if(anCap){ anCap.destroy(); anCap = null; }
+
+  /* Одна точка — это не динамика. Честно говорим, что данных пока мало. */
+  if(H.length < 2){
+    wrap.style.display = 'none';
+    if(delta) delta.textContent = '';
+    note.innerHTML = `<div class="empty" style="padding:14px">
+      Пока не из чего строить историю.<br>
+      График появится, когда наберутся операции хотя бы за два месяца.</div>`;
+    return;
+  }
+  wrap.style.display = 'block';
+
+  const first = H[0], last = H[H.length - 1];
+  const diff = round2(last.net - first.net);
+  const grew = diff >= 0;
+
+  if(delta){
+    delta.textContent = (grew ? '+' : '−') + moneyShort(Math.abs(diff));
+    delta.style.color = grew ? 'var(--green)' : 'var(--red)';
+  }
+
+  const monthsSpan = H.length;
+  const perMonth = round2(diff / Math.max(1, monthsSpan - 1));
+  note.innerHTML = `<div class="note ${grew ? 'ok' : 'warn'}">
+    ${grew
+      ? `<b>Капитал растёт.</b> За ${monthsSpan} ${plural(monthsSpan,'месяц','месяца','месяцев')}
+         прибавилось ${money(diff)} — это примерно ${money(perMonth)} в месяц.`
+      : `<b>Капитал снижается.</b> За ${monthsSpan} ${plural(monthsSpan,'месяц','месяца','месяцев')}
+         стало меньше на ${money(Math.abs(diff))} — около ${money(Math.abs(perMonth))} в месяц.
+         Проверьте ниже, какие траты можно сдвинуть.`}
+  </div>`;
+
+  if(!window.Chart) return;
+  anCap = new Chart(document.getElementById('anCapChart'), {
+    data:{ labels: H.map(h=>h.label),
+      datasets:[
+        {type:'bar', label:'Активы', data: H.map(h=>h.assets),
+         backgroundColor:'#2e7d32', borderRadius:3, order:3},
+        {type:'bar', label:'Долги', data: H.map(h=>-h.debt),
+         backgroundColor:'#c62828', borderRadius:3, order:3},
+        {type:'line', label:'Чистый капитал', data: H.map(h=>h.net),
+         borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
+         tension:.25, pointRadius:3, pointBackgroundColor:'#fff', order:0}
+      ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:true, position:'bottom',
+          labels:{boxWidth:9, boxHeight:9, font:{size:10.5}, padding:11,
+                  usePointStyle:true, pointStyle:'rectRounded'}},
+        tooltip:{callbacks:{label: c => c.dataset.label + ': ' + money(Math.abs(c.parsed.y))}}},
+      scales:{
+        y:{ ticks:{callback:v=>moneyShort(v), font:{size:10}},
+            grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+        x:{ ticks:{font:{size:10}}, grid:{display:false} } } }
+  });
+}
 
 function renderAnalytics(){
+  /* История капитала не зависит от выбранного периода — она всегда
+     за последние 12 месяцев, поэтому считается отдельно. */
+  renderCapitalHistory();
+
   const [from,to] = periodRange(document.getElementById('anPeriod').value);
   const kind = document.getElementById('anKind').value;
   const list = txInRange(from,to).filter(t=>t.type===kind);
