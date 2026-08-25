@@ -326,11 +326,52 @@ function openAccountSheet(){
   openOv('ovAccount');
 }
 
+/* Общий хвост окна профиля: категории расходов, курсы валют, о приложении.
+   Один и тот же блок нужен и гостю, и вошедшему — вынесен отдельно,
+   чтобы не дублировать разметку. */
+function settingsBlockHtml(){
+  return `
+    <div class="sec-title" style="margin-top:18px">Категории</div>
+    <div class="row" onclick="toggleCatSection()" style="cursor:pointer">
+      <div class="l"><div class="t">Категории расходов</div>
+        <div class="s">Отметьте, какие можно сократить при необходимости</div></div>
+      <span class="arw" id="catArw" style="display:inline-block;width:9px;color:var(--muted);font-size:9px;transition:transform .15s">▶</span>
+    </div>
+    <div id="catBody" style="display:none">
+      <div style="text-align:right;margin:6px 0 8px">
+        <button class="act" onclick="openCategory()">+ Категория</button>
+      </div>
+      <div class="note" id="catNote">Отметка «необязательная» используется в аналитике, чтобы показать, где можно сократить траты.</div>
+      <div id="catList"></div>
+    </div>
+
+    <div class="sec-title" style="margin-top:18px">Курсы валют</div>
+    <div class="row" onclick="toggleRatesSection()" style="cursor:pointer">
+      <div class="l"><div class="t">Курсы к рублю</div>
+        <div class="s">Итоги в других валютах считаются по этим курсам</div></div>
+      <span class="arw" id="ratesArw" style="display:inline-block;width:9px;color:var(--muted);font-size:9px;transition:transform .15s">▶</span>
+    </div>
+    <div id="ratesSecBody" style="display:none">
+      <div style="text-align:right;margin:6px 0 8px">
+        <button class="act" onclick="fetchRates()">Обновить из интернета</button>
+      </div>
+      <div id="ratesBody"></div>
+    </div>
+
+    <div class="sec-title" style="margin-top:18px">О приложении</div>
+    <div style="font-size:12.5px;color:var(--muted);line-height:1.6">
+      Все данные хранятся локально в вашем браузере и никуда не передаются, кроме синхронизации с вашим аккаунтом.
+      Чтобы поставить иконку на телефон — откройте страницу в браузере и выберите «Добавить на экран Домой».
+    </div>`;
+}
+
 function renderAccountSheet(){
   const box = document.getElementById('accountBody');
   if(!box) return;
   const p = profile();
   const meta = syncMeta();
+  CAT_OPEN = false;
+  RATES_OPEN = false;
 
   /* --- гость: вход, он же регистрация --- */
   if(!sbUser){
@@ -348,7 +389,17 @@ function renderAccountSheet(){
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6">
         Без входа приложение тоже работает, но данные останутся только в этом браузере
         и не откроются на телефоне.
-      </div>`;
+      </div>
+
+      <div class="sec-title" style="margin-top:18px">Данные</div>
+      <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
+        <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
+      <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
+        <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
+      <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
+        <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
+      ${settingsBlockHtml()}`;
+    renderCategories(); renderRates();
     return;
   }
 
@@ -368,10 +419,20 @@ function renderAccountSheet(){
     <div class="row"><div class="l"><div class="t">Последняя синхронизация</div>
       <div class="s">${meta.syncedAt ? dateLong(meta.syncedAt.slice(0,10))+', '+meta.syncedAt.slice(11,16) : 'ещё не было'}</div></div>
       <button class="btn btn-s btn-sm" onclick="syncNow()">Обновить</button></div>
+
+    <div class="sec-title" style="margin-top:18px">Данные</div>
+    <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
+      <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
+    <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
+      <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
+    <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
+      <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
+    ${settingsBlockHtml()}
+
     <div class="btnrow" style="margin-top:14px">
-      <button class="btn btn-s" onclick="backupData()">Скачать копию данных</button>
-      <button class="btn btn-d" onclick="syncSignOut()">Выйти</button>
+      <button class="btn btn-d btn-blk" onclick="syncSignOut()">Выйти из аккаунта</button>
     </div>`;
+  renderCategories(); renderRates();
 }
 
 function saveProfileName(){

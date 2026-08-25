@@ -996,19 +996,29 @@ function download(content, filename, mime){
 /* =========================================================================
    КАТЕГОРИИ
    ========================================================================= */
-let CATTAB = 'expense';
-function setCatTab(k){
-  CATTAB = k;
-  document.querySelectorAll('#catTabs button').forEach(b=>b.classList.toggle('on', b.dataset.k===k));
-  renderCategories();
+/* Категории доходов не показываем здесь: пользователь их не редактирует,
+   а «необязательный/регулярный» доход настраивается по умолчанию.
+   Список ниже — только расходы. */
+var CAT_OPEN = false;
+function toggleCatSection(){
+  CAT_OPEN = !CAT_OPEN;
+  const body = document.getElementById('catBody');
+  const arw = document.getElementById('catArw');
+  if(body) body.style.display = CAT_OPEN ? 'block' : 'none';
+  if(arw) arw.style.transform = CAT_OPEN ? 'rotate(90deg)' : 'none';
+  if(CAT_OPEN) renderCategories();
 }
 function renderCategories(){
-  const list = S.categories.filter(c=>c.kind===CATTAB);
-  document.getElementById('catList').innerHTML = list.map(c=>`
+  /* Список живёт внутри окна профиля и есть в DOM, только пока оно открыто —
+     если панель закрыта, тихо выходим вместо ошибки. */
+  const box = document.getElementById('catList');
+  if(!box) return;
+  const list = S.categories.filter(c=>c.kind==='expense');
+  box.innerHTML = list.map(c=>`
     <div class="row">
       <div class="l" onclick="openCategory('${c.id}')" style="cursor:pointer">
         <div class="t"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${catColor(c.id)};margin-right:6px"></span>${esc(c.name)}</div>
-        <div class="s">${c.mandatory===false?'можно сократить':'обязательная'}</div>
+        <div class="s">${c.mandatory===false ? 'можно сократить' : 'обязательная'}</div>
       </div>
       <label class="check" style="margin:0" title="Необязательная">
         <input type="checkbox" ${c.mandatory===false?'checked':''} onchange="toggleMandatory('${c.id}', this.checked)">
@@ -1021,15 +1031,12 @@ function toggleMandatory(id, optional){
   c.mandatory = !optional; save(); renderAll();
 }
 function openCategory(id){
+  /* Эта форма открывается только со списка категорий расходов —
+     категории доходов здесь не заводятся, поэтому тип не спрашиваем. */
   const c = id ? cat(id) : null;
   document.getElementById('ovCatBody').innerHTML = `
-    <h3>${c?'Категория':'Новая категория'}</h3>
+    <h3>${c?'Категория':'Новая категория расхода'}</h3>
     <div class="f"><label>Название</label><input type="text" id="ctName" value="${c?esc(c.name):''}"></div>
-    <div class="f"><label>Тип</label>
-      <select id="ctKind" ${c?'disabled':''}>
-        <option value="expense" ${(!c||c.kind==='expense')?'selected':''}>Расход</option>
-        <option value="income"  ${c&&c.kind==='income'?'selected':''}>Доход</option>
-      </select></div>
     <label class="check"><input type="checkbox" id="ctOpt" ${c&&c.mandatory===false?'checked':''}>
       Необязательная — можно сократить</label>
     <div class="btnrow">
@@ -1041,11 +1048,10 @@ function openCategory(id){
 function saveCategory(id){
   const name = document.getElementById('ctName').value.trim();
   if(!name){ toast('Введите название'); return; }
-  const kind = document.getElementById('ctKind').value;
   const mandatory = !document.getElementById('ctOpt').checked;
   if(id){ const c = cat(id); c.name = name; c.mandatory = mandatory; }
-  else S.categories.push({id:uid(), name, kind, mandatory});
-  save(); closeOv('ovCat'); setCatTab(kind); renderAll(); toast('Сохранено');
+  else S.categories.push({id:uid(), name, kind:'expense', mandatory});
+  save(); closeOv('ovCat'); renderCategories(); renderAll(); toast('Сохранено');
 }
 function deleteCategory(id){
   const n = S.transactions.filter(t=>t.categoryId===id).length;
@@ -1103,6 +1109,15 @@ async function wipeData(){
 /* =========================================================================
    КУРСЫ ВАЛЮТ
    ========================================================================= */
+var RATES_OPEN = false;
+function toggleRatesSection(){
+  RATES_OPEN = !RATES_OPEN;
+  const body = document.getElementById('ratesSecBody');
+  const arw = document.getElementById('ratesArw');
+  if(body) body.style.display = RATES_OPEN ? 'block' : 'none';
+  if(arw) arw.style.transform = RATES_OPEN ? 'rotate(90deg)' : 'none';
+  if(RATES_OPEN) renderRates();
+}
 function renderRates(){
   const box = document.getElementById('ratesBody');
   if(!box) return;

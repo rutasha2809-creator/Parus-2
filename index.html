@@ -651,46 +651,6 @@ nav button.on{color:var(--brand);font-weight:650}
   </div>
 </section>
 
-<!-- ============ НАСТРОЙКИ ============ -->
-<section class="screen" id="s-settings">
-  <div class="card">
-    <h2>Категории <button class="act" onclick="openCategory()">+ Категория</button></h2>
-    <div class="note">Отметка «необязательная» используется в аналитике, чтобы показать, где можно сократить траты.</div>
-    <div class="tabs" id="catTabs">
-      <button class="on" data-k="expense" onclick="setCatTab('expense')">Расходы</button>
-      <button data-k="income" onclick="setCatTab('income')">Доходы</button>
-    </div>
-    <div id="catList"></div>
-  </div>
-
-  <div class="card">
-    <h2>Курсы валют <button class="act" onclick="fetchRates()">Обновить из интернета</button></h2>
-    <div class="note">Итоги считаются в рублях. Если у счёта другая валюта, остаток
-      переводится по курсу ниже. Курсы можно поправить вручную.</div>
-    <div id="ratesBody"></div>
-  </div>
-
-  <div class="card">
-    <h2>Данные</h2>
-    <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
-      <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
-    <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
-      <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
-    <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
-      <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
-    <input type="file" id="restoreInput" accept=".json" style="display:none">
-  </div>
-
-  <div class="card">
-    <h2>О приложении</h2>
-    <div style="font-size:13px;color:var(--muted);line-height:1.65">
-      Все данные хранятся локально в вашем браузере и никуда не передаются.
-      Чтобы поставить иконку на телефон — откройте страницу в браузере и выберите «Добавить на экран Домой».
-      Регулярно делайте резервную копию: очистка данных браузера удалит информацию.
-    </div>
-  </div>
-</section>
-
 </main>
 
 <button class="fab" onclick="openTx()">+</button>
@@ -702,7 +662,6 @@ nav button.on{color:var(--brand);font-weight:650}
   <button class="nv" data-s="calendar" onclick="go('calendar')"><span class="ic">▤</span>Календарь</button>
   <button class="nv" data-s="debts" onclick="go('debts')"><span class="ic">◺</span>Долги</button>
   <button class="nv" data-s="analytics" onclick="go('analytics')"><span class="ic">▥</span>Анализ</button>
-  <button class="nv" data-s="settings" onclick="go('settings')"><span class="ic">⋯</span>Ещё</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -716,6 +675,7 @@ nav button.on{color:var(--brand);font-weight:650}
 <div class="ov" id="ovAccount"><div class="sheet"><button class="xbtn" onclick="closeOv('ovAccount')">✕</button><div id="accountBody"></div></div></div>
 <input type="file" id="avatarInput" accept="image/*" style="display:none">
 <input type="file" id="schedImageInput" accept="image/*" style="display:none">
+<input type="file" id="restoreInput" accept=".json" style="display:none">
 <div class="ov" id="ovSched"><div class="sheet wide"><button class="xbtn" onclick="closeOv('ovSched')">✕</button><div id="ovSchedBody"></div></div></div>
 
 <script>
@@ -1717,19 +1677,29 @@ function download(content, filename, mime){
 /* =========================================================================
    КАТЕГОРИИ
    ========================================================================= */
-let CATTAB = 'expense';
-function setCatTab(k){
-  CATTAB = k;
-  document.querySelectorAll('#catTabs button').forEach(b=>b.classList.toggle('on', b.dataset.k===k));
-  renderCategories();
+/* Категории доходов не показываем здесь: пользователь их не редактирует,
+   а «необязательный/регулярный» доход настраивается по умолчанию.
+   Список ниже — только расходы. */
+var CAT_OPEN = false;
+function toggleCatSection(){
+  CAT_OPEN = !CAT_OPEN;
+  const body = document.getElementById('catBody');
+  const arw = document.getElementById('catArw');
+  if(body) body.style.display = CAT_OPEN ? 'block' : 'none';
+  if(arw) arw.style.transform = CAT_OPEN ? 'rotate(90deg)' : 'none';
+  if(CAT_OPEN) renderCategories();
 }
 function renderCategories(){
-  const list = S.categories.filter(c=>c.kind===CATTAB);
-  document.getElementById('catList').innerHTML = list.map(c=>`
+  /* Список живёт внутри окна профиля и есть в DOM, только пока оно открыто —
+     если панель закрыта, тихо выходим вместо ошибки. */
+  const box = document.getElementById('catList');
+  if(!box) return;
+  const list = S.categories.filter(c=>c.kind==='expense');
+  box.innerHTML = list.map(c=>`
     <div class="row">
       <div class="l" onclick="openCategory('${c.id}')" style="cursor:pointer">
         <div class="t"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${catColor(c.id)};margin-right:6px"></span>${esc(c.name)}</div>
-        <div class="s">${c.mandatory===false?'можно сократить':'обязательная'}</div>
+        <div class="s">${c.mandatory===false ? 'можно сократить' : 'обязательная'}</div>
       </div>
       <label class="check" style="margin:0" title="Необязательная">
         <input type="checkbox" ${c.mandatory===false?'checked':''} onchange="toggleMandatory('${c.id}', this.checked)">
@@ -1742,15 +1712,12 @@ function toggleMandatory(id, optional){
   c.mandatory = !optional; save(); renderAll();
 }
 function openCategory(id){
+  /* Эта форма открывается только со списка категорий расходов —
+     категории доходов здесь не заводятся, поэтому тип не спрашиваем. */
   const c = id ? cat(id) : null;
   document.getElementById('ovCatBody').innerHTML = `
-    <h3>${c?'Категория':'Новая категория'}</h3>
+    <h3>${c?'Категория':'Новая категория расхода'}</h3>
     <div class="f"><label>Название</label><input type="text" id="ctName" value="${c?esc(c.name):''}"></div>
-    <div class="f"><label>Тип</label>
-      <select id="ctKind" ${c?'disabled':''}>
-        <option value="expense" ${(!c||c.kind==='expense')?'selected':''}>Расход</option>
-        <option value="income"  ${c&&c.kind==='income'?'selected':''}>Доход</option>
-      </select></div>
     <label class="check"><input type="checkbox" id="ctOpt" ${c&&c.mandatory===false?'checked':''}>
       Необязательная — можно сократить</label>
     <div class="btnrow">
@@ -1762,11 +1729,10 @@ function openCategory(id){
 function saveCategory(id){
   const name = document.getElementById('ctName').value.trim();
   if(!name){ toast('Введите название'); return; }
-  const kind = document.getElementById('ctKind').value;
   const mandatory = !document.getElementById('ctOpt').checked;
   if(id){ const c = cat(id); c.name = name; c.mandatory = mandatory; }
-  else S.categories.push({id:uid(), name, kind, mandatory});
-  save(); closeOv('ovCat'); setCatTab(kind); renderAll(); toast('Сохранено');
+  else S.categories.push({id:uid(), name, kind:'expense', mandatory});
+  save(); closeOv('ovCat'); renderCategories(); renderAll(); toast('Сохранено');
 }
 function deleteCategory(id){
   const n = S.transactions.filter(t=>t.categoryId===id).length;
@@ -1824,6 +1790,15 @@ async function wipeData(){
 /* =========================================================================
    КУРСЫ ВАЛЮТ
    ========================================================================= */
+var RATES_OPEN = false;
+function toggleRatesSection(){
+  RATES_OPEN = !RATES_OPEN;
+  const body = document.getElementById('ratesSecBody');
+  const arw = document.getElementById('ratesArw');
+  if(body) body.style.display = RATES_OPEN ? 'block' : 'none';
+  if(arw) arw.style.transform = RATES_OPEN ? 'rotate(90deg)' : 'none';
+  if(RATES_OPEN) renderRates();
+}
 function renderRates(){
   const box = document.getElementById('ratesBody');
   if(!box) return;
@@ -4771,11 +4746,52 @@ function openAccountSheet(){
   openOv('ovAccount');
 }
 
+/* Общий хвост окна профиля: категории расходов, курсы валют, о приложении.
+   Один и тот же блок нужен и гостю, и вошедшему — вынесен отдельно,
+   чтобы не дублировать разметку. */
+function settingsBlockHtml(){
+  return `
+    <div class="sec-title" style="margin-top:18px">Категории</div>
+    <div class="row" onclick="toggleCatSection()" style="cursor:pointer">
+      <div class="l"><div class="t">Категории расходов</div>
+        <div class="s">Отметьте, какие можно сократить при необходимости</div></div>
+      <span class="arw" id="catArw" style="display:inline-block;width:9px;color:var(--muted);font-size:9px;transition:transform .15s">▶</span>
+    </div>
+    <div id="catBody" style="display:none">
+      <div style="text-align:right;margin:6px 0 8px">
+        <button class="act" onclick="openCategory()">+ Категория</button>
+      </div>
+      <div class="note" id="catNote">Отметка «необязательная» используется в аналитике, чтобы показать, где можно сократить траты.</div>
+      <div id="catList"></div>
+    </div>
+
+    <div class="sec-title" style="margin-top:18px">Курсы валют</div>
+    <div class="row" onclick="toggleRatesSection()" style="cursor:pointer">
+      <div class="l"><div class="t">Курсы к рублю</div>
+        <div class="s">Итоги в других валютах считаются по этим курсам</div></div>
+      <span class="arw" id="ratesArw" style="display:inline-block;width:9px;color:var(--muted);font-size:9px;transition:transform .15s">▶</span>
+    </div>
+    <div id="ratesSecBody" style="display:none">
+      <div style="text-align:right;margin:6px 0 8px">
+        <button class="act" onclick="fetchRates()">Обновить из интернета</button>
+      </div>
+      <div id="ratesBody"></div>
+    </div>
+
+    <div class="sec-title" style="margin-top:18px">О приложении</div>
+    <div style="font-size:12.5px;color:var(--muted);line-height:1.6">
+      Все данные хранятся локально в вашем браузере и никуда не передаются, кроме синхронизации с вашим аккаунтом.
+      Чтобы поставить иконку на телефон — откройте страницу в браузере и выберите «Добавить на экран Домой».
+    </div>`;
+}
+
 function renderAccountSheet(){
   const box = document.getElementById('accountBody');
   if(!box) return;
   const p = profile();
   const meta = syncMeta();
+  CAT_OPEN = false;
+  RATES_OPEN = false;
 
   /* --- гость: вход, он же регистрация --- */
   if(!sbUser){
@@ -4793,7 +4809,17 @@ function renderAccountSheet(){
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6">
         Без входа приложение тоже работает, но данные останутся только в этом браузере
         и не откроются на телефоне.
-      </div>`;
+      </div>
+
+      <div class="sec-title" style="margin-top:18px">Данные</div>
+      <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
+        <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
+      <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
+        <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
+      <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
+        <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
+      ${settingsBlockHtml()}`;
+    renderCategories(); renderRates();
     return;
   }
 
@@ -4813,10 +4839,20 @@ function renderAccountSheet(){
     <div class="row"><div class="l"><div class="t">Последняя синхронизация</div>
       <div class="s">${meta.syncedAt ? dateLong(meta.syncedAt.slice(0,10))+', '+meta.syncedAt.slice(11,16) : 'ещё не было'}</div></div>
       <button class="btn btn-s btn-sm" onclick="syncNow()">Обновить</button></div>
+
+    <div class="sec-title" style="margin-top:18px">Данные</div>
+    <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
+      <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
+    <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
+      <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
+    <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
+      <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
+    ${settingsBlockHtml()}
+
     <div class="btnrow" style="margin-top:14px">
-      <button class="btn btn-s" onclick="backupData()">Скачать копию данных</button>
-      <button class="btn btn-d" onclick="syncSignOut()">Выйти</button>
+      <button class="btn btn-d btn-blk" onclick="syncSignOut()">Выйти из аккаунта</button>
     </div>`;
+  renderCategories(); renderRates();
 }
 
 function saveProfileName(){

@@ -651,46 +651,6 @@ nav button.on{color:var(--brand);font-weight:650}
   </div>
 </section>
 
-<!-- ============ НАСТРОЙКИ ============ -->
-<section class="screen" id="s-settings">
-  <div class="card">
-    <h2>Категории <button class="act" onclick="openCategory()">+ Категория</button></h2>
-    <div class="note">Отметка «необязательная» используется в аналитике, чтобы показать, где можно сократить траты.</div>
-    <div class="tabs" id="catTabs">
-      <button class="on" data-k="expense" onclick="setCatTab('expense')">Расходы</button>
-      <button data-k="income" onclick="setCatTab('income')">Доходы</button>
-    </div>
-    <div id="catList"></div>
-  </div>
-
-  <div class="card">
-    <h2>Курсы валют <button class="act" onclick="fetchRates()">Обновить из интернета</button></h2>
-    <div class="note">Итоги считаются в рублях. Если у счёта другая валюта, остаток
-      переводится по курсу ниже. Курсы можно поправить вручную.</div>
-    <div id="ratesBody"></div>
-  </div>
-
-  <div class="card">
-    <h2>Данные</h2>
-    <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
-      <button class="btn btn-s btn-sm" onclick="backupData()">Скачать</button></div>
-    <div class="row"><div class="l"><div class="t">Восстановить</div><div class="s">Загрузить данные из файла копии</div></div>
-      <button class="btn btn-s btn-sm" onclick="document.getElementById('restoreInput').click()">Загрузить</button></div>
-    <div class="row"><div class="l"><div class="t">Очистить всё</div><div class="s">Удалить все данные без возврата</div></div>
-      <button class="btn btn-d btn-sm" onclick="wipeData()">Очистить</button></div>
-    <input type="file" id="restoreInput" accept=".json" style="display:none">
-  </div>
-
-  <div class="card">
-    <h2>О приложении</h2>
-    <div style="font-size:13px;color:var(--muted);line-height:1.65">
-      Все данные хранятся локально в вашем браузере и никуда не передаются.
-      Чтобы поставить иконку на телефон — откройте страницу в браузере и выберите «Добавить на экран Домой».
-      Регулярно делайте резервную копию: очистка данных браузера удалит информацию.
-    </div>
-  </div>
-</section>
-
 </main>
 
 <button class="fab" onclick="openTx()">+</button>
@@ -702,7 +662,6 @@ nav button.on{color:var(--brand);font-weight:650}
   <button class="nv" data-s="calendar" onclick="go('calendar')"><span class="ic">▤</span>Календарь</button>
   <button class="nv" data-s="debts" onclick="go('debts')"><span class="ic">◺</span>Долги</button>
   <button class="nv" data-s="analytics" onclick="go('analytics')"><span class="ic">▥</span>Анализ</button>
-  <button class="nv" data-s="settings" onclick="go('settings')"><span class="ic">⋯</span>Ещё</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -716,6 +675,7 @@ nav button.on{color:var(--brand);font-weight:650}
 <div class="ov" id="ovAccount"><div class="sheet"><button class="xbtn" onclick="closeOv('ovAccount')">✕</button><div id="accountBody"></div></div></div>
 <input type="file" id="avatarInput" accept="image/*" style="display:none">
 <input type="file" id="schedImageInput" accept="image/*" style="display:none">
+<input type="file" id="restoreInput" accept=".json" style="display:none">
 <div class="ov" id="ovSched"><div class="sheet wide"><button class="xbtn" onclick="closeOv('ovSched')">✕</button><div id="ovSchedBody"></div></div></div>
 
 <script>
