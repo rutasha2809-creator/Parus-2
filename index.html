@@ -1798,11 +1798,25 @@ document.getElementById('restoreInput').addEventListener('change', e=>{
   r.readAsText(f);
   e.target.value = '';
 });
-function wipeData(){
+async function wipeData(){
   if(!confirm('Удалить ВСЕ данные без возможности восстановления?')) return;
   if(!confirm('Точно? Сделайте резервную копию, если ещё не сделали.')) return;
   localStorage.removeItem(KEY);
-  S = load(); renderAll(); toast('Данные очищены');
+  S = load(); renderAll();
+
+  /* Если включена облачная синхронизация — очистку нужно отправить и туда.
+     Иначе при следующем входе приложение решит, что локально «просто ничего
+     не меняли», и молча подтянет старые данные обратно из облака. */
+  if(typeof sb !== 'undefined' && sb && typeof sbUser !== 'undefined' && sbUser){
+    try{
+      await syncPush();
+      toast('Данные очищены — на этом устройстве и в облаке');
+    }catch(e){
+      toast('Данные очищены локально, но не в облаке — проверьте связь и синхронизацию в профиле');
+    }
+  } else {
+    toast('Данные очищены');
+  }
 }
 
 
