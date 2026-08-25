@@ -136,6 +136,17 @@ nav button.on{color:var(--brand);font-weight:650}
 .acc .sb{font-size:11.5px;color:var(--muted);margin-top:1px}
 .acc .bal{margin-left:auto;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 
+/* Раскрывающийся счёт: клик по строке показывает операции этого счёта
+   и позволяет сразу добавить новую или загрузить выписку — тот же приём,
+   что и со свёрнутыми месяцами в календаре. */
+.acx{border-bottom:1px solid var(--line)}
+.acx:last-child{border-bottom:none}
+.acx .acc{border-bottom:none}
+.acx .arw{flex-shrink:0;width:11px;color:var(--muted);font-size:9px;transition:transform .15s}
+.acx.open .arw{transform:rotate(90deg)}
+.acx-b{display:none;padding:0 0 14px}
+.acx.open .acx-b{display:block}
+
 .bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin:8px 0 5px}
 .bar>i{display:block;height:100%;background:var(--brand);border-radius:4px;transition:width .3s}
 .bar.g>i{background:var(--green)} .bar.a>i{background:var(--amber)} .bar.r>i{background:var(--red)}
@@ -344,28 +355,20 @@ nav button.on{color:var(--brand);font-weight:650}
   </div>
 
   <div class="card">
-    <h2>Последние операции <button class="act" onclick="go('tx')">Все →</button></h2>
+    <h2>Последние операции <button class="act" onclick="go('accounts')">Все →</button></h2>
     <div id="homeTx"></div>
   </div>
 </section>
 
-<!-- ============ СЧЕТА ============ -->
+<!-- ============ СЧЕТА И ОПЕРАЦИИ ============ -->
 <section class="screen" id="s-accounts">
   <div class="btnrow" style="margin-bottom:12px">
     <button class="btn btn-p" onclick="openAccount()">+ Добавить счёт</button>
     <button class="btn btn-s" onclick="openTransfer()">⇄ Перевод между счетами</button>
   </div>
   <div id="accGroups"></div>
-</section>
 
-<!-- ============ ОПЕРАЦИИ ============ -->
-<section class="screen" id="s-tx">
-  <div class="btnrow" style="margin-bottom:12px">
-    <button class="btn btn-p" onclick="openTx()">+ Операция</button>
-    <button class="btn btn-s" onclick="openTransfer()">⇄ Перевод</button>
-    <button class="btn btn-s" onclick="go('import')">Импорт</button>
-  </div>
-
+  <div class="sec-title" style="margin-top:24px">Все операции</div>
   <div class="card">
     <div class="f2" style="margin-bottom:0">
       <div class="f" style="margin-bottom:0">
@@ -402,7 +405,7 @@ nav button.on{color:var(--brand);font-weight:650}
 <!-- ============ ИМПОРТ ============ -->
 <section class="screen" id="s-import">
   <div class="btnrow" style="margin-bottom:12px">
-    <button class="btn btn-s" onclick="go('tx')">← К операциям</button>
+    <button class="btn btn-s" onclick="go('accounts')">← К счетам</button>
     <button class="btn btn-p" onclick="openTx()">+ Ввести вручную</button>
   </div>
 
@@ -658,7 +661,6 @@ nav button.on{color:var(--brand);font-weight:650}
 <nav>
   <button class="nv on" data-s="home" onclick="go('home')"><span class="ic">◉</span>Обзор</button>
   <button class="nv" data-s="accounts" onclick="go('accounts')"><span class="ic">▦</span>Счета</button>
-  <button class="nv" data-s="tx" onclick="go('tx')"><span class="ic">☰</span>Операции</button>
   <button class="nv" data-s="calendar" onclick="go('calendar')"><span class="ic">▤</span>Календарь</button>
   <button class="nv" data-s="debts" onclick="go('debts')"><span class="ic">◺</span>Долги</button>
   <button class="nv" data-s="analytics" onclick="go('analytics')"><span class="ic">▥</span>Анализ</button>
@@ -1279,6 +1281,14 @@ function deleteAccount(id){
   save(); closeOv('ovAcc'); renderAll(); toast('Счёт удалён');
 }
 
+/* Какие счета развёрнуты на странице «Счета». Живёт вне рендера,
+   иначе после любой правки внутри всё схлопывалось бы обратно. */
+var ACC_OPEN = new Set();
+function toggleAccOpen(id){
+  if(ACC_OPEN.has(id)) ACC_OPEN.delete(id); else ACC_OPEN.add(id);
+  renderAccounts();
+}
+
 function renderAccounts(){
   const box = document.getElementById('accGroups');
   if(S.accounts.length===0){
@@ -1295,11 +1305,13 @@ function renderAccounts(){
     if(!list.length) return '';
     const sum = list.reduce((s,a)=>s+toBase(balance(a), accCurrency(a)),0);
     return `<div class="sec-title">${title} · <span style="text-transform:none;letter-spacing:0">${money(sum)}</span></div>
-      <div class="card">${list.map(accRow).join('')}</div>`;
+      <div class="card">${list.map(accRowExpand).join('')}</div>`;
   }).join('');
 }
 
-function accRow(a){
+/* Общая «начинка» строки счёта: иконка, название, подпись, остаток.
+   Используется и в свёрнутом виде на Обзоре, и в раскрывающемся на Счетах. */
+function accRowInner(a){
   const T = ACC_TYPES[a.type]; const b = balance(a);
   const isAsset = T.asset;
   let sub = T.label;
@@ -1317,17 +1329,51 @@ function accRow(a){
   if(a.type==='debt' && a.dueDate) sub += ` · до ${dateShort(a.dueDate)}`;
   const cur = accCurrency(a);
   const inBase = cur !== BASE ? `<div style="font-size:11px;color:var(--muted);font-weight:500">${money(toBase(b,cur))}</div>` : '';
-  return `<div class="acc" onclick="openAccount('${a.id}')">
-    <div class="ico" style="background:${T.bg}">${T.icon}</div>
+  return `<div class="ico" style="background:${T.bg}">${T.icon}</div>
     <div class="l"><div class="nm">${esc(a.name)}</div><div class="sb">${sub}</div></div>
-    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b,{cur})}${inBase}</div>
+    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b,{cur})}${inBase}</div>`;
+}
+
+/* Короткая строка счёта для Обзора — клик сразу открывает настройки. */
+function accRow(a){
+  return `<div class="acc" onclick="openAccount('${a.id}')">${accRowInner(a)}</div>`;
+}
+
+/* Раскрывающаяся строка счёта для страницы «Счета»: клик по строке
+   показывает операции этого счёта и кнопки быстрого добавления. */
+function accRowExpand(a){
+  const open = ACC_OPEN.has(a.id);
+  const list = accTxList(a.id);
+  const body = list.length
+    ? list.map(txRow).join('')
+    : `<div class="empty" style="padding:10px 0">Операций по этому счёту ещё нет.</div>`;
+  return `<div class="acx ${open?'open':''}">
+    <div class="acc" onclick="toggleAccOpen('${a.id}')" style="cursor:pointer">
+      ${accRowInner(a)}<span class="arw" style="margin-left:2px">▶</span>
+    </div>
+    <div class="acx-b">
+      <div class="btnrow" style="margin:2px 0 10px">
+        <button class="btn btn-p btn-sm" onclick="openTx(null,'${a.id}')">+ Операция</button>
+        <button class="btn btn-s btn-sm" onclick="startImportFor('${a.id}')">Загрузить выписку</button>
+        <button class="btn btn-s btn-sm" onclick="openAccount('${a.id}')">Настройки</button>
+      </div>
+      ${body}
+    </div>
   </div>`;
+}
+
+/* Последние операции по одному счёту (включая переводы, куда он — получатель) */
+function accTxList(accountId){
+  return [...S.transactions]
+    .filter(t=>t.accountId===accountId || t.toAccountId===accountId)
+    .sort((a,b)=> b.date.localeCompare(a.date) || (b.id>a.id?1:-1))
+    .slice(0,15);
 }
 
 /* =========================================================================
    ОПЕРАЦИИ
    ========================================================================= */
-function openTx(id){
+function openTx(id, presetAccountId){
   const t = id ? S.transactions.find(x=>x.id===id) : null;
   if(S.accounts.length===0){
     toast('Сначала добавьте хотя бы один счёт'); go('accounts'); return;
@@ -1381,6 +1427,18 @@ function openTx(id){
       <button class="btn btn-p" onclick="saveTx(${t?"'"+t.id+"'":'null'})">Сохранить</button>
     </div>`;
   txKind(t ? t.type : 'expense', t);
+
+  /* Открыто изнутри конкретного счёта — сразу подставляем его,
+     чтобы не искать в списке вручную. Только для новой операции:
+     при редактировании существующей счёт задаёт сама операция. */
+  if(!t && presetAccountId){
+    const accSel = document.getElementById('txAccount');
+    if(accSel && [...accSel.options].some(o=>o.value===presetAccountId)){
+      accSel.value = presetAccountId;
+      txCurrencyCheck();
+    }
+  }
+
   const amtEl = document.getElementById('txAmount');
   if(amtEl) amtEl.addEventListener('input', txCurrencyCheck);
   const dEl = document.getElementById('txDate');
@@ -2763,6 +2821,14 @@ if(window.pdfjsLib){
 
 var IMP = null;   // текущий разбираемый импорт  // {raw: [][], headers: [], map:{date,desc,amount,debit,credit}, rows:[], mode}
 
+/* Счёт, с которого открыли «Загрузить выписку» из его развёрнутой строки —
+   при первом показе списка счетов в импорте подставляем именно его. */
+var IMP_PRESET_ACCOUNT = null;
+function startImportFor(accountId){
+  IMP_PRESET_ACCOUNT = accountId;
+  go('import');
+}
+
 /* ---------------- разбор дат и чисел ---------------- */
 function parseAnyDate(v){
   if(v==null) return null;
@@ -3170,8 +3236,10 @@ function showPreview(){
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
   /* Сохраняем выбор пользователя — иначе при каждой перерисовке
-     список сбрасывался бы на первый счёт. */
-  const prevAcc = accSel.value;
+     список сбрасывался бы на первый счёт. Если счёта ещё не выбирали
+     в этом заходе — подставляем тот, с которого открыли импорт. */
+  const prevAcc = accSel.value || IMP_PRESET_ACCOUNT || '';
+  IMP_PRESET_ACCOUNT = null;
   accSel.innerHTML = usable.length
     ? usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
     : `<option value="">— сначала добавьте счёт —</option>`;
@@ -3254,7 +3322,7 @@ function commitImport(){
   }
   save(); cancelImport(); renderAll();
   toast(`Импортировано операций: ${sel.length}`);
-  go('tx');
+  go('accounts');
 }
 
 /* ---------------- правила автокатегоризации ---------------- */

@@ -598,6 +598,14 @@ function deleteAccount(id){
   save(); closeOv('ovAcc'); renderAll(); toast('Счёт удалён');
 }
 
+/* Какие счета развёрнуты на странице «Счета». Живёт вне рендера,
+   иначе после любой правки внутри всё схлопывалось бы обратно. */
+var ACC_OPEN = new Set();
+function toggleAccOpen(id){
+  if(ACC_OPEN.has(id)) ACC_OPEN.delete(id); else ACC_OPEN.add(id);
+  renderAccounts();
+}
+
 function renderAccounts(){
   const box = document.getElementById('accGroups');
   if(S.accounts.length===0){
@@ -614,11 +622,13 @@ function renderAccounts(){
     if(!list.length) return '';
     const sum = list.reduce((s,a)=>s+toBase(balance(a), accCurrency(a)),0);
     return `<div class="sec-title">${title} · <span style="text-transform:none;letter-spacing:0">${money(sum)}</span></div>
-      <div class="card">${list.map(accRow).join('')}</div>`;
+      <div class="card">${list.map(accRowExpand).join('')}</div>`;
   }).join('');
 }
 
-function accRow(a){
+/* Общая «начинка» строки счёта: иконка, название, подпись, остаток.
+   Используется и в свёрнутом виде на Обзоре, и в раскрывающемся на Счетах. */
+function accRowInner(a){
   const T = ACC_TYPES[a.type]; const b = balance(a);
   const isAsset = T.asset;
   let sub = T.label;
@@ -636,17 +646,51 @@ function accRow(a){
   if(a.type==='debt' && a.dueDate) sub += ` · до ${dateShort(a.dueDate)}`;
   const cur = accCurrency(a);
   const inBase = cur !== BASE ? `<div style="font-size:11px;color:var(--muted);font-weight:500">${money(toBase(b,cur))}</div>` : '';
-  return `<div class="acc" onclick="openAccount('${a.id}')">
-    <div class="ico" style="background:${T.bg}">${T.icon}</div>
+  return `<div class="ico" style="background:${T.bg}">${T.icon}</div>
     <div class="l"><div class="nm">${esc(a.name)}</div><div class="sb">${sub}</div></div>
-    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b,{cur})}${inBase}</div>
+    <div class="bal ${isAsset ? (b<0?'neg':'') : 'neg'}">${money(b,{cur})}${inBase}</div>`;
+}
+
+/* Короткая строка счёта для Обзора — клик сразу открывает настройки. */
+function accRow(a){
+  return `<div class="acc" onclick="openAccount('${a.id}')">${accRowInner(a)}</div>`;
+}
+
+/* Раскрывающаяся строка счёта для страницы «Счета»: клик по строке
+   показывает операции этого счёта и кнопки быстрого добавления. */
+function accRowExpand(a){
+  const open = ACC_OPEN.has(a.id);
+  const list = accTxList(a.id);
+  const body = list.length
+    ? list.map(txRow).join('')
+    : `<div class="empty" style="padding:10px 0">Операций по этому счёту ещё нет.</div>`;
+  return `<div class="acx ${open?'open':''}">
+    <div class="acc" onclick="toggleAccOpen('${a.id}')" style="cursor:pointer">
+      ${accRowInner(a)}<span class="arw" style="margin-left:2px">▶</span>
+    </div>
+    <div class="acx-b">
+      <div class="btnrow" style="margin:2px 0 10px">
+        <button class="btn btn-p btn-sm" onclick="openTx(null,'${a.id}')">+ Операция</button>
+        <button class="btn btn-s btn-sm" onclick="startImportFor('${a.id}')">Загрузить выписку</button>
+        <button class="btn btn-s btn-sm" onclick="openAccount('${a.id}')">Настройки</button>
+      </div>
+      ${body}
+    </div>
   </div>`;
+}
+
+/* Последние операции по одному счёту (включая переводы, куда он — получатель) */
+function accTxList(accountId){
+  return [...S.transactions]
+    .filter(t=>t.accountId===accountId || t.toAccountId===accountId)
+    .sort((a,b)=> b.date.localeCompare(a.date) || (b.id>a.id?1:-1))
+    .slice(0,15);
 }
 
 /* =========================================================================
    ОПЕРАЦИИ
    ========================================================================= */
-function openTx(id){
+function openTx(id, presetAccountId){
   const t = id ? S.transactions.find(x=>x.id===id) : null;
   if(S.accounts.length===0){
     toast('Сначала добавьте хотя бы один счёт'); go('accounts'); return;
@@ -700,6 +744,18 @@ function openTx(id){
       <button class="btn btn-p" onclick="saveTx(${t?"'"+t.id+"'":'null'})">Сохранить</button>
     </div>`;
   txKind(t ? t.type : 'expense', t);
+
+  /* Открыто изнутри конкретного счёта — сразу подставляем его,
+     чтобы не искать в списке вручную. Только для новой операции:
+     при редактировании существующей счёт задаёт сама операция. */
+  if(!t && presetAccountId){
+    const accSel = document.getElementById('txAccount');
+    if(accSel && [...accSel.options].some(o=>o.value===presetAccountId)){
+      accSel.value = presetAccountId;
+      txCurrencyCheck();
+    }
+  }
+
   const amtEl = document.getElementById('txAmount');
   if(amtEl) amtEl.addEventListener('input', txCurrencyCheck);
   const dEl = document.getElementById('txDate');

@@ -8,6 +8,14 @@ if(window.pdfjsLib){
 
 var IMP = null;   // текущий разбираемый импорт  // {raw: [][], headers: [], map:{date,desc,amount,debit,credit}, rows:[], mode}
 
+/* Счёт, с которого открыли «Загрузить выписку» из его развёрнутой строки —
+   при первом показе списка счетов в импорте подставляем именно его. */
+var IMP_PRESET_ACCOUNT = null;
+function startImportFor(accountId){
+  IMP_PRESET_ACCOUNT = accountId;
+  go('import');
+}
+
 /* ---------------- разбор дат и чисел ---------------- */
 function parseAnyDate(v){
   if(v==null) return null;
@@ -415,8 +423,10 @@ function showPreview(){
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
   /* Сохраняем выбор пользователя — иначе при каждой перерисовке
-     список сбрасывался бы на первый счёт. */
-  const prevAcc = accSel.value;
+     список сбрасывался бы на первый счёт. Если счёта ещё не выбирали
+     в этом заходе — подставляем тот, с которого открыли импорт. */
+  const prevAcc = accSel.value || IMP_PRESET_ACCOUNT || '';
+  IMP_PRESET_ACCOUNT = null;
   accSel.innerHTML = usable.length
     ? usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
     : `<option value="">— сначала добавьте счёт —</option>`;
@@ -499,7 +509,7 @@ function commitImport(){
   }
   save(); cancelImport(); renderAll();
   toast(`Импортировано операций: ${sel.length}`);
-  go('tx');
+  go('accounts');
 }
 
 /* ---------------- правила автокатегоризации ---------------- */
