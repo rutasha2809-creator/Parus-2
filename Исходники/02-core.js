@@ -40,8 +40,11 @@ const DEFAULT = {
   transactions: [],
   categories: [
     // расходы — обязательные
-    {id:'c_mortgage', name:'Ипотека',            kind:'expense', mandatory:true},
-    {id:'c_loan',     name:'Платежи по кредитам',kind:'expense', mandatory:true},
+    /* Категорий «Ипотека» и «Платежи по кредитам» здесь намеренно нет.
+       Платёж по кредиту вносится переводом на счёт долга — тогда он
+       засчитывается в график погашения. Если записать его обычным расходом
+       с такой категорией, сумма посчитается дважды: и как расход,
+       и как плановый платёж из графика. */
     {id:'c_utility',  name:'ЖКХ',                kind:'expense', mandatory:true},
     {id:'c_food',     name:'Продукты',           kind:'expense', mandatory:true},
     {id:'c_transport',name:'Транспорт',          kind:'expense', mandatory:true},
@@ -85,7 +88,10 @@ const DEFAULT = {
   profile: { name: '', avatar: '' },   // имя и фото пользователя
   planOverrides: {},                   // ручные правки плановых платежей
   settings: {
-    minBuffer: 10000,
+    /* 0 — значит не задан. Сумму подушки пользователь вписывает сам:
+       выдуманное значение по умолчанию выглядело бы как его собственная
+       настройка и вводило бы в заблуждение. */
+    minBuffer: 0,
     /* Ориентировочные курсы — проверьте и поправьте в настройках.
        Приложение считает итоги, переводя всё в рубли. */
     rates: { RUB:1, USD:80, EUR:93, CNY:11, GBP:108, CHF:99, JPY:0.55, KZT:0.16, TRY:2.0, AED:22 },
@@ -714,7 +720,10 @@ function openTx(id, presetAccountId){
       <input type="number" step="0.01" id="txToAmount" placeholder="0">
       <div class="hint">Счета в разных валютах — укажите, сколько пришло на второй счёт.</div>
     </div>
-    <div class="f" id="txCatWrap"><label>Категория</label><select id="txCategory"></select></div>
+    <div class="f" id="txCatWrap"><label>Категория</label><select id="txCategory"></select>
+      <div class="hint" id="txDebtHint" style="display:none">Платите по кредиту или кредитке?
+        Выберите вверху «Перевод» и укажите этот долг — тогда платёж зачтётся в график погашения.
+        Если внести его расходом, сумма посчитается дважды.</div></div>
     <div class="f"><label>Описание</label><input type="text" id="txNote" value="${t?esc(t.note||''):''}" placeholder="необязательно"></div>
 
     <label class="check" id="txRepeatWrap">
@@ -847,6 +856,11 @@ function txKind(k, t){
     const cats = S.categories.filter(c=>c.kind===k);
     document.getElementById('txCategory').innerHTML =
       cats.map(c=>`<option value="${c.id}">${esc(c.name)}${c.mandatory===false?' •':''}</option>`).join('');
+
+    /* Подсказка про платежи по долгам нужна только в расходах и только
+       тем, у кого долги вообще заведены. */
+    const dh = document.getElementById('txDebtHint');
+    if(dh) dh.style.display = (k === 'expense' && debtAccounts().length) ? 'block' : 'none';
   }
   if(t){
     if(t.accountId) accSel.value = t.accountId;

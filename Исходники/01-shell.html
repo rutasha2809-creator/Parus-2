@@ -128,6 +128,18 @@ nav button.on{color:var(--brand);font-weight:650}
 .chip.bad{background:var(--red-l);color:var(--red)}
 .chip.info{background:var(--brand-l);color:var(--brand)}
 
+/* ---------- онбординг: шаги на пустом Обзоре ---------- */
+.stp{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+.stp:last-child{border-bottom:none}
+.stp .num{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:650}
+.stp.done .num{background:var(--green)}
+.stp .l{flex:1;min-width:0}
+.stp .t{font-weight:600;font-size:13.5px}
+.stp.done .t{color:var(--muted);text-decoration:line-through}
+.stp .s{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.5}
+.stp .go{flex-shrink:0;align-self:center}
+
 /* ---------- account cards ---------- */
 .acc{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .acc:last-child{border-bottom:none}
@@ -310,6 +322,13 @@ nav button.on{color:var(--brand);font-weight:650}
 
 <!-- ============ ОБЗОР ============ -->
 <section class="screen active" id="s-home">
+  <div class="card" id="cardOnboard" style="display:none">
+    <h2>С чего начать</h2>
+    <div class="note">Заполните по порядку — после этого приложение построит прогноз
+      и покажет, хватит ли денег до конца периода.</div>
+    <div id="onboardSteps"></div>
+  </div>
+
   <div class="grid2" style="margin-bottom:12px">
     <div class="stat"><div class="n pos" id="kLiquid">—</div><div class="l">Свободные деньги</div></div>
     <div class="stat"><div class="n neg" id="kDebt">—</div><div class="l">Всего долгов</div></div>
@@ -474,7 +493,8 @@ nav button.on{color:var(--brand);font-weight:650}
       </div>
       <div class="f" style="margin:0">
         <label>Минимальный остаток, ₽</label>
-        <input type="number" id="calMinBuf" value="10000" onchange="renderCalendar()">
+        <input type="number" id="calMinBuf" placeholder="не задан" onchange="renderCalendar()">
+        <div class="hint">Сколько хотите всегда держать на счетах. Если укажете — календарь предупредит, когда прогноз опустится ниже.</div>
       </div>
     </div>
   </div>
@@ -487,6 +507,13 @@ nav button.on{color:var(--brand);font-weight:650}
   <div id="calStartNote" style="margin-bottom:12px"></div>
 
   <div id="calGapNote"></div>
+
+  <div class="card">
+    <h2>Регулярные платежи и доходы <button class="act" onclick="openRecurring()">+ Добавить</button></h2>
+    <div class="note">Основа прогноза: повторяющиеся начисления — зарплата, аренда, ЖКХ, подписки.
+      Платежи по кредитам добавлять сюда не нужно, они подтягиваются из графиков погашения сами.</div>
+    <div id="recList"></div>
+  </div>
 
   <div class="card">
     <div class="f2" style="margin:0 0 12px">
@@ -527,11 +554,6 @@ nav button.on{color:var(--brand);font-weight:650}
     <div id="calDays"></div>
   </div>
 
-  <div class="card">
-    <h2>Регулярные платежи и доходы <button class="act" onclick="openRecurring()">+ Добавить</button></h2>
-    <div class="note">Это основа прогноза: повторяющиеся начисления (зарплата, ЖКХ, подписки). Платежи по кредитам подтягиваются автоматически из графиков.</div>
-    <div id="recList"></div>
-  </div>
 </section>
 
 <!-- ============ ДОЛГИ ============ -->

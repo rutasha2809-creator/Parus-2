@@ -26,6 +26,17 @@ for %%F in ("..\*.html") do copy /y "index.html" "%%~fF" >nul 2>&1
 echo Done
 
 echo.
+echo === Step 1b: Update cache version in sw.js ===
+rem Без смены версии браузер продолжит показывать старую копию из кэша.
+rem Ставим отметку времени сборки — она всегда уникальна.
+rem [char]39 — это одинарная кавычка: так внутри команды нет вложенных кавычек.
+if exist "sw.js" (
+    powershell -NoProfile -Command "$p=Resolve-Path 'sw.js'; $e=New-Object Text.UTF8Encoding($false); $c=[IO.File]::ReadAllText($p,$e); $q=[char]39; $v='parus-'+(Get-Date -Format 'yyyyMMdd-HHmmss'); $pat='const VERSION = '+$q+'[^'+$q+']*'+$q; $new='const VERSION = '+$q+$v+$q; if($c -match $pat){ $c=[regex]::Replace($c,$pat,$new); [IO.File]::WriteAllText($p,$c,$e); Write-Host ('Done: '+$v) } else { Write-Host 'WARNING: VERSION not found in sw.js - update it by hand' }"
+) else (
+    echo WARNING: sw.js not found - skipped
+)
+
+echo.
 echo === Step 2: Remove git lock files ===
 if exist ".git\index.lock" (
     del /f ".git\index.lock"

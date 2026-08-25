@@ -472,8 +472,14 @@ function forecastCatShare(F){
 
 function renderCalendar(){
   const days = parseInt(document.getElementById('calHorizon').value, 10);
-  const buf  = parseFloat(document.getElementById('calMinBuf').value) || 0;
-  S.settings.minBuffer = buf; save();
+
+  /* Поле подушки: пустое — берём сохранённое значение, иначе введённое.
+     Раньше поле не читало настройки и при каждой загрузке возвращалось
+     к значению из разметки, стирая выбор пользователя. */
+  const bufEl = document.getElementById('calMinBuf');
+  if(bufEl.value === '' && S.settings.minBuffer > 0) bufEl.value = S.settings.minBuffer;
+  const buf = parseFloat(bufEl.value) || 0;
+  if(buf !== (S.settings.minBuffer || 0)){ S.settings.minBuffer = buf; save(); }
 
   const F = buildForecast(days);
   const closes = F.map(d=>d.close);
@@ -505,20 +511,31 @@ function renderCalendar(){
   const gaps = F.filter(d=>d.close<0);
   const lows = F.filter(d=>d.close>=0 && d.close<buf);
   const noteBox = document.getElementById('calGapNote');
-  if(gaps.length){
+
+  /* Пока нет ни счетов, ни регулярных платежей — прогнозировать нечего.
+     Вместо «тонко, но без минуса» на пустых нулях подсказываем, что делать. */
+  const nothingToForecast = !liquidAccounts().length && !S.recurring.length;
+
+  if(nothingToForecast){
+    noteBox.innerHTML = `<div class="note">
+      <b>Прогноз пока пустой.</b> Добавьте счёт с текущим остатком на вкладке «Счета»,
+      а ниже — регулярные доходы и платежи. После этого календарь начнёт показывать,
+      как будет меняться остаток и не уйдёте ли вы в минус.</div>`;
+  } else if(gaps.length){
     const first = gaps[0];
     const need = Math.abs(minVal) + buf;
     noteBox.innerHTML = `<div class="note err">
       <b>Кассовый разрыв.</b> Первый минус — ${dateLong(first.date)} (${money(first.close)}).
       Дней в минусе: ${gaps.length}. Чтобы пройти период, не хватает примерно <b>${money(need)}</b>.
       Посмотрите на вкладке «Анализ», какие необязательные расходы можно сдвинуть.</div>`;
-  } else if(lows.length){
+  } else if(buf > 0 && lows.length){
     noteBox.innerHTML = `<div class="note warn">
-      <b>Тонко, но без минуса.</b> ${lows.length} дн. остаток опускается ниже вашей подушки ${money(buf)}.
-      Минимум — ${money(minVal)} ${dateLong(minDay.date)}.</div>`;
+      <b>Тонко, но без минуса.</b> ${lows.length} дн. остаток держится ниже заданного вами
+      минимального остатка ${money(buf)}. Самая низкая точка — ${money(minVal)} ${dateLong(minDay.date)}.</div>`;
   } else {
     noteBox.innerHTML = `<div class="note ok">
-      <b>Разрывов нет.</b> На горизонте ${days} дн. остаток не опускается ниже ${money(minVal)}.</div>`;
+      <b>Разрывов нет.</b> На горизонте ${days} дн. остаток не опускается ниже ${money(minVal)}.
+      ${buf > 0 ? '' : '<br>Хотите, чтобы приложение предупреждало заранее — впишите минимальный остаток выше.'}</div>`;
   }
 
   const MO = forecastMonths(F);
@@ -588,7 +605,7 @@ function renderCalendar(){
     const sub = [
       m.moves ? m.moves + ' ' + plural(m.moves,'операция','операции','операций') : 'без движений',
       m.debt  ? 'долги ' + moneyShort(m.debt) : null,
-      m.min < 0 ? 'уходит в минус' : (m.min < buf ? 'ниже подушки' : null)
+      m.min < 0 ? 'уходит в минус' : (buf > 0 && m.min < buf ? 'ниже вашего минимума' : null)
     ].filter(Boolean).join(' · ');
 
     return `<div class="mon ${cls}">
@@ -926,7 +943,49 @@ function monthsBetween(a,b){
 /* =========================================================================
    ГЛАВНЫЙ ЭКРАН
    ========================================================================= */
+/* Шаги первого заполнения. Карточка исчезает, когда всё сделано —
+   дальше она только мешала бы на главном экране. */
+function renderOnboard(){
+  const card = document.getElementById('cardOnboard');
+  const box  = document.getElementById('onboardSteps');
+  if(!card || !box) return;
+
+  const hasAccounts  = S.accounts.some(a=>!a.archived && ACC_TYPES[a.type] && ACC_TYPES[a.type].asset);
+  const hasDebts     = debtAccounts().length > 0;
+  const hasRecurring = S.recurring.length > 0;
+  const hasTx        = S.transactions.length > 0;
+
+  /* «Долги» пропускаем как необязательный шаг: у человека их может не быть,
+     и вечно горящий пункт выглядел бы как незакрытая задача. */
+  if(hasAccounts && hasRecurring && hasTx){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const steps = [
+    { done: hasAccounts, t: 'Добавьте счета',
+      s: 'Карты, наличные, накопительные. Укажите текущий остаток — от него считается всё остальное.',
+      btn: 'К счетам', act: "go('accounts')" },
+    { done: hasDebts, t: 'Внесите долги', opt: true,
+      s: 'Кредиты, рассрочки, кредитки. Приложение само построит график погашения. Если долгов нет — пропустите.',
+      btn: 'К долгам', act: "go('debts')" },
+    { done: hasRecurring, t: 'Задайте регулярные платежи',
+      s: 'Зарплата, аренда, ЖКХ, подписки. Это основа прогноза: без них календарь не знает, что вас ждёт.',
+      btn: 'К календарю', act: "go('calendar')" },
+    { done: hasTx, t: 'Внесите операции',
+      s: 'Вручную или загрузите выписку из банка — кнопки внутри каждого счёта.',
+      btn: 'К счетам', act: "go('accounts')" }
+  ];
+
+  box.innerHTML = steps.map((st,i)=>`
+    <div class="stp ${st.done?'done':''}">
+      <span class="num">${st.done?'✓':i+1}</span>
+      <span class="l"><div class="t">${st.t}${st.opt&&!st.done?' <span class="chip opt">если есть</span>':''}</div>
+        <div class="s">${st.s}</div></span>
+      ${st.done ? '' : `<span class="go"><button class="btn btn-s btn-sm" onclick="${st.act}">${st.btn}</button></span>`}
+    </div>`).join('');
+}
+
 function renderHome(){
+  renderOnboard();
   const liq = totalLiquid(), debt = totalDebt();
   document.getElementById('hNet').textContent = moneyShort(netWorth());
   document.getElementById('kLiquid').textContent = moneyShort(liq);
@@ -960,9 +1019,11 @@ function renderHome(){
   const buf = S.settings.minBuffer || 0;
   const gap = F.find(d=>d.close<0);
   if(gap) alerts.push({t:'Кассовый разрыв '+dateLong(gap.date), s:'Прогнозный остаток '+money(gap.close), cls:'bad', go:'calendar'});
-  else {
+  else if(buf > 0){
+    /* Предупреждаем, только если пользователь сам задал минимальный остаток */
     const low = F.find(d=>d.close<buf);
-    if(low) alerts.push({t:'Остаток ниже подушки '+dateShort(low.date), s:money(low.close)+' при подушке '+money(buf), cls:'opt', go:'calendar'});
+    if(low) alerts.push({t:'Остаток ниже вашего минимума '+dateShort(low.date),
+                         s:money(low.close)+' при заданном минимуме '+money(buf), cls:'opt', go:'calendar'});
   }
   for(const a of debtAccounts()){
     if(a.type==='credit_card'){
