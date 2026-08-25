@@ -3,6 +3,9 @@ node_modules/
 package.json
 package-lock.json
 
+# Отчёт последнего прогона тестов — нужен только локально
+Тесты/результат.txt
+
 # Системные файлы
 .DS_Store
 Thumbs.db

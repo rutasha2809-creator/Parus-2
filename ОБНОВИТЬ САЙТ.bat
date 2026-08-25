@@ -37,6 +37,53 @@ if exist "sw.js" (
 )
 
 echo.
+echo === Step 1c: Run tests ===
+rem Проверяем собранное приложение ДО отправки на сайт.
+rem Если Node.js не установлен — пропускаем, деплой не блокируем.
+where node >nul 2>&1
+if errorlevel 1 goto :tests_skipped_node
+if not exist "Тесты\тесты.js" goto :tests_skipped_missing
+
+if not exist "Тесты\node_modules\jsdom" (
+    echo First run: installing test library, please wait...
+    pushd "Тесты"
+    call npm install jsdom --silent
+    popd
+)
+
+pushd "Тесты"
+node "тесты.js" > "результат.txt" 2>&1
+if errorlevel 1 goto :tests_failed
+popd
+echo OK: all tests passed
+goto :tests_done
+
+:tests_failed
+popd
+echo.
+echo ##############################################
+echo #   ТЕСТЫ НЕ ПРОШЛИ — ВЫКЛАДКА ОТМЕНЕНА      #
+echo ##############################################
+echo.
+type "Тесты\результат.txt"
+echo.
+echo Сайт НЕ обновлён. Исправьте ошибки и запустите снова.
+echo Отчёт сохранён: Тесты\результат.txt
+echo.
+pause
+exit /b 1
+
+:tests_skipped_node
+echo SKIPPED: Node.js not installed - tests not run
+goto :tests_done
+
+:tests_skipped_missing
+echo SKIPPED: tests not found
+goto :tests_done
+
+:tests_done
+
+echo.
 echo === Step 2: Remove git lock files ===
 if exist ".git\index.lock" (
     del /f ".git\index.lock"
