@@ -2155,12 +2155,18 @@ function loanSchedule(a){
       const hit = pays.find((p,idx)=> !used.has(idx) && Math.abs(daysBetween(p.date, r.date))<=10 && !used.has(idx));
       let paid = null;
       if(hit){ const idx = pays.indexOf(hit); if(!used.has(idx)){ used.add(idx); paid = hit; } }
-      const amount = Number(r.amount)||0;
+      let amount = Number(r.amount)||0;
+      const key = planKey('debt', a.id, r.date);
+      const ov = planOverride(key);
+      /* Свой платёж на этот месяц — только пока платёж ещё не внесён фактически. */
+      const overridden = !!(!paid && ov && ov.amount != null);
+      if(overridden) amount = Number(ov.amount) || 0;
       const interest = r.interest!=null ? Number(r.interest) : round2(bal*rate);
       const principal = round2((paid ? paid.amount : amount) - interest);
       bal = round2(Math.max(0, bal - principal));
       rows.push({date:r.date, payment:amount, interest, principal, balance:bal,
-                 paid: !!paid, paidAmount: paid?paid.amount:null, paidDate: paid?paid.date:null});
+                 paid: !!paid, paidAmount: paid?paid.amount:null, paidDate: paid?paid.date:null,
+                 overridden, planKey: key});
     }
     // платежи, не попавшие ни в одну строку графика (досрочные)
     pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
@@ -2289,12 +2295,17 @@ function cardSchedule(a, mode){
       pays.forEach((p,idx)=>{
         if(!paid && !used.has(idx) && Math.abs(daysBetween(p.date, r.date)) <= 10){ used.add(idx); paid = p; }
       });
-      const amount = Number(r.amount)||0;
+      let amount = Number(r.amount)||0;
+      const key = planKey('debt', a.id, r.date);
+      const ov = planOverride(key);
+      const overridden = !!(!paid && ov && ov.amount != null);
+      if(overridden) amount = Number(ov.amount) || 0;
       const interest = r.interest!=null ? Number(r.interest) : 0;
       const principal = round2((paid ? paid.amount : amount) - interest);
       left = round2(Math.max(0, left - principal));
       rows.push({date:r.date, payment:amount, interest, principal, balance:left,
-                 paid: !!paid, paidAmount: paid?paid.amount:null});
+                 paid: !!paid, paidAmount: paid?paid.amount:null,
+                 overridden, planKey: key});
     }
     pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
       principal:p.amount, balance:null, paid:true, paidAmount:p.amount, extra:true}); });

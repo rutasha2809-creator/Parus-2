@@ -481,6 +481,53 @@ function reset(W, patch){
             cardTooLow[0] && cardTooLow[0].error === true);
 
   /* ======================================================================
+     Свой платёж за месяц — теперь и в СВОЁМ графике (вставленном со
+     скриншота или графика банка), не только в авторасчёте. Была замечена
+     после публикации: кнопка «Изменить» не появлялась для банковского
+     графика, потому что override применялся только к формуле аннуитета.
+     ====================================================================== */
+  group('Свой платёж — ручной график банка');
+
+  reset(W, { accounts: [{
+    id:'card3', type:'credit_card', name:'Карта 3', currency:'RUB',
+    openingBalance: 200000, rate: 25, minPercent: 20,
+    scheduleMode: 'manual',
+    manualSchedule: [
+      {date:'2026-09-14', amount:130454, interest:0},
+      {date:'2026-10-15', amount:17254, interest:0},
+      {date:'2026-11-14', amount:17062, interest:0}
+    ]
+  }]});
+  const manFull = W.cardSchedule(W.acc('card3'));
+  checkTrue('ручной график: строки посчитаны', manFull.length === 3);
+  checkTrue('ручной график: без правки строка не помечена своей', !manFull[1].overridden);
+
+  W.setPlanOverride(W.planKey('debt','card3','2026-10-15'), {amount: 5000});
+  const manOv = W.cardSchedule(W.acc('card3'));
+  check('ручной график: сумма месяца заменена своей', manOv[1] && manOv[1].payment, 5000);
+  checkTrue('ручной график: строка помечена своей',   manOv[1] && manOv[1].overridden);
+  checkTrue('ручной график: остаток после неё больше, чем по банковскому графику',
+            manOv[1] && manFull[1] && manOv[1].balance > manFull[1].balance);
+  checkTrue('ручной график: другие строки не тронуты',
+            manOv[0] && manFull[0] && manOv[0].payment === manFull[0].payment &&
+            manOv[2] && manFull[2] && manOv[2].payment === manFull[2].payment);
+
+  // тот же кредит, но не карта — для параллельной проверки loanSchedule
+  reset(W, { accounts: [{
+    id:'loan3', type:'loan', name:'Кредит 3', currency:'RUB',
+    openingBalance: 100000, rate: 12,
+    scheduleMode: 'manual',
+    manualSchedule: [
+      {date:'2026-09-14', amount:9000},
+      {date:'2026-10-14', amount:9000}
+    ]
+  }]});
+  W.setPlanOverride(W.planKey('debt','loan3','2026-09-14'), {amount: 3000});
+  const loanManOv = W.loanSchedule(W.acc('loan3'));
+  check('кредит (свой график): сумма месяца заменена своей', loanManOv[0] && loanManOv[0].payment, 3000);
+  checkTrue('кредит (свой график): строка помечена своей',   loanManOv[0] && loanManOv[0].overridden);
+
+  /* ======================================================================
      ИТОГ
      ====================================================================== */
   console.log('\n' + '═'.repeat(60));
