@@ -606,6 +606,32 @@ function reset(W, patch){
   checkTrue('и всё равно доходит до нулевого остатка',
             afterTail[afterTail.length-1] && afterTail[afterTail.length-1].balance === 0);
 
+  group('Быстрое добавление долга');
+
+  reset(W);
+  W.openQuickDebt();
+  W.document.getElementById('acName').value = 'Ozon — кроссовки';
+  W.document.getElementById('acOpening').value = '12000';
+  W.document.getElementById('acParts').value = '4';
+  W.document.getElementById('acNextDate').value = '2026-09-15';
+  W.saveAccount(null);
+  const qdInst = W.S.accounts.find(a=>a.name==='Ozon — кроссовки');
+  checkTrue('рассрочка создана', !!qdInst);
+  check('тип счёта — installment', qdInst && qdInst.type, 'installment');
+  check('сумма платежа посчитана сама (12000/4)', qdInst && qdInst.payment, 3000);
+  check('число платежей сохранено', qdInst && qdInst.partsLeft, 4);
+
+  W.quickDebtKind('debt');
+  W.document.getElementById('acName').value = 'Долг Андрею';
+  W.document.getElementById('acOpening').value = '5000';
+  W.document.getElementById('acDueDate').value = '2026-12-01';
+  W.saveAccount(null);
+  const qdDebt = W.S.accounts.find(a=>a.name==='Долг Андрею');
+  checkTrue('простой долг создан', !!qdDebt);
+  check('тип счёта — debt', qdDebt && qdDebt.type, 'debt');
+  check('срок возврата сохранён', qdDebt && qdDebt.dueDate, '2026-12-01');
+  checkTrue('первая рассрочка не пострадала', W.S.accounts.length === 2);
+
   /* ======================================================================
      ИТОГ
      ====================================================================== */

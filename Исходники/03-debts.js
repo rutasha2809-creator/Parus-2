@@ -475,6 +475,67 @@ function futureDebtPayments(untilDate){
   return out;
 }
 
+/* ---------------- быстрое добавление долга ---------------- */
+/* Раньше единственный способ завести долг — полная форма счёта на вкладке
+   «Счета» (тип, валюта, лимиты и т.п.). Для покупки в рассрочку на
+   маркетплейсе или простого долга человеку это лишнее — нужен короткий путь
+   прямо с экрана «Долги». Под капотом всё равно создаётся обычный счёт
+   (installment или debt), просто через упрощённую форму. */
+function openQuickDebt(){
+  document.getElementById('ovAccBody').innerHTML = `
+    <h3>Новый долг</h3>
+    <div class="f">
+      <label>Что это</label>
+      <div class="btnrow" id="qdKind">
+        <button type="button" class="btn btn-p" data-k="installment" onclick="quickDebtKind('installment')">⊞ Рассрочка / сплит</button>
+        <button type="button" class="btn" data-k="debt" onclick="quickDebtKind('debt')">◺ Простой долг</button>
+      </div>
+      <div class="hint" style="margin-top:6px">
+        Рассрочка или сплит — покупка в магазине или на маркетплейсе с платежами по графику.
+        Простой долг — заняли у человека или организации, графика нет, просто сумма и срок.
+      </div>
+    </div>
+    <input type="hidden" id="acType" value="installment">
+    <input type="hidden" id="acCurrency" value="${BASE}">
+    <div id="qdFields"></div>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn btn-p" onclick="saveAccount(null)">Сохранить</button>
+    </div>`;
+  quickDebtKind('installment');
+  openOv('ovAcc');
+}
+
+function quickDebtKind(kind){
+  document.getElementById('acType').value = kind;
+  document.querySelectorAll('#qdKind .btn').forEach(b=>b.classList.toggle('btn-p', b.dataset.k===kind));
+  const box = document.getElementById('qdFields');
+  if(kind==='installment'){
+    box.innerHTML = `
+      <div class="f"><label>Где куплено / название</label>
+        <input type="text" id="acName" placeholder="Например: Ozon — кроссовки"></div>
+      <div class="f2">
+        <div class="f"><label>Сумма покупки, ₽</label><input type="number" step="0.01" id="acOpening" value="0"></div>
+        <div class="f"><label>Число платежей</label><input type="number" min="1" id="acParts" placeholder="напр. 4"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Периодичность</label>
+          <select id="acFreq"><option value="monthly" selected>Ежемесячно</option><option value="biweekly">Раз в 2 недели</option></select></div>
+        <div class="f"><label>Дата первого платежа</label><input type="date" id="acNextDate" value="${today()}"></div>
+      </div>
+      <div class="f"><label>Размер платежа, ₽ (необязательно)</label>
+        <input type="number" step="0.01" id="acPayment" placeholder="посчитаю сам">
+        <div class="hint">Оставьте пустым — поделю сумму покупки на число платежей поровну.</div></div>
+      <div class="f"><label>Заметка</label><input type="text" id="acNote" placeholder="необязательно"></div>`;
+  } else {
+    box.innerHTML = `
+      <div class="f"><label>Кому должны / от кого заняли</label>
+        <input type="text" id="acName" placeholder="Например: Долг Андрею"></div>
+      <div class="f"><label>Сумма долга, ₽</label><input type="number" step="0.01" id="acOpening" value="0"></div>
+      <div class="f"><label>Срок возврата</label><input type="date" id="acDueDate"></div>
+      <div class="f"><label>Заметка</label><input type="text" id="acNote" placeholder="необязательно"></div>`;
+  }
+}
+
 /* ---------------- рендер экрана «Долги» ---------------- */
 /* Ячейка «След. платёж»: главное — когда платить, сумма подписью.
    Просроченный платёж остаётся ближайшим и подсвечивается. */
@@ -508,7 +569,8 @@ function renderDebts(){
 
   if(!list.length){
     box.innerHTML = `<div class="card"><div class="empty"><span class="big">✓</span>
-      Долговых счетов нет.<br>Добавьте кредит, ипотеку или кредитную карту на вкладке «Счета», чтобы видеть график погашения.</div></div>`;
+      Долгов нет.<br>Нажмите «+ Добавить долг» выше — рассрочка, сплит-платёж или простой долг человеку добавляются за минуту.
+      Для кредита, ипотеки или кредитной карты с полным графиком банка — «Ещё варианты» или вкладка «Счета».</div></div>`;
     return;
   }
 
