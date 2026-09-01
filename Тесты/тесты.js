@@ -414,6 +414,73 @@ function reset(W, patch){
         W.netWorthAt(back(3)) < W.netWorthAt(back(1)), true);
 
   /* ======================================================================
+     Свой платёж за один месяц (график кредита / кредитки / рассрочки).
+     Раньше сумму платежа авторасчёта нельзя было поменять для одного
+     месяца — только принять график целиком. Если в этот раз получается
+     внести меньше (например, минимум), долг должен погаситься частично
+     и график продолжиться дальше, а не пропасть и не обнулиться.
+     ====================================================================== */
+  group('Свой платёж за месяц');
+
+  // --- рассрочка ---
+  reset(W, { accounts: [{
+    id:'inst2', type:'installment', name:'Рассрочка 2', currency:'RUB',
+    openingBalance: 45200, payment: 4520, freq:'monthly',
+    nextPaymentDate: '2026-08-17'
+  }]});
+  W.setPlanOverride(W.planKey('debt','inst2','2026-08-17'), {amount: 2000});
+  const instOv = W.installmentSchedule(W.acc('inst2'));
+  check('рассрочка: сумма месяца заменена своей',   instOv[0] && instOv[0].payment, 2000);
+  checkTrue('рассрочка: строка помечена своей',      instOv[0] && instOv[0].overridden);
+  check('рассрочка: остаток уменьшился только на неё', instOv[0] && instOv[0].balance, 43200);
+  check('рассрочка: следующий платёж — обычный',     instOv[1] && instOv[1].payment, 4520);
+  checkTrue('рассрочка: следующая строка не своя',   instOv[1] && !instOv[1].overridden);
+
+  W.clearPlanOverride(W.planKey('debt','inst2','2026-08-17'));
+  const instBack = W.installmentSchedule(W.acc('inst2'));
+  check('рассрочка: «вернуть как было» восстанавливает сумму', instBack[0] && instBack[0].payment, 4520);
+
+  // --- кредит (аннуитет) ---
+  reset(W, { accounts: [{
+    id:'loan2', type:'loan', name:'Кредит 2', currency:'RUB',
+    openingBalance: 100000, rate: 12, termMonths: 12,
+    nextPaymentDate: '2026-08-14'
+  }]});
+  const loanFull = W.loanSchedule(W.acc('loan2'));
+  W.setPlanOverride(W.planKey('debt','loan2','2026-08-14'), {amount: 2000});
+  const loanOv = W.loanSchedule(W.acc('loan2'));
+  check('кредит: сумма месяца — ровно введённая',    loanOv[0] && loanOv[0].payment, 2000);
+  checkTrue('кредит: остаток больше, чем при обычном платеже',
+            loanOv[0] && loanFull[0] && loanOv[0].balance > loanFull[0].balance);
+  checkTrue('кредит: график стал длиннее — долг гасится дольше',
+            loanOv.length >= loanFull.length);
+  checkTrue('кредит: второй месяц — снова обычный платёж',
+            loanOv[1] && loanFull[1] && Math.abs(loanOv[1].payment - loanFull[1].payment) < 0.01);
+
+  // --- кредитная карта (минимальный платёж) ---
+  reset(W, { accounts: [{
+    id:'card2', type:'credit_card', name:'Карта 2', currency:'RUB',
+    openingBalance: 50000, rate: 25, minPercent: 5, paymentDay: 20
+  }]});
+  const cardFull = W.cardSchedule(W.acc('card2'));
+  // 1 500 ₽: меньше обычного минимального платежа (2 500 = 5% от 50 000),
+  // но покрывает проценты за месяц (≈1 041,67 ₽) — долг всё ещё гасится,
+  // просто медленнее.
+  W.setPlanOverride(W.planKey('debt','card2', cardFull[0].date), {amount: 1500});
+  const cardOv = W.cardSchedule(W.acc('card2'));
+  check('кредитка: свой минимальный платёж применился', cardOv[0] && cardOv[0].payment, 1500);
+  checkTrue('кредитка: строка помечена своей',          cardOv[0] && cardOv[0].overridden);
+  checkTrue('кредитка: из-за меньшего платежа долг закрывается дольше обычного',
+            cardOv.length > cardFull.length);
+
+  // а если своя сумма даже процентов не покрывает — честно показываем ошибку,
+  // а не тихо уходим в бесконечный долг
+  W.setPlanOverride(W.planKey('debt','card2', cardFull[0].date), {amount: 500});
+  const cardTooLow = W.cardSchedule(W.acc('card2'));
+  checkTrue('кредитка: платёж меньше процентов помечен ошибкой',
+            cardTooLow[0] && cardTooLow[0].error === true);
+
+  /* ======================================================================
      ИТОГ
      ====================================================================== */
   console.log('\n' + '═'.repeat(60));

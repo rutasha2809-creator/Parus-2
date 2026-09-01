@@ -149,14 +149,21 @@ function loanSchedule(a){
   while(bal > 0.01 && guard < 600){
     const interest = round2(bal*rate);
     let pay = payment;
+    /* Свой платёж на этот месяц — например, если получается внести только
+       минимум. Меняет только эту строку: остаток переходит дальше,
+       график продолжается обычным платежом. */
+    const key = planKey('debt', a.id, d);
+    const ov = planOverride(key);
+    const overridden = !!(ov && ov.amount != null);
+    if(overridden) pay = Number(ov.amount) || 0;
     if(pay <= interest && rate>0){ // платёж не покрывает проценты — некорректные данные
-      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true});
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true, overridden, planKey:key});
       break;
     }
     let principal = round2(pay - interest);
     if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
     bal = round2(bal - principal);
-    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false});
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, overridden, planKey:key});
     d = addMonths(d, 1);
     guard++;
   }
@@ -250,14 +257,21 @@ function cardSchedule(a, mode){
     const interest = inGrace ? 0 : round2(bal*rate);
     let pay = cardMinPayment(a, bal);
 
+    /* Свой платёж на этот месяц — например, минимальный, если больше сейчас
+       не получается. Остальные месяцы график не трогает. */
+    const key = planKey('debt', a.id, d);
+    const ov = planOverride(key);
+    const overridden = !!(ov && ov.amount != null);
+    if(overridden) pay = Number(ov.amount) || 0;
+
     if(pay <= interest){
-      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true});
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true, overridden, planKey:key});
       break;
     }
     let principal = round2(pay - interest);
     if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
     bal = round2(bal - principal);
-    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, grace:inGrace});
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, grace:inGrace, overridden, planKey:key});
     d = addMonths(d,1); guard++;
   }
   // долг так и не погашен за 60 лет — минимальный платёж почти целиком уходит в проценты
@@ -315,9 +329,12 @@ function installmentSchedule(a){
   let d = a.nextPaymentDate || today();
   let guard = 0;
   while(bal > 0.01 && guard < 240){
-    const amount = Math.min(pay, bal);
+    const key = planKey('debt', a.id, d);
+    const ov = planOverride(key);
+    const overridden = !!(ov && ov.amount != null);
+    const amount = Math.min(overridden ? (Number(ov.amount)||0) : pay, bal);
     bal = round2(bal - amount);
-    rows.push({date:d, payment:amount, interest:0, principal:amount, balance:bal, paid:false});
+    rows.push({date:d, payment:amount, interest:0, principal:amount, balance:bal, paid:false, overridden, planKey:key});
     d = (a.freq === 'biweekly') ? addDays(d, 14) : addMonths(d, 1);
     guard++;
   }
@@ -632,26 +649,62 @@ function showSchedule(id){
     <div class="scrollx scrolly">
       <table class="tbl">
         <thead><tr><th>Дата</th><th class="r">Платёж</th><th class="r">Проценты</th><th class="r">Тело долга</th><th class="r">Остаток</th><th></th></tr></thead>
-        <tbody>${rows.map(schedRow).join('')}</tbody>
+        <tbody>${rows.map(r=>schedRow(r, id)).join('')}</tbody>
       </table>
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:8px">Всего к выплате: <b>${money(totalPay)}</b></div>
     ${manualBlock}`;
   openOv('ovSched');
 }
-function schedRow(r){
+function schedRow(r, accountId){
   const cls = r.paid ? 'paid' : (r.date<=addDays(today(),7) && r.date>=today() ? 'today' : '');
   const mark = r.error ? '<span class="chip bad">платёж меньше процентов</span>'
              : r.extra ? '<span class="chip info">досрочно</span>'
              : r.paid  ? '<span class="chip ok">внесён</span>'
+             : r.overridden ? '<span class="chip opt">свой платёж</span>'
              : r.grace ? '<span class="chip ok">льготный</span>' : '';
+  /* Правку суммы предлагаем только для будущих строк авторасчёта — там,
+     где есть planKey. Уже внесённые и досрочные платежи — факт, их не трогаем. */
+  const editBtn = (!r.paid && !r.extra && r.planKey)
+    ? `<button class="btn btn-s btn-sm" onclick="editScheduleRow('${accountId}','${r.planKey}','${r.date}',${r.payment})">Изменить</button>`
+    : '';
   return `<tr class="${cls}">
     <td>${dateShort(r.date)} ${parseISO(r.date).getFullYear()}</td>
     <td class="r">${money(r.paidAmount!=null?r.paidAmount:r.payment)}</td>
     <td class="r mut">${r.interest?money(r.interest):'—'}</td>
     <td class="r">${r.principal?money(r.principal):'—'}</td>
     <td class="r">${r.balance!=null?money(r.balance):'—'}</td>
-    <td>${mark}</td></tr>`;
+    <td>${mark}${editBtn}</td></tr>`;
+}
+
+/* =========================================================================
+   СВОЙ ПЛАТЁЖ ЗА ОДИН МЕСЯЦ (авторасчёт)
+   Например, посчитали по графику 79 315 ₽, а внести получится только
+   минимум. Меняем сумму одной строки — график и переплата пересчитаются
+   от неё, остальные месяцы останутся как были.
+   ========================================================================= */
+function editScheduleRow(accountId, key, date, amount){
+  const ov = planOverride(key);
+  document.getElementById('ovSchedBody').innerHTML = `
+    <h3>Платёж за ${dateLong(date)}</h3>
+    <div class="note">Не получается внести всю сумму по графику — впишите сколько
+      выйдет (например, минимальный платёж). Долг за эту сумму спишется частично,
+      остаток перейдёт на следующие месяцы. Другие платежи не изменятся.</div>
+    <div class="f"><label>Сумма, ₽</label>
+      <input type="number" step="0.01" id="poAmount" value="${(ov && ov.amount != null) ? ov.amount : Math.round(amount)}"></div>
+    <div class="btnrow">
+      ${ov ? `<button class="btn btn-s" onclick="clearPlanOverride('${key}'); showSchedule('${accountId}')">Вернуть как было</button>` : ''}
+      <button class="btn btn-s" onclick="showSchedule('${accountId}')">Отмена</button>
+      <button class="btn btn-p" onclick="saveScheduleRowEdit('${key}','${accountId}')">Сохранить</button>
+    </div>`;
+}
+function saveScheduleRowEdit(key, accountId){
+  const el = document.getElementById('poAmount');
+  const a = parseFloat(el.value);
+  if(!a || a <= 0){ toast('Укажите сумму'); return; }
+  setPlanOverride(key, {amount: a});
+  toast('Платёж изменён — график пересчитан');
+  showSchedule(accountId);
 }
 function applyManualSchedule(id){
   const txt = document.getElementById('schedPaste').value.trim();
