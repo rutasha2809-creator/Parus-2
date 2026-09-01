@@ -499,7 +499,9 @@ function reset(W, patch){
     ]
   }]});
   const manFull = W.cardSchedule(W.acc('card3'));
-  checkTrue('ручной график: строки посчитаны', manFull.length === 3);
+  checkTrue('ручной график: строки банка на месте', manFull.length >= 3);
+  checkTrue('ручной график: первые 3 строки — из списка банка, без правок',
+            !manFull[0].overridden && !manFull[1].overridden && !manFull[2].overridden);
   checkTrue('ручной график: без правки строка не помечена своей', !manFull[1].overridden);
 
   W.setPlanOverride(W.planKey('debt','card3','2026-10-15'), {amount: 5000});
@@ -526,6 +528,45 @@ function reset(W, patch){
   const loanManOv = W.loanSchedule(W.acc('loan3'));
   check('кредит (свой график): сумма месяца заменена своей', loanManOv[0] && loanManOv[0].payment, 3000);
   checkTrue('кредит (свой график): строка помечена своей',   loanManOv[0] && loanManOv[0].overridden);
+
+  /* ======================================================================
+     Свой график банка не должен «терять» деньги.
+     Раньше: если где-то в графике внесли меньше нужного, оставшийся долг
+     после последней строки банка просто исчезал — график заканчивался,
+     а остаток так и не доходил до нуля. Теперь после списка банка график
+     продолжается минимальным платежом по формуле, пока долг не закроется.
+     ====================================================================== */
+  group('Свой график банка продолжается до нуля');
+
+  reset(W, { accounts: [{
+    id:'sovcom', type:'credit_card', name:'Совком', currency:'RUB',
+    openingBalance: 211106, rate: 0, minPercent: 20,
+    scheduleMode: 'manual',
+    manualSchedule: [
+      {date:'2026-09-14', amount:130454},
+      {date:'2026-10-15', amount:17254},
+      {date:'2026-11-14', amount:17062},
+      {date:'2026-12-15', amount:8605},
+      {date:'2027-01-14', amount:6534},
+      {date:'2027-07-15', amount:737}
+    ]
+  }]});
+
+  const beforeCut = W.cardSchedule(W.acc('sovcom'));
+  checkTrue('без правок график сам доходит до нулевого остатка',
+            beforeCut.length && beforeCut[beforeCut.length-1].balance === 0);
+
+  W.setPlanOverride(W.planKey('debt','sovcom','2026-09-14'), {amount: 9877});
+  const afterCut = W.cardSchedule(W.acc('sovcom'));
+  const lastCut = afterCut[afterCut.length-1];
+  checkTrue('после уменьшенного платежа график всё равно доходит до нуля',
+            lastCut && lastCut.balance === 0);
+  checkTrue('появились дополнительные строки сверх списка банка',
+            afterCut.length > beforeCut.length);
+  checkTrue('дополнительные строки помечены «по расчёту»',
+            afterCut.slice(beforeCut.length).every(r => r.continued === true));
+  check('строка сентября — ровно введённая сумма', afterCut[0] && afterCut[0].payment, 9877);
+  check('строка октября из списка банка не изменилась', afterCut[1] && afterCut[1].payment, 17254);
 
   /* ======================================================================
      ИТОГ

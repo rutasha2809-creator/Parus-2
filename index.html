@@ -2168,6 +2168,34 @@ function loanSchedule(a){
                  paid: !!paid, paidAmount: paid?paid.amount:null, paidDate: paid?paid.date:null,
                  overridden, planKey: key});
     }
+    /* Список банка кончился, а долг остался — например, где-то внесли меньше
+       положенного. Молча терять эти деньги нельзя: продолжаем график тем же
+       платежом, что был в последней строке банка, пока долг не закроется. */
+    if(bal > 0.01 && a.manualSchedule.length){
+      const lastRow = [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date)).slice(-1)[0];
+      let d = addMonths(lastRow.date, 1);
+      const contPay = Number(a.payment) || Number(lastRow.amount) || 0;
+      let guard = 0;
+      while(bal > 0.01 && contPay > 0 && guard < 600){
+        const interest = round2(bal*rate);
+        const key = planKey('debt', a.id, d);
+        const ov = planOverride(key);
+        let pay = contPay;
+        const overridden = !!(ov && ov.amount != null);
+        if(overridden) pay = Number(ov.amount) || 0;
+        if(pay <= interest && rate>0){
+          rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true, overridden, planKey:key, continued:true});
+          break;
+        }
+        let principal = round2(pay - interest);
+        if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
+        bal = round2(bal - principal);
+        rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, overridden, planKey:key, continued:true});
+        d = addMonths(d, 1);
+        guard++;
+      }
+    }
+
     // платежи, не попавшие ни в одну строку графика (досрочные)
     pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
       principal:p.amount, balance:null, paid:true, paidAmount:p.amount, extra:true, note:p.note}); });
@@ -2307,6 +2335,35 @@ function cardSchedule(a, mode){
                  paid: !!paid, paidAmount: paid?paid.amount:null,
                  overridden, planKey: key});
     }
+
+    /* Список банка кончился, а долг остался — например, где-то внесли меньше
+       минимального. Продолжаем графиком минимального платежа по формуле
+       карты (% от остатка), пока долг не закроется. */
+    if(left > 0.01 && a.manualSchedule.length){
+      const lastRow = [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date)).slice(-1)[0];
+      let d = addMonths(lastRow.date, 1);
+      let guard = 0;
+      while(left > 0.01 && guard < 720){
+        const inGrace = !!(gEnd && d <= gEnd);
+        const interest = inGrace ? 0 : round2(left*rate);
+        let pay = cardMinPayment(a, left);
+        const key = planKey('debt', a.id, d);
+        const ov = planOverride(key);
+        const overridden = !!(ov && ov.amount != null);
+        if(overridden) pay = Number(ov.amount) || 0;
+        if(pay <= interest){
+          rows.push({date:d, payment:pay, interest, principal:0, balance:left, error:true, overridden, planKey:key, continued:true});
+          break;
+        }
+        let principal = round2(pay - interest);
+        if(principal >= left){ principal = left; pay = round2(left + interest); }
+        left = round2(left - principal);
+        rows.push({date:d, payment:pay, interest, principal, balance:left, paid:false, grace:inGrace, overridden, planKey:key, continued:true});
+        d = addMonths(d, 1);
+        guard++;
+      }
+    }
+
     pays.forEach((p,idx)=>{ if(!used.has(idx)) rows.push({date:p.date, payment:p.amount, interest:0,
       principal:p.amount, balance:null, paid:true, paidAmount:p.amount, extra:true}); });
     rows.sort((x,y)=>x.date.localeCompare(y.date));
@@ -2646,7 +2703,10 @@ function showSchedule(id){
   const manualBlock = (a.type==='loan' || a.type==='credit_card') ? `
     <div class="sec-title" style="margin-top:18px">Свой график погашения</div>
     <div class="note">Если банк присылает точный график — внесите его, и расчёт пойдёт по нему.
-      Можно вписать строки вручную или распознать скриншот из приложения банка.</div>
+      Можно вписать строки вручную или распознать скриншот из приложения банка.
+      Если в какой-то месяц заплатите меньше — остаток не потеряется: строки банка
+      останутся как есть, а после них график продолжится минимальным платежом
+      по формуле (помечены «по расчёту»), пока долг не закроется.</div>
 
     <div class="btnrow" style="margin-bottom:10px">
       <button class="btn btn-s btn-sm" onclick="pickScheduleImage('${id}')">Распознать скриншот</button>
@@ -2732,6 +2792,7 @@ function schedRow(r, accountId){
              : r.extra ? '<span class="chip info">досрочно</span>'
              : r.paid  ? '<span class="chip ok">внесён</span>'
              : r.overridden ? '<span class="chip opt">свой платёж</span>'
+             : r.continued ? '<span class="chip info">по расчёту</span>'
              : r.grace ? '<span class="chip ok">льготный</span>' : '';
   /* Правку суммы предлагаем только для будущих строк авторасчёта — там,
      где есть planKey. Уже внесённые и досрочные платежи — факт, их не трогаем. */
