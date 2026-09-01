@@ -2150,23 +2150,31 @@ function loanSchedule(a){
   if(a.scheduleMode==='manual' && Array.isArray(a.manualSchedule) && a.manualSchedule.length){
     let bal = Number(a.openingBalance)||0;
     const used = new Set();
+    /* Недоплата с прошлой строки — прибавляется к следующей: заплатили
+       меньше в этом месяце, значит именно на эту разницу вырастет
+       следующий платёж, а не просто «остаток» где-то в стороне. */
+    let carry = 0;
     for(const r of [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date))){
       // ищем фактический платёж в пределах ±10 дней
       const hit = pays.find((p,idx)=> !used.has(idx) && Math.abs(daysBetween(p.date, r.date))<=10 && !used.has(idx));
       let paid = null;
       if(hit){ const idx = pays.indexOf(hit); if(!used.has(idx)){ used.add(idx); paid = hit; } }
-      let amount = Number(r.amount)||0;
+      const scheduled = Number(r.amount)||0;
+      const due = round2(scheduled + carry);
       const key = planKey('debt', a.id, r.date);
       const ov = planOverride(key);
       /* Свой платёж на этот месяц — только пока платёж ещё не внесён фактически. */
       const overridden = !!(!paid && ov && ov.amount != null);
-      if(overridden) amount = Number(ov.amount) || 0;
+      const amount = overridden ? (Number(ov.amount) || 0) : due;
+      const bumped = !overridden && carry > 0.01;
       const interest = r.interest!=null ? Number(r.interest) : round2(bal*rate);
-      const principal = round2((paid ? paid.amount : amount) - interest);
+      const actual = paid ? paid.amount : amount;
+      const principal = round2(actual - interest);
       bal = round2(Math.max(0, bal - principal));
-      rows.push({date:r.date, payment:amount, interest, principal, balance:bal,
+      carry = paid ? 0 : round2(Math.max(0, due - amount));
+      rows.push({date:r.date, payment: paid ? paid.amount : amount, interest, principal, balance:bal,
                  paid: !!paid, paidAmount: paid?paid.amount:null, paidDate: paid?paid.date:null,
-                 overridden, planKey: key});
+                 overridden, bumped, planKey: key});
     }
     /* Список банка кончился, а долг остался — например, где-то внесли меньше
        положенного. Молча терять эти деньги нельзя: продолжаем график тем же
@@ -2239,24 +2247,28 @@ function loanSchedule(a){
     if(a.nextPaymentDate && a.nextPaymentDate > d) d = a.nextPaymentDate;
   }
   let guard = 0;
+  /* Недоплата с прошлой строки — прибавляется к следующей, платёж растёт
+     ровно на разницу, а не просто «где-то в остатке». */
+  let carry = 0;
   while(bal > 0.01 && guard < 600){
     const interest = round2(bal*rate);
-    let pay = payment;
+    const due = round2(payment + carry);
     /* Свой платёж на этот месяц — например, если получается внести только
-       минимум. Меняет только эту строку: остаток переходит дальше,
-       график продолжается обычным платежом. */
+       минимум. Недостающая часть перейдёт в следующий платёж. */
     const key = planKey('debt', a.id, d);
     const ov = planOverride(key);
     const overridden = !!(ov && ov.amount != null);
-    if(overridden) pay = Number(ov.amount) || 0;
+    let pay = overridden ? (Number(ov.amount) || 0) : due;
+    const bumped = !overridden && carry > 0.01;
     if(pay <= interest && rate>0){ // платёж не покрывает проценты — некорректные данные
-      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true, overridden, planKey:key});
+      rows.push({date:d, payment:pay, interest, principal:0, balance:bal, error:true, overridden, bumped, planKey:key});
       break;
     }
     let principal = round2(pay - interest);
-    if(principal >= bal){ principal = bal; pay = round2(bal + interest); }
+    if(principal >= bal){ principal = bal; pay = round2(bal + interest); carry = 0; }
+    else carry = round2(Math.max(0, due - pay));
     bal = round2(bal - principal);
-    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, overridden, planKey:key});
+    rows.push({date:d, payment:pay, interest, principal, balance:bal, paid:false, overridden, bumped, planKey:key});
     d = addMonths(d, 1);
     guard++;
   }
@@ -2318,22 +2330,30 @@ function cardSchedule(a, mode){
     const pays = actualPayments(a.id);
     const used = new Set();
     let left = bal;
+    /* Недоплата с прошлой строки — прибавляется к следующей: заплатили
+       меньше в этом месяце, значит именно на эту разницу вырастет
+       следующий платёж, а не просто «остаток» где-то в стороне. */
+    let carry = 0;
     for(const r of [...a.manualSchedule].sort((x,y)=>x.date.localeCompare(y.date))){
       let paid = null;
       pays.forEach((p,idx)=>{
         if(!paid && !used.has(idx) && Math.abs(daysBetween(p.date, r.date)) <= 10){ used.add(idx); paid = p; }
       });
-      let amount = Number(r.amount)||0;
+      const scheduled = Number(r.amount)||0;
+      const due = round2(scheduled + carry);
       const key = planKey('debt', a.id, r.date);
       const ov = planOverride(key);
       const overridden = !!(!paid && ov && ov.amount != null);
-      if(overridden) amount = Number(ov.amount) || 0;
+      const amount = overridden ? (Number(ov.amount) || 0) : due;
+      const bumped = !overridden && carry > 0.01;
       const interest = r.interest!=null ? Number(r.interest) : 0;
-      const principal = round2((paid ? paid.amount : amount) - interest);
+      const actual = paid ? paid.amount : amount;
+      const principal = round2(actual - interest);
       left = round2(Math.max(0, left - principal));
-      rows.push({date:r.date, payment:amount, interest, principal, balance:left,
+      carry = paid ? 0 : round2(Math.max(0, due - amount));
+      rows.push({date:r.date, payment: paid ? paid.amount : amount, interest, principal, balance:left,
                  paid: !!paid, paidAmount: paid?paid.amount:null,
-                 overridden, planKey: key});
+                 overridden, bumped, planKey: key});
     }
 
     /* Список банка кончился, а долг остался — например, где-то внесли меньше
@@ -2455,13 +2475,19 @@ function installmentSchedule(a){
      как считается график по кредиту. */
   let d = a.nextPaymentDate || today();
   let guard = 0;
+  /* Недоплата с прошлой строки — прибавляется к следующей. */
+  let carry = 0;
   while(bal > 0.01 && guard < 240){
+    const due = round2(pay + carry);
     const key = planKey('debt', a.id, d);
     const ov = planOverride(key);
     const overridden = !!(ov && ov.amount != null);
-    const amount = Math.min(overridden ? (Number(ov.amount)||0) : pay, bal);
+    const wanted = overridden ? (Number(ov.amount)||0) : due;
+    const bumped = !overridden && carry > 0.01;
+    const amount = Math.min(wanted, bal);
+    carry = round2(Math.max(0, due - amount));
     bal = round2(bal - amount);
-    rows.push({date:d, payment:amount, interest:0, principal:amount, balance:bal, paid:false, overridden, planKey:key});
+    rows.push({date:d, payment:amount, interest:0, principal:amount, balance:bal, paid:false, overridden, bumped, planKey:key});
     d = (a.freq === 'biweekly') ? addDays(d, 14) : addMonths(d, 1);
     guard++;
   }
@@ -2704,9 +2730,9 @@ function showSchedule(id){
     <div class="sec-title" style="margin-top:18px">Свой график погашения</div>
     <div class="note">Если банк присылает точный график — внесите его, и расчёт пойдёт по нему.
       Можно вписать строки вручную или распознать скриншот из приложения банка.
-      Если в какой-то месяц заплатите меньше — остаток не потеряется: строки банка
-      останутся как есть, а после них график продолжится минимальным платежом
-      по формуле (помечены «по расчёту»), пока долг не закроется.</div>
+      Заплатите в какой-то месяц меньше — недостающая часть прибавится к следующему
+      платежу (помечен «с переносом»), а если строк банка не хватит, чтобы её
+      закрыть, график продолжится минимальным платежом по формуле («по расчёту»).</div>
 
     <div class="btnrow" style="margin-bottom:10px">
       <button class="btn btn-s btn-sm" onclick="pickScheduleImage('${id}')">Распознать скриншот</button>
@@ -2792,6 +2818,7 @@ function schedRow(r, accountId){
              : r.extra ? '<span class="chip info">досрочно</span>'
              : r.paid  ? '<span class="chip ok">внесён</span>'
              : r.overridden ? '<span class="chip opt">свой платёж</span>'
+             : r.bumped ? '<span class="chip info">с переносом</span>'
              : r.continued ? '<span class="chip info">по расчёту</span>'
              : r.grace ? '<span class="chip ok">льготный</span>' : '';
   /* Правку суммы предлагаем только для будущих строк авторасчёта — там,
@@ -2820,7 +2847,8 @@ function editScheduleRow(accountId, key, date, amount){
     <h3>Платёж за ${dateLong(date)}</h3>
     <div class="note">Не получается внести всю сумму по графику — впишите сколько
       выйдет (например, минимальный платёж). Долг за эту сумму спишется частично,
-      остаток перейдёт на следующие месяцы. Другие платежи не изменятся.</div>
+      а недостающая часть прибавится к следующему платежу — он вырастет ровно
+      на неё. Более поздние платежи не изменятся.</div>
     <div class="f"><label>Сумма, ₽</label>
       <input type="number" step="0.01" id="poAmount" value="${(ov && ov.amount != null) ? ov.amount : Math.round(amount)}"></div>
     <div class="btnrow">

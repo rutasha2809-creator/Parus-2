@@ -433,8 +433,12 @@ function reset(W, patch){
   check('рассрочка: сумма месяца заменена своей',   instOv[0] && instOv[0].payment, 2000);
   checkTrue('рассрочка: строка помечена своей',      instOv[0] && instOv[0].overridden);
   check('рассрочка: остаток уменьшился только на неё', instOv[0] && instOv[0].balance, 43200);
-  check('рассрочка: следующий платёж — обычный',     instOv[1] && instOv[1].payment, 4520);
-  checkTrue('рассрочка: следующая строка не своя',   instOv[1] && !instOv[1].overridden);
+  check('рассрочка: следующий платёж вырос ровно на недостачу',
+        instOv[1] && instOv[1].payment, 7040);   // 4520 (план) + 2520 (недоплата в августе)
+  checkTrue('рассрочка: следующая строка не своя, а «с переносом»',
+            instOv[1] && !instOv[1].overridden && instOv[1].bumped);
+  check('рассрочка: платёж через один — снова обычный',
+        instOv[2] && instOv[2].payment, 4520);
 
   W.clearPlanOverride(W.planKey('debt','inst2','2026-08-17'));
   const instBack = W.installmentSchedule(W.acc('inst2'));
@@ -454,8 +458,12 @@ function reset(W, patch){
             loanOv[0] && loanFull[0] && loanOv[0].balance > loanFull[0].balance);
   checkTrue('кредит: график стал длиннее — долг гасится дольше',
             loanOv.length >= loanFull.length);
-  checkTrue('кредит: второй месяц — снова обычный платёж',
-            loanOv[1] && loanFull[1] && Math.abs(loanOv[1].payment - loanFull[1].payment) < 0.01);
+  checkTrue('кредит: второй месяц вырос ровно на недостачу первого',
+            loanOv[1] && loanFull[1] &&
+            Math.abs(loanOv[1].payment - (loanFull[1].payment + (loanFull[0].payment - 2000))) < 0.01);
+  checkTrue('кредит: второй месяц помечен «с переносом»', loanOv[1] && loanOv[1].bumped);
+  checkTrue('кредит: третий месяц — снова обычный платёж',
+            loanOv[2] && loanFull[2] && Math.abs(loanOv[2].payment - loanFull[2].payment) < 0.01);
 
   // --- кредитная карта (минимальный платёж) ---
   reset(W, { accounts: [{
@@ -510,9 +518,12 @@ function reset(W, patch){
   checkTrue('ручной график: строка помечена своей',   manOv[1] && manOv[1].overridden);
   checkTrue('ручной график: остаток после неё больше, чем по банковскому графику',
             manOv[1] && manFull[1] && manOv[1].balance > manFull[1].balance);
-  checkTrue('ручной график: другие строки не тронуты',
-            manOv[0] && manFull[0] && manOv[0].payment === manFull[0].payment &&
-            manOv[2] && manFull[2] && manOv[2].payment === manFull[2].payment);
+  checkTrue('ручной график: строка до правки не тронута',
+            manOv[0] && manFull[0] && manOv[0].payment === manFull[0].payment);
+  checkTrue('ручной график: следующая строка выросла ровно на недостачу',
+            manOv[2] && manFull[2] &&
+            Math.abs(manOv[2].payment - (manFull[2].payment + (manFull[1].payment - 5000))) < 0.01 &&
+            manOv[2].bumped === true);
 
   // тот же кредит, но не карта — для параллельной проверки loanSchedule
   reset(W, { accounts: [{
@@ -538,6 +549,7 @@ function reset(W, patch){
      ====================================================================== */
   group('Свой график банка продолжается до нуля');
 
+  // --- реалистичный случай: недостача переходит в следующий платёж банка ---
   reset(W, { accounts: [{
     id:'sovcom', type:'credit_card', name:'Совком', currency:'RUB',
     openingBalance: 211106, rate: 0, minPercent: 20,
@@ -548,6 +560,11 @@ function reset(W, patch){
       {date:'2026-11-14', amount:17062},
       {date:'2026-12-15', amount:8605},
       {date:'2027-01-14', amount:6534},
+      {date:'2027-02-14', amount:6534},
+      {date:'2027-03-15', amount:6534},
+      {date:'2027-04-14', amount:6534},
+      {date:'2027-05-15', amount:5502},
+      {date:'2027-06-14', amount:5355},
       {date:'2027-07-15', amount:737}
     ]
   }]});
@@ -558,15 +575,36 @@ function reset(W, patch){
 
   W.setPlanOverride(W.planKey('debt','sovcom','2026-09-14'), {amount: 9877});
   const afterCut = W.cardSchedule(W.acc('sovcom'));
-  const lastCut = afterCut[afterCut.length-1];
-  checkTrue('после уменьшенного платежа график всё равно доходит до нуля',
-            lastCut && lastCut.balance === 0);
-  checkTrue('появились дополнительные строки сверх списка банка',
-            afterCut.length > beforeCut.length);
-  checkTrue('дополнительные строки помечены «по расчёту»',
-            afterCut.slice(beforeCut.length).every(r => r.continued === true));
-  check('строка сентября — ровно введённая сумма', afterCut[0] && afterCut[0].payment, 9877);
-  check('строка октября из списка банка не изменилась', afterCut[1] && afterCut[1].payment, 17254);
+  check('сентябрь — ровно введённая сумма', afterCut[0] && afterCut[0].payment, 9877);
+  check('октябрь вырос ровно на недостачу сентября (130454 − 9877)',
+        afterCut[1] && afterCut[1].payment, 130454 - 9877 + 17254);
+  checkTrue('октябрь помечен «с переносом»', afterCut[1] && afterCut[1].bumped);
+  check('ноябрь — снова обычная сумма банка', afterCut[2] && afterCut[2].payment, 17062);
+  checkTrue('после переноса график всё равно доходит до нулевого остатка',
+            afterCut[afterCut.length-1] && afterCut[afterCut.length-1].balance === 0);
+
+  // --- когда переносить уже некуда (это последняя строка банка) —
+  //     страхует достройка графика минимальным платежом ---
+  reset(W, { accounts: [{
+    id:'tail1', type:'credit_card', name:'Тест хвоста', currency:'RUB',
+    openingBalance: 10000, rate: 0, minPercent: 20,
+    scheduleMode: 'manual',
+    manualSchedule: [
+      {date:'2026-09-14', amount:6000},
+      {date:'2026-10-14', amount:4000}
+    ]
+  }]});
+  const beforeTail = W.cardSchedule(W.acc('tail1'));
+  check('без правок ровно 2 строки, долг закрыт', beforeTail.length, 2);
+
+  W.setPlanOverride(W.planKey('debt','tail1','2026-10-14'), {amount: 1000});
+  const afterTail = W.cardSchedule(W.acc('tail1'));
+  checkTrue('после недоплаты последней строки появились новые строки',
+            afterTail.length > beforeTail.length);
+  checkTrue('новые строки помечены «по расчёту»',
+            afterTail.slice(beforeTail.length).every(r => r.continued === true));
+  checkTrue('и всё равно доходит до нулевого остатка',
+            afterTail[afterTail.length-1] && afterTail[afterTail.length-1].balance === 0);
 
   /* ======================================================================
      ИТОГ
