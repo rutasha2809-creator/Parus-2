@@ -761,16 +761,51 @@ function extractScheduleRows(lines){
     const date = parseAnyDate(dm[1].replace(/\s+/g,' ').trim());
     if(!date) continue;
 
-    const rest = line.slice(line.indexOf(dm[1]) + dm[1].length);
-    const nums = [];
+    /* Сумма может стоять и до даты («17 254,13 ₽   По 15.10.2026» —
+       так подписи выглядят в приложениях банков), и после (наш же
+       формат «дата;сумма»). Сначала ищем после даты, если пусто — до неё. */
+    const cut = line.indexOf(dm[1]);
+    const after  = line.slice(cut + dm[1].length);
+    const before = line.slice(0, cut);
     const re = /(\d[\d\s ]*(?:[.,]\d{1,2})?)/g;
-    let m;
-    while((m = re.exec(rest)) !== null){
-      const v = parseAnyNumber(m[1]);
-      if(v !== null && Math.abs(v) >= 10) nums.push(Math.abs(v));
+    function numsIn(str){
+      const found = [];
+      let m; re.lastIndex = 0;
+      while((m = re.exec(str)) !== null){
+        const v = parseAnyNumber(m[1]);
+        if(v !== null && Math.abs(v) >= 10) found.push(Math.abs(v));
+      }
+      return found;
     }
+    let nums = numsIn(after);
+    if(!nums.length) nums = numsIn(before);
     if(!nums.length) continue;
     out.push({date, amount: nums[0]});
+  }
+  if(out.length) return out;
+
+  /* Ничего не нашли построчно — иногда распознавание разбивает две колонки
+     («суммы» и «даты») в отдельные группы строк вместо одной строки на
+     платёж. Тогда достаём все даты и все подходящие суммы по отдельности
+     и, если их поровну, просто соединяем по порядку. */
+  const re2 = /(\d[\d\s ]*(?:[.,]\d{1,2})?)/g;
+  const allDates = [];
+  const allAmounts = [];
+  for(const line of lines){
+    const dm = line.match(dateRe);
+    if(dm){
+      const d = parseAnyDate(dm[1].replace(/\s+/g,' ').trim());
+      if(d) allDates.push(d);
+      continue;
+    }
+    let m; re2.lastIndex = 0;
+    while((m = re2.exec(line)) !== null){
+      const v = parseAnyNumber(m[1]);
+      if(v !== null && Math.abs(v) >= 10) allAmounts.push(Math.abs(v));
+    }
+  }
+  if(allDates.length && allDates.length === allAmounts.length){
+    for(let i=0;i<allDates.length;i++) out.push({date: allDates[i], amount: allAmounts[i]});
   }
   return out;
 }
