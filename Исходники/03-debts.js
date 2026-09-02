@@ -669,10 +669,33 @@ function renderDebts(){
       <div class="btnrow" style="margin-top:10px">
         <button class="btn btn-p btn-sm" onclick="quickPay('${a.id}')">Внести платёж</button>
         ${(a.type==='loan'||a.type==='credit_card'||a.type==='installment')?`<button class="btn btn-s btn-sm" onclick="showSchedule('${a.id}')">График</button>`:''}
+        <button class="btn btn-s btn-sm" onclick="toggleDebtHist('${a.id}')">История платежей</button>
         <button class="btn btn-s btn-sm" onclick="openAccount('${a.id}')">Настроить</button>
       </div>
+      ${debtHistBlock(a.id)}
     </div>`;
   }).join('');
+}
+
+/* ---------------- история платежей по долгу ---------------- */
+/* Ошиблись счётом списания или суммой во «Внести платёж» — исправить можно
+   было только через «Счета» → раскрыть счёт → найти операцию. Прямо на
+   карточке долга такой возможности не было. Теперь список последних
+   операций (переводы в счёт долга + всё, что списано с него) открывается
+   тут же, клик по строке — то же окно правки, что и на «Счета»:
+   можно поменять счёт списания, сумму, дату. */
+var DEBT_HIST_OPEN = new Set();
+function toggleDebtHist(id){
+  if(DEBT_HIST_OPEN.has(id)) DEBT_HIST_OPEN.delete(id); else DEBT_HIST_OPEN.add(id);
+  renderDebts();
+}
+function debtHistBlock(accountId){
+  if(!DEBT_HIST_OPEN.has(accountId)) return '';
+  const list = accTxList(accountId);
+  const body = list.length
+    ? list.map(txRow).join('')
+    : `<div class="empty" style="padding:10px 0">Платежей по этому долгу ещё нет.</div>`;
+  return `<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${body}</div>`;
 }
 
 /* Быстрое внесение платежа = перевод с ликвидного счёта на долговой */

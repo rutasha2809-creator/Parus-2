@@ -632,6 +632,34 @@ function reset(W, patch){
   check('срок возврата сохранён', qdDebt && qdDebt.dueDate, '2026-12-01');
   checkTrue('первая рассрочка не пострадала', W.S.accounts.length === 2);
 
+  group('История платежей по долгу — можно исправить счёт списания');
+
+  reset(W, { accounts: [
+    { id:'debit1', type:'debit', name:'Карта верно', openingBalance: 100000 },
+    { id:'debit2', type:'debit', name:'Карта неверно', openingBalance: 100000 },
+    { id:'ozon', type:'installment', name:'Ozon', openingBalance: 12000, partsLeft: 4, freq:'monthly', nextPaymentDate:'2026-09-01', payment: 3000 }
+  ]});
+
+  // «Внести платёж» по ошибке указали не тот счёт списания
+  W.quickPay('ozon');
+  W.document.getElementById('qpAmount').value = '3000';
+  W.document.getElementById('qpFrom').value = 'debit2';
+  W.saveQuickPay('ozon');
+
+  const debtHist = W.accTxList('ozon');
+  checkTrue('платёж попал в историю операций счёта долга', debtHist.length === 1);
+  check('счёт списания сохранён ошибочный', debtHist[0].accountId, 'debit2');
+
+  // находим операцию через историю на карточке долга и правим счёт
+  const txId = debtHist[0].id;
+  W.openTx(txId);
+  W.document.getElementById('txAccount').value = 'debit1';
+  W.saveTx(txId);
+
+  const fixed = W.S.transactions.find(t=>t.id===txId);
+  check('счёт списания исправлен', fixed.accountId, 'debit1');
+  check('сумма и получатель не пострадали', [fixed.amount, fixed.toAccountId], [3000, 'ozon']);
+
   /* ======================================================================
      ИТОГ
      ====================================================================== */
