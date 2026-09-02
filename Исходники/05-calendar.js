@@ -471,7 +471,6 @@ function renderCalTable(F){
   body += colLine('sub', 'Прочие расходы', c=>c.other);
   if(detail === 'full') body += T.other.map(r=>line('sub', '· '+r.name, r.vals, r.total)).join('');
 
-  body += colLine('grp', 'Итого за период', c=>round2(c.inc - c.debt - c.other));
   body += `<tr class="edge"><td>Остаток на конец</td>
     ${T.cols.map(c=>`<td ${c.close<0?'style="color:var(--red)"':''}>${n(c.close)}</td>`).join('')}
     <td class="tot" ${T.cols[T.cols.length-1].close<0?'style="color:var(--red)"':''}>${n(T.cols[T.cols.length-1].close)}</td></tr>`;

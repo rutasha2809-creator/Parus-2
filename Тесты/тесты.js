@@ -729,6 +729,24 @@ function reset(W, patch){
             W.document.getElementById('ovRecList').classList.contains('on') &&
             W.document.getElementById('recList').innerHTML.includes('Регулярных платежей ещё нет'));
 
+  group('Таблица прогноза — без «Итого за период», горизонт по умолчанию — год');
+
+  reset(W, {
+    accounts: [{ id:'card', type:'debit', name:'Карта', openingBalance: 10000 }],
+    recurring: [{ id:'r1', name:'Зарплата', amount: 50000, kind:'income', freq:'monthly',
+                  startDate: W.today(), accountId:'card', categoryId:'', active:true }]
+  });
+
+  check('«Горизонт прогноза» по умолчанию — 12 месяцев', W.document.getElementById('calHorizon').value, '365');
+
+  W.go('calendar');
+  const tableHtml = W.document.getElementById('calTable').innerHTML;
+  checkTrue('строки «Итого за период» в таблице больше нет', !tableHtml.includes('Итого за период'));
+  checkTrue('«Остаток на начало» и «Остаток на конец» остались', 
+            tableHtml.includes('Остаток на начало') && tableHtml.includes('Остаток на конец'));
+  const cols = (tableHtml.match(/<th>[^<]+<\/th>/g) || []).length;
+  checkTrue('на годовом горизонте больше 3 колонок месяцев (реально есть что прокручивать)', cols > 4);
+
   /* ======================================================================
      ИТОГ
      ====================================================================== */
