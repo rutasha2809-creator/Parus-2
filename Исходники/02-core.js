@@ -275,11 +275,13 @@ function depositIsLiquid(a){
    Карты и наличные — всегда. Накопительный счёт (вклад без даты окончания)
    тоже: с него можно снять в любой момент. А срочный вклад с датой закрытия
    заперт до срока — он не в остатке, зато в календаре появится приходом
-   в день закрытия. */
+   в день закрытия. Вклад, отмеченный «не учитывать в остатке денег»
+   (резерв, накопления не на трату), не в остатке никогда и ни при какой
+   дате — как лимит кредитной карты. */
 function liquidAccounts(){
   return S.accounts.filter(a => !a.archived && (
     a.type==='debit' || a.type==='cash' ||
-    (a.type==='deposit' && depositIsLiquid(a))
+    (a.type==='deposit' && depositIsLiquid(a) && !a.excludeFromBalance)
   ));
 }
 
@@ -479,6 +481,15 @@ function accTypeFields(a){
         Отмечено — вклад считается доступными деньгами и входит в остаток «Сейчас» в календаре.
         Снято — деньги заперты до даты окончания и появятся в календаре приходом в этот день.
       </div>
+      <label class="check"><input type="checkbox" id="acExclude" ${a&&a.excludeFromBalance?'checked':''}>
+        Не учитывать эту сумму в остатке денег</label>
+      <div class="hint" style="margin:-6px 0 12px">
+        Для накоплений или резерва, которым вы не планируете пользоваться. Сумма
+        останется на счёте и в чистом капитале, но не войдёт в «Остаток сейчас»
+        и в прогноз календаря — ни сейчас, ни по дате окончания. Как лимит
+        кредитной карты, который тоже нигде не учитывается. Не зависит от
+        галочки выше и даты окончания.
+      </div>
       <div class="f"><label>Проценты выплачиваются на счёт</label>
         <select id="acLinkAcc"><option value="">— не указан —</option>
         ${liquidAccounts().map(x=>`<option value="${x.id}" ${a&&a.linkAccountId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
@@ -587,7 +598,8 @@ function saveAccount(id){
   if(type==='deposit'){
     a.rate = gn('acRate'); a.endDate = g('acEndDate');
     a.capitalization = gb('acCapital'); a.linkAccountId = g('acLinkAcc');
-    a.liquid = gb('acLiquid');       // доступен ли к снятию прямо сейчас
+    a.liquid = gb('acLiquid');                 // доступен ли к снятию прямо сейчас
+    a.excludeFromBalance = gb('acExclude');    // резерв — вообще не в остатке денег
   }
   if(type==='credit_card'){
     a.limit = gn('acLimit'); a.rate = gn('acRate');
@@ -684,7 +696,9 @@ function accRowInner(a){
   if(a.type==='loan'){ const pd = payoffDateOf(a); if(pd) sub += ` · до ${dateShort(pd)} ${parseISO(pd).getFullYear()}`; }
   if(a.type==='deposit'){
     if(a.rate) sub += ` · ${pct(a.rate)}% годовых`;
-    sub += depositIsLiquid(a) ? ' · доступен' : ` · заперт до ${a.endDate?dateShort(a.endDate):'срока'}`;
+    sub += a.excludeFromBalance
+      ? ' · не в остатке'
+      : (depositIsLiquid(a) ? ' · доступен' : ` · заперт до ${a.endDate?dateShort(a.endDate):'срока'}`);
   }
   if(a.type==='installment'){
     const left = installmentPartsLeft(a);

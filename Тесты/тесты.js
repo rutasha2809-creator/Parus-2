@@ -660,6 +660,39 @@ function reset(W, patch){
   check('счёт списания исправлен', fixed.accountId, 'debit1');
   check('сумма и получатель не пострадали', [fixed.amount, fixed.toAccountId], [3000, 'ozon']);
 
+  group('Вклад «не учитывать в остатке денег» — резерв');
+
+  reset(W, { accounts: [
+    { id:'card', type:'debit', name:'Карта', openingBalance: 50000 },
+    { id:'dep1', type:'deposit', name:'Подушка', openingBalance: 300000,
+      liquid:false, excludeFromBalance:true, endDate: W.addDays(W.today(), 10) },
+    { id:'dep2', type:'deposit', name:'На отпуск', openingBalance: 100000,
+      liquid:true, excludeFromBalance:true }
+  ]});
+
+  check('в остатке «Сейчас» только обычная карта', W.totalLiquid(), 50000);
+  check('оба резервных вклада исключены из liquidAccounts',
+        W.liquidAccounts().map(a=>a.id), ['card']);
+  check('в чистом капитале вклады по-прежнему считаются', W.netWorth(), 450000);
+
+  const F = W.buildForecast(30);
+  check('остаток на начало прогноза — без вкладов', F[0].open, 50000);
+  check('остаток в конце горизонта — без вкладов, даже после даты окончания', F[F.length-1].close, 50000);
+  const closingDay = F.find(d=>d.date===W.addDays(W.today(),10));
+  checkTrue('в день окончания вклада приход не появляется (резерв)',
+            !closingDay.items.some(i=>i.deposit));
+
+  // обычный «запертый до даты» вклад (без резерва) — прежнее поведение сохранилось
+  reset(W, { accounts: [
+    { id:'card', type:'debit', name:'Карта', openingBalance: 50000 },
+    { id:'dep3', type:'deposit', name:'Срочный вклад', openingBalance: 200000,
+      liquid:false, endDate: W.addDays(W.today(), 5) }
+  ]});
+  check('обычный запертый вклад не в остатке сейчас', W.totalLiquid(), 50000);
+  const F2 = W.buildForecast(30);
+  const closeDay2 = F2.find(d=>d.date===W.addDays(W.today(),5));
+  checkTrue('но в день закрытия деньги приходят как обычно', closeDay2.items.some(i=>i.deposit));
+
   /* ======================================================================
      ИТОГ
      ====================================================================== */

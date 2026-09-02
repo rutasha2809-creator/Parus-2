@@ -169,8 +169,11 @@ function buildForecast(days){
   // 3) закрытие вкладов
   for(const a of S.accounts){
     /* Приход в день закрытия — только для запертых вкладов.
-       Доступный вклад уже посчитан в остатке, иначе деньги удвоятся. */
-    if(a.type==='deposit' && !depositIsLiquid(a) && a.endDate && a.endDate>=from && a.endDate<=to && !a.archived){
+       Доступный вклад уже посчитан в остатке, иначе деньги удвоятся.
+       Вклад с «не учитывать в остатке денег» — резерв: не появляется
+       ни сейчас, ни в день закрытия, деньги вообще не входят в прогноз. */
+    if(a.type==='deposit' && !depositIsLiquid(a) && !a.excludeFromBalance &&
+       a.endDate && a.endDate>=from && a.endDate<=to && !a.archived){
       push({date:a.endDate, name:'Закрытие вклада: '+a.name, amount:toBase(balance(a), accCurrency(a)), kind:'income', deposit:true});
     }
   }
@@ -491,11 +494,14 @@ function renderCalendar(){
   const startNote = document.getElementById('calStartNote');
   if(startNote){
     const parts = liquidAccounts().map(a=>`${esc(a.name)} ${money(toBase(balance(a), accCurrency(a)))}`);
-    const locked = S.accounts.filter(a=>!a.archived && a.type==='deposit' && !depositIsLiquid(a));
+    const notLiquid = S.accounts.filter(a=>!a.archived && a.type==='deposit' && (!depositIsLiquid(a) || a.excludeFromBalance));
+    const reserved = notLiquid.filter(a=>a.excludeFromBalance);
+    const locked = notLiquid.filter(a=>!a.excludeFromBalance);
     startNote.innerHTML = parts.length
       ? `<div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5">
            Учтено: ${parts.join(' · ')}
            ${locked.length ? `<br>Не учтено (заперто до срока): ${locked.map(a=>esc(a.name)).join(', ')}` : ''}
+           ${reserved.length ? `<br>Не учтено (резерв, не в остатке): ${reserved.map(a=>esc(a.name)).join(', ')}` : ''}
          </div>`
       : '';
   }
