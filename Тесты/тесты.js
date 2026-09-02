@@ -693,6 +693,42 @@ function reset(W, patch){
   const closeDay2 = F2.find(d=>d.date===W.addDays(W.today(),5));
   checkTrue('но в день закрытия деньги приходят как обычно', closeDay2.items.some(i=>i.deposit));
 
+  group('Регулярные платежи — отдельное окно с «Календаря»');
+
+  reset(W, { accounts: [{ id:'card', type:'debit', name:'Карта', openingBalance: 10000 }] });
+
+  check('таблица — вид по умолчанию, не график', W.CAL_VIEW, 'table');
+  checkTrue('карточки «Регулярные платежи» на самом календаре больше нет',
+            !W.document.getElementById('recList'));
+
+  W.openRecList();
+  checkTrue('окно списка открывается', W.document.getElementById('ovRecList').classList.contains('on'));
+  checkTrue('пустой список показывает подсказку',
+            W.document.getElementById('recList').innerHTML.includes('Регулярных платежей ещё нет'));
+
+  W.openRecurring();
+  checkTrue('форма добавления открывается поверх, список — под ней',
+            !W.document.getElementById('ovRecList').classList.contains('on') &&
+            W.document.getElementById('ovRec').classList.contains('on'));
+  W.document.getElementById('rcName').value = 'Зарплата';
+  W.document.getElementById('rcAmount').value = '50000';
+  W.recKind('income');
+  W.saveRecurring(null);
+
+  check('регулярный платёж сохранён', W.S.recurring.length, 1);
+  checkTrue('после сохранения список открывается снова',
+            W.document.getElementById('ovRecList').classList.contains('on'));
+  checkTrue('новая запись видна в списке',
+            W.document.getElementById('recList').innerHTML.includes('Зарплата'));
+
+  const recId = W.S.recurring[0].id;
+  W.openRecurring(recId);
+  W.deleteRecurring(recId);
+  check('после удаления регулярных платежей не осталось', W.S.recurring.length, 0);
+  checkTrue('список снова открыт и показывает пустое состояние',
+            W.document.getElementById('ovRecList').classList.contains('on') &&
+            W.document.getElementById('recList').innerHTML.includes('Регулярных платежей ещё нет'));
+
   /* ======================================================================
      ИТОГ
      ====================================================================== */

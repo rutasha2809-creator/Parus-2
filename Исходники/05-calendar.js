@@ -41,6 +41,7 @@ function openRecurring(id){
       <button class="btn btn-p" onclick="saveRecurring(${r?"'"+r.id+"'":'null'})">Сохранить</button>
     </div>`;
   recKind(r ? r.kind : 'expense', r);
+  closeOv('ovRecList');   // список (если открыт) уступает место форме правки
   openOv('ovRec');
 }
 let RECKIND = 'expense';
@@ -69,11 +70,11 @@ function saveRecurring(id){
   };
   if(id){ const i = S.recurring.findIndex(x=>x.id===id); S.recurring[i] = rec; }
   else S.recurring.push(rec);
-  save(); closeOv('ovRec'); renderAll(); toast('Сохранено');
+  save(); closeOv('ovRec'); renderAll(); openRecList(); toast('Сохранено');
 }
 function deleteRecurring(id){
   S.recurring = S.recurring.filter(r=>r.id!==id);
-  save(); closeOv('ovRec'); renderAll(); toast('Удалено');
+  save(); closeOv('ovRec'); renderAll(); openRecList(); toast('Удалено');
 }
 
 /* Ищем реальную операцию, которая закрывает плановое начисление.
@@ -313,15 +314,45 @@ function forecastMonths(F){
 /* ---------------- сводная таблица прогноза ----------------
    Повторяет формат исходного Excel: статьи в строках, периоды в колонках,
    последняя колонка — итог за весь горизонт. */
-var CAL_VIEW = 'chart';
+var CAL_VIEW = 'table';
 function calSetView(v){
   CAL_VIEW = v;
-  document.querySelectorAll('#calView button').forEach((b,i)=>
-    b.classList.toggle('on', (i===0) === (v==='chart')));
+  document.querySelectorAll('#calView button').forEach(b=>
+    b.classList.toggle('on', b.dataset.v === v));
   document.getElementById('calChartWrap').style.display = v==='chart' ? 'block' : 'none';
   document.getElementById('calTableWrap').style.display = v==='table' ? 'block' : 'none';
   document.getElementById('calGranWrap').style.display  = v==='table' ? 'grid'  : 'none';
   renderCalendar();
+}
+
+/* ---------------- отдельное окно «Регулярные платежи и доходы» ----------------
+   Раньше список жил прямо на «Календаре» отдельной карточкой — занимал
+   много места и не был нужен там каждый раз. Теперь список — в отдельном
+   окне, а на «Календаре» осталась только ссылка «Регулярные платежи →». */
+function openRecList(){
+  document.getElementById('ovRecListBody').innerHTML = `
+    <h3>Регулярные платежи и доходы <button class="act" onclick="openRecurring()">+ Добавить</button></h3>
+    <div class="note">Основа прогноза: повторяющиеся начисления — зарплата, аренда, ЖКХ, подписки.
+      Платежи по кредитам добавлять сюда не нужно, они подтягиваются из графиков погашения сами.</div>
+    <div id="recList"></div>`;
+  renderRecList();
+  openOv('ovRecList');
+}
+function renderRecList(){
+  const rbox = document.getElementById('recList');
+  if(!rbox) return;                     // окно сейчас закрыто — рендерить некуда
+  if(!S.recurring.length){
+    rbox.innerHTML = `<div class="empty"><span class="big">▤</span>
+      Регулярных платежей ещё нет.<br>Добавьте зарплату, ЖКХ, подписки — и календарь начнёт прогнозировать остаток.</div>`;
+  } else {
+    const sorted = [...S.recurring].sort((a,b)=> a.kind===b.kind ? b.amount-a.amount : (a.kind==='income'?-1:1));
+    rbox.innerHTML = sorted.map(r=>`
+      <div class="row" onclick="openRecurring('${r.id}')" style="cursor:pointer">
+        <div class="l"><div class="t">${esc(r.name)} ${r.kind==='expense'&&!catMandatory(r.categoryId)?'<span class="chip opt">необяз</span>':''}</div>
+          <div class="s">${FREQ[r.freq]} · с ${dateShort(r.startDate)}${r.endDate?' до '+dateShort(r.endDate):''} · ${esc(accName(r.accountId))}</div></div>
+        <div class="v ${r.kind==='income'?'pos':'neg'}">${r.kind==='income'?'+':'−'}${money(r.amount)}</div>
+      </div>`).join('');
+  }
 }
 function anFcSetView(v){
   AN_FC_VIEW = v;
@@ -576,20 +607,9 @@ function renderCalendar(){
   // таблица
   if(CAL_VIEW === 'table') renderCalTable(F);
 
-  // регулярные платежи
-  const rbox = document.getElementById('recList');
-  if(!S.recurring.length){
-    rbox.innerHTML = `<div class="empty"><span class="big">▤</span>
-      Регулярных платежей ещё нет.<br>Добавьте зарплату, ЖКХ, подписки — и календарь начнёт прогнозировать остаток.</div>`;
-  } else {
-    const sorted = [...S.recurring].sort((a,b)=> a.kind===b.kind ? b.amount-a.amount : (a.kind==='income'?-1:1));
-    rbox.innerHTML = sorted.map(r=>`
-      <div class="row" onclick="openRecurring('${r.id}')" style="cursor:pointer">
-        <div class="l"><div class="t">${esc(r.name)} ${r.kind==='expense'&&!catMandatory(r.categoryId)?'<span class="chip opt">необяз</span>':''}</div>
-          <div class="s">${FREQ[r.freq]} · с ${dateShort(r.startDate)}${r.endDate?' до '+dateShort(r.endDate):''} · ${esc(accName(r.accountId))}</div></div>
-        <div class="v ${r.kind==='income'?'pos':'neg'}">${r.kind==='income'?'+':'−'}${money(r.amount)}</div>
-      </div>`).join('');
-  }
+  // регулярные платежи — список живёт в отдельном окне (openRecList),
+  // но если оно сейчас открыто, обновим и его
+  renderRecList();
 
   /* Прогноз по месяцам: свёрнутые блоки, внутри — дни */
   const dbox = document.getElementById('calDays');
