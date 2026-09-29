@@ -1129,8 +1129,9 @@ function savingsProgressAgg(){
 function renderHome(){
   renderOnboard();
   const mode = S.settings.mode || 'simple';
-  document.getElementById('homeSimple').style.display   = mode==='simple'   ? 'block' : 'none';
-  document.getElementById('homeAdvanced').style.display = mode==='advanced' ? 'block' : 'none';
+  document.getElementById('homeSimple').style.display   = mode==='simple'   ? '' : 'none';
+       document.getElementById('s-home').dataset.mode = mode;
+  document.getElementById('homeAdvanced').style.display = mode==='advanced' ? '' : 'none';
 
   document.getElementById('hNet').textContent = moneyShort(netWorth());
   const n = new Date();

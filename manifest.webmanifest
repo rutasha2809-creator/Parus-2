@@ -6,9 +6,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#f2f1ef",
-  "theme_color": "#e6e3dc",
+  "background_color": "#08060F",
+  "theme_color": "#08060F",
   "categories": ["finance", "productivity"],
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
