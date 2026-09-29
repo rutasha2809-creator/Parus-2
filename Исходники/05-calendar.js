@@ -1077,11 +1077,14 @@ function renderOnboard(){
   ];
 
   box.innerHTML = steps.map((st,i)=>`
-    <div class="stp ${st.done?'done':''}">
-      <span class="num">${st.done?'✓':i+1}</span>
-      <span class="l"><div class="t">${st.t}${st.opt&&!st.done?' <span class="chip opt">если есть</span>':''}</div>
-        <div class="s">${st.s}</div></span>
-      ${st.done ? '' : `<span class="go"><button class="btn btn-s btn-sm" onclick="${st.act}">${st.btn}</button></span>`}
+    <div class="stpt ${st.done?'done':''}" role="button" tabindex="0" onclick="${st.act}">
+      <div class="stpt-h">
+        <span class="num">${st.done?'✓':i+1}</span>
+        ${st.opt&&!st.done?'<span class="chip opt">если есть</span>':''}
+      </div>
+      <div class="stpt-t">${st.t}</div>
+      <div class="stpt-s">${st.s}</div>
+      <div class="stpt-go">${st.btn} →</div>
     </div>`).join('');
 }
 

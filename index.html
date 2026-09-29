@@ -518,6 +518,24 @@ nav .brand{display:none}
 .kpi--main .kpi-s{color:rgba(255,255,255,.82)}
 .kpi .bar{margin:8px 0 5px}
 .kpi .empty{padding:2px 0;font-size:12px;text-align:left}
+
+/* ---------- «С чего начать»: четыре шага плитками, по два в ряд ---------- */
+#onboardSteps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stpt{display:flex;flex-direction:column;gap:4px;padding:15px;border-radius:18px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--line);color:var(--ink);
+  transition:transform .25s cubic-bezier(.2,.8,.3,1),box-shadow .25s ease,border-color .25s}
+.stpt:hover{transform:translateY(-2px);box-shadow:var(--shadow-hi);border-color:var(--brand)}
+.stpt:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.stpt-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;min-height:28px}
+.stpt .num{width:28px;height:28px;border-radius:9px;background:var(--brand-d);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.stpt.done .num{background:var(--green-l);color:var(--green)}
+.stpt-t{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:-.2px;line-height:1.25}
+.stpt.done .stpt-t{color:var(--muted)}
+.stpt-s{font-size:12px;color:var(--muted);line-height:1.5}
+.stpt-go{margin-top:auto;padding-top:8px;font-size:12.5px;font-weight:700;color:var(--brand)}
+.stpt.done .stpt-go{color:var(--muted-2)}
+@media (max-width:420px){.stpt{padding:13px}.stpt-t{font-size:14.5px}.stpt-s{font-size:11.5px}}
 </style>
 </head>
 <body>
@@ -5171,11 +5189,14 @@ function renderOnboard(){
   ];
 
   box.innerHTML = steps.map((st,i)=>`
-    <div class="stp ${st.done?'done':''}">
-      <span class="num">${st.done?'✓':i+1}</span>
-      <span class="l"><div class="t">${st.t}${st.opt&&!st.done?' <span class="chip opt">если есть</span>':''}</div>
-        <div class="s">${st.s}</div></span>
-      ${st.done ? '' : `<span class="go"><button class="btn btn-s btn-sm" onclick="${st.act}">${st.btn}</button></span>`}
+    <div class="stpt ${st.done?'done':''}" role="button" tabindex="0" onclick="${st.act}">
+      <div class="stpt-h">
+        <span class="num">${st.done?'✓':i+1}</span>
+        ${st.opt&&!st.done?'<span class="chip opt">если есть</span>':''}
+      </div>
+      <div class="stpt-t">${st.t}</div>
+      <div class="stpt-s">${st.s}</div>
+      <div class="stpt-go">${st.btn} →</div>
     </div>`).join('');
 }
 

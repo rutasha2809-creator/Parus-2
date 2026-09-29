@@ -233,10 +233,10 @@ function reset(W, patch){
   reset(W);
   W.go('home');
   const card  = () => D.getElementById('cardOnboard');
-  const doneN = () => D.getElementById('onboardSteps').querySelectorAll('.stp.done').length;
+  const doneN = () => D.getElementById('onboardSteps').querySelectorAll('.stpt.done').length;
 
   check('на пустом приложении видна', card().style.display, 'block');
-  check('всего шагов', D.getElementById('onboardSteps').querySelectorAll('.stp').length, 4);
+  check('всего шагов', D.getElementById('onboardSteps').querySelectorAll('.stpt').length, 4);
   check('выполненных пока нет', doneN(), 0);
 
   W.S.accounts = [{id:'a1',type:'debit',name:'Карта',currency:'RUB',openingBalance:50000}];
