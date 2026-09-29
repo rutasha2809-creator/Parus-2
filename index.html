@@ -5,10 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Парус — личные финансы</title>
 <meta name="description" content="Учёт доходов и расходов, платёжный календарь и графики погашения задолженностей">
-<meta name="theme-color" content="#e6e3dc">
+<meta name="theme-color" content="#08060F">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Парус">
+<script>
+/* тема ставится до первой отрисовки, чтобы не было вспышки; по умолчанию тёмная, как во Фрилансе */
+(function(){var t='dark';try{t=localStorage.getItem('parus_theme')||'dark'}catch(e){}
+document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');})();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAACWElEQVR4nO3dQU6DQBiA0dZ4CsMJ9P5H0fO4cOPCr6lYmBHe25aGCf06sPnDdVleLvCTp9ELYF7iIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA7S8+gFHNzH+/uNT1/f3nZbyQpXU/YbuZ3Fd9Mm4rayifvL+O3BexLH4634sefsQxwkcTzY6j1gws1DHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBEgdJHCRxkMRBOuMg9b8ebt7TueK4Z3Do6xiJXE51WznGcPOezhLHYYab93SWOFjhFHEcabh5T6eIg3XEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQRIHSRwkcZDEQZplHNL86oTGx2F+dVqDbyvmV2c2Mg7zq5PzQEoaFof51fnZOUjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA7SsDhWv1lnxRePeq6t2TlII+OY/H/5L861qcE7x68uyh+v4FHPtZ3rsryMXsPlsu/bIY96roebJQ4m5IGUJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA6SOEjiIImDJA7SJ2VpWLesLqr/AAAAAElFTkSuQmCC">
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAACmUlEQVR4nO3dTU7CUBhAUTCuwrAC3f9SdD0OnJg4ELn4fug54zavLTevTPg4Xy4vJ7jV0+wLYG8CIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIJLn2RdwRB/v778e8/r2NuBKurP5QCNdk85362fkFTbOX+u57ZTBBDTIzSks3pCASAQ0QtxFVt6EBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBITOd4qFkZ4x06oOt/8fl1pIx+Ou4r7CFnZYx30IAedVbGeAcNiHs5YkAPPCtjvCMGxB0JiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZGsNZ3DpJXtrBKQSSubWuIVZtLKvuYHZNLK1uYHxNYmB2TSyu7sQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhkckDxv3NvO338olNuc4yNd6Apj3X8oivXc1ohIB1s7Xy5vMy+htPpj/9+eq8PY/yiU27zX60S0Jdrnu/dH+v4Rafc5j9ZKyC2M/87EFsTEImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCQCIhEQiYBIBEQiIBIBkQiIREAkAiIREImASAREIiASAZEIiERAJAIiERCJgEgERCIgEgGRCIhEQCSftgxfIC5bs6UAAAAASUVORK5CYII=">
@@ -17,16 +22,55 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
+/* ===== Тема в стиле «Фриланс»: одна градиентная гамма фиолетовый — малиновый — бирюза,
+   стеклянные поверхности, живой фон. Старые имена переменных сохранены как алиасы. ===== */
+@font-face{font-family:'Manrope';font-weight:400;font-display:swap;src:url(fonts/manrope-cyrillic-400-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Manrope';font-weight:400;font-display:swap;src:url(fonts/manrope-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD,U+20BD}
+@font-face{font-family:'Manrope';font-weight:500;font-display:swap;src:url(fonts/manrope-cyrillic-500-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Manrope';font-weight:500;font-display:swap;src:url(fonts/manrope-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD,U+20BD}
+@font-face{font-family:'Manrope';font-weight:600;font-display:swap;src:url(fonts/manrope-cyrillic-600-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Manrope';font-weight:600;font-display:swap;src:url(fonts/manrope-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD,U+20BD}
+@font-face{font-family:'Manrope';font-weight:700;font-display:swap;src:url(fonts/manrope-cyrillic-700-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Manrope';font-weight:700;font-display:swap;src:url(fonts/manrope-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD,U+20BD}
+@font-face{font-family:'Manrope';font-weight:800;font-display:swap;src:url(fonts/manrope-cyrillic-800-normal.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:'Manrope';font-weight:800;font-display:swap;src:url(fonts/manrope-latin-800-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD,U+20BD}
+@font-face{font-family:'Space Grotesk';font-weight:500;font-display:swap;src:url(fonts/space-grotesk-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Space Grotesk';font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Space Grotesk';font-weight:700;font-display:swap;src:url(fonts/space-grotesk-latin-700-normal.woff2) format('woff2')}
+
 :root{
-  /* Строгая монохромная палитра: тёплый песочный фон, графитовый текст.
-     Акценты приглушённые — различимы, но не режут глаз. */
-  --bg:#f2f1ef; --card:#fff; --ink:#1c1c1a; --muted:#8a8880; --line:#e3e1dd;
-  --brand:#2f2e2b; --brand-d:#111110; --brand-l:#f0efec;   /* акцент = графит */
-  --green:#2e7d32; --green-l:#e8f5e9;                       /* классический зелёный */
-  --red:#c62828;   --red-l:#ffebee;                         /* классический красный */
-  --amber:#e65100; --amber-l:#fff3e0;                       /* предупреждение */
-  --violet:#6b6478;
-  --r:12px;
+  --v1:#7C5CFF; --v2:#C061FF; --v3:#FF5CA8; --aqua:#2BB9AE;
+  --ink:#1A1430; --muted:#6A6188; --muted-2:#938BB3;
+  --bg:#F1EDFB; --card:rgba(255,255,255,.72); --line:rgba(26,20,48,.10);
+  --panel-bg:#FDFCFF; --surface2:rgba(124,92,255,.06); --chip-bg:rgba(124,92,255,.10);
+  --brand:#6A4AE6; --brand-d:#5A3ED0; --brand-l:rgba(124,92,255,.10);
+  --violet:#7C5CFF;
+  --green:#0F9E8F; --green-l:rgba(43,185,174,.14);
+  --red:#E0425F;   --red-l:rgba(224,66,95,.12);
+  --amber:#B7791F; --amber-l:rgba(245,158,11,.14);
+  --shadow:0 2px 6px rgba(40,20,90,.06),0 16px 40px -20px rgba(40,20,90,.28);
+  --shadow-hi:0 4px 10px rgba(40,20,90,.10),0 28px 60px -22px rgba(60,30,120,.45);
+  --glass:rgba(255,255,255,.72); --blur:blur(24px) saturate(1.5);
+  --hero-bg:linear-gradient(145deg,#4A3FA6 0%,#5B49B8 60%,#6B4C9A 100%);
+  --overlay:rgba(26,20,48,.45);
+  --chart-line:#1A1430; --chart-grid:rgba(26,20,48,.08); --chart-zero:rgba(26,20,48,.28); --chart-gap:#fff;
+  --r:20px; --r-control:13px;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ink:#F4F2FF; --muted:#A79FD0; --muted-2:#6F6795;
+  --bg:#08060F; --card:rgba(255,255,255,.05); --line:rgba(255,255,255,.10);
+  --panel-bg:#171226; --surface2:rgba(255,255,255,.04); --chip-bg:rgba(255,255,255,.08);
+  --brand:#8B7CFF; --brand-d:#7C5CFF; --brand-l:rgba(124,92,255,.18);
+  --green:#3DE0D2; --green-l:rgba(61,224,210,.14);
+  --red:#FF7A90;   --red-l:rgba(255,92,120,.16);
+  --amber:#FFC46B; --amber-l:rgba(255,196,107,.14);
+  --shadow:0 20px 50px -26px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.06);
+  --shadow-hi:0 28px 64px -24px rgba(0,0,0,1),inset 0 1px 0 rgba(255,255,255,.10);
+  --glass:rgba(14,12,26,.62);
+  --hero-bg:linear-gradient(145deg,rgba(124,92,255,.26),rgba(124,92,255,.10) 60%,rgba(61,224,210,.07));
+  --overlay:rgba(0,0,0,.6);
+  --chart-line:#F4F2FF; --chart-grid:rgba(255,255,255,.08); --chart-zero:rgba(255,255,255,.30); --chart-gap:#171226;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -34,7 +78,7 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   background:var(--bg); color:var(--ink); font-size:15px; line-height:1.45;
   /* ровно под высоту нижнего меню, без лишней полосы */
-  padding-bottom:calc(54px + env(safe-area-inset-bottom));
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
 }
 button,input,select,textarea{font-family:inherit;font-size:inherit}
 
@@ -59,10 +103,10 @@ header .hright{display:flex;align-items:center;gap:14px}
   border:2px solid #fff; box-shadow:0 0 0 1px #c9c4ba, 0 1px 3px rgba(28,28,26,.18);
   display:flex;align-items:center;justify-content:center;position:relative}
 .avatar img{width:100%;height:100%;object-fit:cover;display:block}
-.avatar.guest{background:#fff;color:#63605a;border:2px dashed #b4afa4;box-shadow:none;font-size:20px;font-weight:400}
+.avatar.guest{background:var(--panel-bg);color:#63605a;border:2px dashed #b4afa4;box-shadow:none;font-size:20px;font-weight:400}
 .avatar:active{filter:brightness(.92)}
 .avatar:hover{box-shadow:0 0 0 1px #9b978c, 0 2px 6px rgba(28,28,26,.22)}
-.avatar-lg{width:76px;height:76px;font-size:26px;margin:0 auto 10px;background:#eceae6;color:#5c5a55;
+.avatar-lg{width:76px;height:76px;font-size:26px;margin:0 auto 10px;background:var(--chip-bg);color:var(--muted);
   border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .avatar-lg img{width:100%;height:100%;object-fit:cover;display:block}
 
@@ -88,7 +132,7 @@ main{max-width:760px;margin:0 auto;padding:14px 14px 24px}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.stat{background:#faf9f7;border:1px solid var(--line);border-radius:10px;padding:11px}
+.stat{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:11px}
 .stat .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .stat .l{font-size:11px;color:var(--muted);margin-top:2px}
 
@@ -96,7 +140,7 @@ main{max-width:760px;margin:0 auto;padding:14px 14px 24px}
 .btn{border:none;border-radius:9px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;transition:filter .12s}
 .btn:active{filter:brightness(.93)}
 .btn-p{background:var(--brand);color:#fff}
-.btn-s{background:#eceae6;color:#3a3936}
+.btn-s{background:var(--chip-bg);color:var(--ink)}
 .btn-d{background:var(--red-l);color:var(--red)}
 .btn-sm{padding:6px 11px;font-size:13px;border-radius:8px}
 .btn-blk{display:block;width:100%}
@@ -107,7 +151,7 @@ main{max-width:760px;margin:0 auto;padding:14px 14px 24px}
   background:var(--brand);color:#fff;font-size:26px;border:none;box-shadow:0 4px 14px rgba(28,28,26,.28);z-index:35;cursor:pointer;line-height:1}
 
 /* ---------- nav ---------- */
-nav{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
   border-top:1px solid var(--line);display:flex;z-index:40;padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;border:none;background:none;padding:5px 2px 4px;font-size:10px;color:var(--muted);
   display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;line-height:1.15}
@@ -117,12 +161,12 @@ nav button.on{color:var(--brand);font-weight:650}
 /* ---------- pills / tabs ---------- */
 .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px;-webkit-overflow-scrolling:touch}
 .tabs::-webkit-scrollbar{display:none}
-.tabs button{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:20px;padding:6px 13px;
+.tabs button{border:1px solid var(--line);background:var(--panel-bg);color:var(--muted);border-radius:20px;padding:6px 13px;
   font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer}
 .tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
 
 .chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}
-.chip.req{background:#eceae6;color:#5c5a55}
+.chip.req{background:var(--chip-bg);color:var(--muted)}
 .chip.opt{background:var(--amber-l);color:var(--amber)}
 .chip.ok{background:var(--green-l);color:var(--green)}
 .chip.bad{background:var(--red-l);color:var(--red)}
@@ -143,7 +187,7 @@ nav button.on{color:var(--brand);font-weight:650}
 /* ---------- account cards ---------- */
 .acc{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .acc:last-child{border-bottom:none}
-.acc .ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;color:#5c5a55}
+.acc .ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;color:var(--muted)}
 .acc .nm{font-weight:600;font-size:14px}
 .acc .sb{font-size:11.5px;color:var(--muted);margin-top:1px}
 .acc .bal{margin-left:auto;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -166,7 +210,7 @@ nav button.on{color:var(--brand);font-weight:650}
 /* ---------- tables ---------- */
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl th{text-align:left;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;
-  padding:8px 9px;border-bottom:1px solid var(--line);font-weight:650;background:#faf9f7;position:sticky;top:0}
+  padding:8px 9px;border-bottom:1px solid var(--line);font-weight:650;background:var(--surface2);position:sticky;top:0}
 .tbl td{padding:8px 9px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 .tbl tr:last-child td{border-bottom:none}
 .tbl td.r,.tbl th.r{text-align:right}
@@ -187,13 +231,13 @@ nav button.on{color:var(--brand);font-weight:650}
   box-shadow:1px 0 0 var(--line)}
 .fintbl thead th{font-size:10.5px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;
   border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
-.fintbl thead th:last-child,.fintbl td.tot{background:#faf9f7;font-weight:650}
-.fintbl tr.grp td{font-weight:650;background:#f6f5f2}
-.fintbl tr.grp td:first-child{background:#f6f5f2}
+.fintbl thead th:last-child,.fintbl td.tot{background:var(--surface2);font-weight:650}
+.fintbl tr.grp td{font-weight:650;background:var(--surface2)}
+.fintbl tr.grp td:first-child{background:var(--surface2)}
 .fintbl tr.sub td:first-child{padding-left:20px;color:var(--muted);font-weight:400}
-.fintbl tr.edge td{font-weight:650;border-top:1px solid var(--ink)}
+.fintbl tr.edge td{font-weight:650;border-top:1px solid var(--muted)}
 .fintbl tr.edge td:first-child{background:var(--card)}
-.fintbl .z{color:#c7c4bd}
+.fintbl .z{color:var(--muted-2)}
 
 /* ---------- прогноз: блоки по месяцам ----------
    Месяц свёрнут по умолчанию: сначала итог, детали по клику */
@@ -213,9 +257,9 @@ nav button.on{color:var(--brand);font-weight:650}
 .mon-h .mclose em{font-style:normal;font-size:9.5px;color:var(--muted)}
 .mon.low .mon-h{background:var(--amber-l)}
 .mon.gap .mon-h{background:var(--red-l)}
-.mon-b{display:none;border-top:1px solid var(--line);background:#fbfaf9}
+.mon-b{display:none;border-top:1px solid var(--line);background:var(--surface2)}
 .mon.open .mon-b{display:block}
-.mbar{display:flex;height:3px;border-radius:2px;overflow:hidden;background:#eae8e4;margin-top:4px}
+.mbar{display:flex;height:3px;border-radius:2px;overflow:hidden;background:var(--chip-bg);margin-top:4px}
 .mbar i{display:block;height:100%}
 /* цвета сумм: доход зелёный, расход красный */
 .a-inc{color:var(--green)}
@@ -241,39 +285,39 @@ nav button.on{color:var(--brand);font-weight:650}
 .day .cls span{font-size:9.5px;color:var(--muted)}
 
 /* ---------- modal ---------- */
-.ov{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:flex-end;justify-content:center;z-index:60}
+.ov{position:fixed;inset:0;background:var(--overlay);display:none;align-items:flex-end;justify-content:center;z-index:60}
 .ov.on{display:flex}
-.sheet{background:#fff;width:100%;max-width:600px;border-radius:16px 16px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));
+.sheet{background:var(--panel-bg);width:100%;max-width:600px;border-radius:16px 16px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));
   max-height:92vh;overflow-y:auto;position:relative;animation:up .2s ease}
 @keyframes up{from{transform:translateY(24px)}to{transform:none}}
 .sheet.wide{max-width:860px}
 .sheet h3{margin:0 0 14px;font-size:17px;font-weight:650;padding-right:30px}
-.xbtn{position:absolute;top:14px;right:14px;background:#eceae6;border:none;width:28px;height:28px;border-radius:50%;
+.xbtn{position:absolute;top:14px;right:14px;background:var(--chip-bg);border:none;width:28px;height:28px;border-radius:50%;
   font-size:15px;color:var(--muted);cursor:pointer;line-height:1}
 
 .f{margin-bottom:12px}
 .f label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;font-weight:600}
-.f input,.f select,.f textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:#faf9f7;outline:none}
-.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--brand);background:#fff}
+.f input,.f select,.f textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface2);outline:none}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--brand);background:var(--panel-bg)}
 .f .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .check{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer}
 .check input{width:auto;margin:0}
 
 .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:14px}
-.seg button{flex:1;padding:9px 6px;border:none;background:#faf9f7;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button{flex:1;padding:9px 6px;border:none;background:var(--surface2);font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer}
 .seg button.on{background:var(--brand);color:#fff}
 .seg.sm button{padding:7px 5px;font-size:12.5px}
 
 .empty{text-align:center;color:var(--muted);font-size:13px;padding:26px 12px;line-height:1.6}
 .empty .big{font-size:26px;display:block;margin-bottom:8px;opacity:.35;color:var(--muted)}
 
-.note{background:var(--brand-l);border:1px solid var(--line);color:#4a4844;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:12px}
-.note.warn{background:var(--amber-l);border-color:#e5dcc8;color:#6e5c3c}
-.note.err{background:var(--red-l);border-color:#e6d2cc;color:#7d4a3f}
-.note.ok{background:var(--green-l);border-color:#d3dbd0;color:#46583f}
+.note{background:var(--brand-l);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:12px}
+.note.warn{background:var(--amber-l);border-color:var(--line);color:var(--amber)}
+.note.err{background:var(--red-l);border-color:var(--line);color:var(--red)}
+.note.ok{background:var(--green-l);border-color:var(--line);color:var(--green)}
 
-.drop{border:2px dashed #cfccc5;border-radius:12px;padding:26px 16px;text-align:center;background:#faf9f7;cursor:pointer}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;background:var(--surface2);cursor:pointer}
 .drop.over{border-color:var(--brand);background:var(--brand-l)}
 .drop .big{font-size:26px;display:block;margin-bottom:8px;opacity:.4}
 .drop .t{font-weight:600;font-size:14px}
@@ -290,16 +334,121 @@ nav button.on{color:var(--brand);font-weight:650}
 .catrow .pct{font-size:11px;color:var(--muted);width:38px;text-align:right}
 
 .toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
-  background:#1c1c1a;color:#f5f4f1;padding:10px 18px;border-radius:22px;font-size:13.5px;z-index:90;
+  background:var(--panel-bg);color:var(--ink);border:1px solid var(--line);padding:10px 18px;border-radius:22px;font-size:13.5px;z-index:90;
   opacity:0;pointer-events:none;transition:opacity .2s;white-space:nowrap;max-width:90vw}
 .toast.on{opacity:1}
 
 @media (min-width:700px){
   .grid2{gap:12px}
 }
+
+/* ============ ОФОРМЛЕНИЕ «как во Фрилансе»: стекло, градиент, живой фон ============ */
+body{font-family:'Manrope',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;transition:background-color .3s,color .3s}
+h1,h3,.display{font-family:'Space Grotesk','Manrope',sans-serif}
+.money,.stat .n,.row .v,.hero-v,.acc .bal,.fintbl,.tbl td{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+.aurora{position:fixed;inset:-20%;z-index:0;pointer-events:none;filter:blur(100px);opacity:.28}
+:root[data-theme="dark"] .aurora{opacity:.42}
+.aurora span{position:absolute;display:block;border-radius:50%;mix-blend-mode:screen;animation:mesh-drift 40s ease-in-out infinite}
+.aurora span:nth-child(1){width:46vw;height:46vw;left:2%;top:0;background:radial-gradient(circle,var(--v1),transparent 62%)}
+.aurora span:nth-child(2){width:40vw;height:40vw;right:4%;top:6%;background:radial-gradient(circle,var(--v3),transparent 62%);animation-delay:-8s}
+.aurora span:nth-child(3){width:38vw;height:38vw;left:30%;top:36%;background:radial-gradient(circle,var(--aqua),transparent 62%);animation-delay:-15s}
+@keyframes mesh-drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(6%,-5%) scale(1.12)}66%{transform:translate(-5%,6%) scale(.94)}}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.18;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E")}
+:root[data-theme="dark"] .grain{opacity:.26}
+main{position:relative;z-index:2}
+
+header{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
+header h1{font-family:'Space Grotesk',sans-serif;font-size:21px;letter-spacing:-.4px;
+  color:var(--ink)}
+header .hsub{color:var(--muted)}
+header .netw .l{color:var(--muted)}
+header .netw .v{font-family:'Space Grotesk',sans-serif}
+.avatar{background:var(--brand-d);color:#fff;border:none;box-shadow:none}
+.avatar.guest{background:var(--card);color:var(--muted);border:1.5px dashed var(--muted-2);box-shadow:none}
+.avatar:hover{filter:brightness(1.1)}
+.themebtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--muted);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex-shrink:0}
+.themebtn:hover{color:var(--ink)}
+.themebtn svg{width:17px;height:17px}
+.themebtn .sun{display:none}
+:root[data-theme="dark"] .themebtn .sun{display:block}
+:root[data-theme="dark"] .themebtn .moon{display:none}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;
+  box-shadow:var(--shadow);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+.card h2{font-family:'Manrope',sans-serif;font-size:11.5px;letter-spacing:.06em}
+.card h2 .act{color:var(--brand)}
+.sec-title{color:var(--muted)}
+.stat{background:var(--surface2);border:1px solid var(--line);border-radius:14px}
+.row,.acc,.catrow,.stp{border-bottom-color:var(--line)}
+
+.btn{border-radius:var(--r-control);font-weight:700}
+.btn-p{background:var(--brand-d);color:#fff;box-shadow:var(--shadow)}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-s{background:var(--chip-bg);color:var(--ink)}
+.btn-d{background:var(--red-l);color:var(--red)}
+.fab{background:var(--brand-d);box-shadow:0 8px 20px -8px rgba(0,0,0,.45);color:#fff}
+
+nav{background:var(--glass);border-top:1px solid var(--line);padding-top:4px}
+nav button{font-size:10.5px;font-weight:600;gap:3px;padding:6px 2px 5px;color:var(--muted-2);transition:color .15s}
+nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--brand)}
+
+.tabs button{background:var(--card);border-color:var(--line);color:var(--muted)}
+.tabs button.on{background:var(--brand-d);border-color:transparent;color:#fff}
+.seg{border-color:var(--line);border-radius:var(--r-control)}
+.seg button{background:var(--surface2);color:var(--muted)}
+.seg button.on{background:var(--brand-d);color:#fff}
+.f input,.f select,.f textarea{background:var(--surface2);border-color:var(--line);color:var(--ink);border-radius:var(--r-control)}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--violet);background:var(--panel-bg)}
+.f select option{background:var(--panel-bg);color:var(--ink)}
+.sheet{background:var(--panel-bg);border:1px solid var(--line);border-radius:24px 24px 0 0;color:var(--ink)}
+.xbtn{background:var(--chip-bg);color:var(--muted)}
+.drop{background:var(--surface2)}
+.note{color:var(--ink)}
+.tbl th{background:var(--panel-bg)}
+.fintbl th:first-child,.fintbl td:first-child,.fintbl thead th,.fintbl tr.edge td:first-child,
+.fintbl tr.grp td:first-child{background:var(--panel-bg)}
+.fintbl thead th:last-child,.fintbl td.tot,.fintbl tr.grp td{background:var(--surface2)}
+.stp .num{background:var(--brand-d)}
+.chip.req{background:var(--chip-bg);color:var(--muted)}
+
+.bar{height:8px;background:var(--chip-bg)}
+.bar>i{background:var(--brand-d)}
+.bar.g>i{background:var(--green)}
+.bar.a>i{background:var(--amber)}
+.bar.r>i{background:var(--red)}
+
+/* ---------- главный экран: героическая плитка ---------- */
+@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes border-spin{to{--angle:360deg}}
+.hero{position:relative;overflow:hidden;background:var(--hero-bg);color:#fff;border-radius:24px;padding:26px 22px 24px;
+  margin-bottom:14px;border:1px solid rgba(255,255,255,.16);box-shadow:var(--shadow-hi)}
+.hero-l{font-size:13px;font-weight:600;color:rgba(255,255,255,.88)}
+.hero-v{font-family:'Space Grotesk',sans-serif;font-size:38px;font-weight:700;letter-spacing:-1.4px;margin-top:6px;line-height:1.1}
+.hero-s{font-size:12.5px;color:rgba(255,255,255,.82);margin-top:8px;line-height:1.5}
+.tiles{gap:12px;margin-bottom:12px}
+.tiles .card{margin-bottom:0}
+.tiles .card h2{margin-bottom:8px}
+.tiles .empty{padding:10px 0;font-size:12px}
+.addbtn{background:var(--card);border:1px dashed var(--muted-2);color:var(--brand);border-radius:var(--r-control);padding:13px}
+/* на простом главном экране своя кнопка «Добавить операцию» — плавающая не нужна */
+body:has(#s-home.active #homeSimple[style*="block"]) .fab{display:none}
+#s-home.active{display:flex;flex-direction:column}
+#s-home #cardOnboard{order:-2}
+#s-home #homeSimple{order:-1}
+.tv{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;letter-spacing:-.5px;line-height:1.15}
+.tl{font-size:11.5px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.aurora span{animation:none}}
 </style>
 </head>
 <body>
+
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="grain" aria-hidden="true"></div>
 
 <header>
   <div class="htop">
@@ -313,6 +462,10 @@ nav button.on{color:var(--brand);font-weight:650}
         <div class="v" id="hNet">—</div>
         <div class="l">Чистый капитал</div>
       </div>
+      <button class="themebtn" id="themeBtn" onclick="toggleTheme()" aria-label="Тема">
+        <svg class="sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.3" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.3M12 19.2v2.3M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.3M19.2 12h2.3M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      </button>
       <button class="avatar guest" id="avatarBtn" onclick="openAccountSheet()" aria-label="Аккаунт">?</button>
     </div>
   </div>
@@ -341,23 +494,22 @@ nav button.on{color:var(--brand);font-weight:650}
 
   <!-- ---- простой режим: три главных цифры + быстрый ввод ---- -->
   <div id="homeSimple" style="display:none">
-    <div class="card">
-      <h2>Можно потратить</h2>
-      <div class="n pos" id="kSafe" style="font-size:30px">—</div>
-      <div class="s mut" id="kSafeNote" style="margin-top:2px">—</div>
+    <div class="hero">
+      <div class="hero-l">Можно потратить</div>
+      <div class="hero-v" id="kSafe">—</div>
+      <div class="hero-s" id="kSafeNote">—</div>
     </div>
-
-    <div class="card">
-      <h2>Долги <button class="act" onclick="go('debts')">Все долги →</button></h2>
-      <div id="homeDebtProgress"></div>
+    <div class="grid2 tiles">
+      <div class="card">
+        <h2>Долги <button class="act" onclick="go('debts')">→</button></h2>
+        <div id="homeDebtProgress"></div>
+      </div>
+      <div class="card">
+        <h2>Подушка <button class="act" onclick="go('accounts')">→</button></h2>
+        <div id="homeSavingsProgress"></div>
+      </div>
     </div>
-
-    <div class="card">
-      <h2>Подушка безопасности <button class="act" onclick="go('accounts')">Счета →</button></h2>
-      <div id="homeSavingsProgress"></div>
-    </div>
-
-    <button class="btn btn-p btn-blk" onclick="openTx()" style="margin-bottom:12px">+ Добавить операцию</button>
+    <button class="btn addbtn btn-blk" onclick="openTx()" style="margin-bottom:12px">+ Добавить операцию</button>
   </div>
 
   <!-- ---- расширенный режим: как было ---- -->
@@ -703,11 +855,11 @@ nav button.on{color:var(--brand);font-weight:650}
 <button class="fab" onclick="openTx()">+</button>
 
 <nav>
-  <button class="nv on" data-s="home" onclick="go('home')"><span class="ic">◉</span>Обзор</button>
-  <button class="nv" data-s="accounts" onclick="go('accounts')"><span class="ic">▦</span>Счета</button>
-  <button class="nv" data-s="calendar" onclick="go('calendar')"><span class="ic">▤</span>Календарь</button>
-  <button class="nv" data-s="debts" onclick="go('debts')"><span class="ic">◺</span>Долги</button>
-  <button class="nv" data-s="analytics" onclick="go('analytics')"><span class="ic">▥</span>Анализ</button>
+  <button class="nv on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>Обзор</button>
+  <button class="nv" data-s="accounts" onclick="go('accounts')"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h3"/></svg>Счета</button>
+  <button class="nv" data-s="calendar" onclick="go('calendar')"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>Календарь</button>
+  <button class="nv" data-s="debts" onclick="go('debts')"><svg viewBox="0 0 24 24"><path d="M4 7l6 6 4-4 6 6"/><path d="M15 15h5v-5"/></svg>Долги</button>
+  <button class="nv" data-s="analytics" onclick="go('analytics')"><svg viewBox="0 0 24 24"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>Анализ</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -732,13 +884,13 @@ nav button.on{color:var(--brand);font-weight:650}
 const KEY = 'finapp_v2';
 
 const ACC_TYPES = {
-  debit:   {label:'Дебетовая карта', short:'дебетовая', icon:'▭', bg:'#ecebe7', asset:true},
-  cash:    {label:'Наличные',        short:'наличные',  icon:'≡', bg:'#eaeee9', asset:true},
-  deposit: {label:'Вклад / накопительный', short:'вклад', icon:'◫', bg:'#e9ebee', asset:true},
-  credit_card:{label:'Кредитная карта', short:'кредитная', icon:'▤', bg:'#f0e8e5', asset:false},
-  loan:    {label:'Кредит / ипотека',  short:'кредит',   icon:'⌂', bg:'#f0ece2', asset:false},
-  installment:{label:'Рассрочка / сплит', short:'рассрочка', icon:'⊞', bg:'#ece9e4', asset:false},
-  debt:    {label:'Прочий долг',       short:'долг',     icon:'§', bg:'#eceaee', asset:false}
+  debit:   {label:'Дебетовая карта', short:'дебетовая', icon:'▭', bg:'rgba(124,92,255,.18)', asset:true},
+  cash:    {label:'Наличные',        short:'наличные',  icon:'≡', bg:'rgba(43,185,174,.18)', asset:true},
+  deposit: {label:'Вклад / накопительный', short:'вклад', icon:'◫', bg:'rgba(91,140,255,.18)', asset:true},
+  credit_card:{label:'Кредитная карта', short:'кредитная', icon:'▤', bg:'rgba(255,92,168,.16)', asset:false},
+  loan:    {label:'Кредит / ипотека',  short:'кредит',   icon:'⌂', bg:'rgba(255,170,80,.18)', asset:false},
+  installment:{label:'Рассрочка / сплит', short:'рассрочка', icon:'⊞', bg:'rgba(192,97,255,.18)', asset:false},
+  debt:    {label:'Прочий долг',       short:'долг',     icon:'§', bg:'rgba(224,66,95,.16)', asset:false}
 };
 
 /* Десять основных валют. Курс — сколько рублей за единицу. */
@@ -757,8 +909,8 @@ const CURRENCIES = {
 const BASE = 'RUB';
 
 /* Приглушённая палитра категорий: тона одной насыщенности, без кислотных цветов */
-const PALETTE = ['#4a4844','#6f7a6c','#9b8564','#9b6b5e','#6d6a7d','#5f7378','#8a7080','#77806a',
-                 '#a08268','#5c5f6b','#6b7d75','#8f6a66','#7a6c86','#63737f','#93855f','#78766f'];
+const PALETTE = ['#7C5CFF','#C061FF','#FF5CA8','#2BB9AE','#5B8CFF','#FFB454','#3DD6A0','#FF7A90',
+                 '#9AA0FF','#E58AFF','#4FC3F7','#F6C177','#8BD17C','#B39DDB','#FF8A65','#90A4AE'];
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
@@ -2066,7 +2218,7 @@ function renderRates(){
         <div class="l"><div class="t">${code} · ${esc(c.name)}</div>
           <div class="s">1 ${c.sym} = столько рублей</div></div>
         <input type="number" step="0.0001" style="width:110px;padding:7px;border:1px solid var(--line);
-          border-radius:8px;background:#faf9f7;text-align:right"
+          border-radius:8px;background:var(--surface2);color:var(--ink);text-align:right"
           value="${r[code] != null ? r[code] : ''}" onchange="saveRate('${code}', this.value)">
       </div>`).join('') +
     `<div style="font-size:12px;color:var(--muted);margin-top:10px">
@@ -3854,6 +4006,9 @@ function deleteRule(id){
   S.rules = S.rules.filter(r=>r.id!==id);
   save(); closeOv('ovRule'); renderRules(); toast('Удалено');
 }
+/* цвет из текущей темы — для графиков */
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+
 /* =========================================================================
    ПЛАТЁЖНЫЙ КАЛЕНДАРЬ: регулярные платежи + прогноз по дням
    ========================================================================= */
@@ -4353,7 +4508,7 @@ function forecastCatShare(F){
   const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({
     id, v,
     name:  id==='__debt' ? 'Платежи по долгам' : id==='__none' ? 'Без категории' : catName(id),
-    color: id==='__debt' ? '#c62828'          : id==='__none' ? '#b6b3ac'       : catColor(id),
+    color: id==='__debt' ? cssVar('--red')          : id==='__none' ? cssVar('--muted-2')       : catColor(id),
     opt:   id!=='__debt' && id!=='__none' && !catMandatory(id)
   }));
   return { rows, total: round2(total) };
@@ -4439,12 +4594,12 @@ function renderCalendar(){
       data:{ labels: MO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
-           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--green'), borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Расходы', data: MO.map(m=>-(m.debt+m.other)),
-           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--red'), borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток', data: MO.map(m=>m.close),
-           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
+           borderColor:cssVar('--chart-line'), backgroundColor:cssVar('--chart-line'), borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:cssVar('--chart-gap'), stack:'line', order:0}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
@@ -4455,7 +4610,7 @@ function renderCalendar(){
             (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
         scales:{
           y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
-              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+              grid:{color: c => c.tick.value === 0 ? cssVar('--chart-zero') : cssVar('--chart-grid')} },
           x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
   }
@@ -4586,12 +4741,12 @@ function renderCapitalHistory(){
     data:{ labels: H.map(h=>h.label),
       datasets:[
         {type:'bar', label:'Активы', data: H.map(h=>h.assets),
-         backgroundColor:'#2e7d32', borderRadius:3, order:3},
+         backgroundColor:cssVar('--green'), borderRadius:3, order:3},
         {type:'bar', label:'Долги', data: H.map(h=>-h.debt),
-         backgroundColor:'#c62828', borderRadius:3, order:3},
+         backgroundColor:cssVar('--red'), borderRadius:3, order:3},
         {type:'line', label:'Чистый капитал', data: H.map(h=>h.net),
-         borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-         tension:.25, pointRadius:3, pointBackgroundColor:'#fff', order:0}
+         borderColor:cssVar('--chart-line'), backgroundColor:cssVar('--chart-line'), borderWidth:2,
+         tension:.25, pointRadius:3, pointBackgroundColor:cssVar('--chart-gap'), order:0}
       ]},
     options:{ responsive:true, maintainAspectRatio:false,
       interaction:{mode:'index', intersect:false},
@@ -4602,7 +4757,7 @@ function renderCapitalHistory(){
         tooltip:{callbacks:{label: c => c.dataset.label + ': ' + money(Math.abs(c.parsed.y))}}},
       scales:{
         y:{ ticks:{callback:v=>moneyShort(v), font:{size:10}},
-            grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+            grid:{color: c => c.tick.value === 0 ? cssVar('--chart-zero') : cssVar('--chart-grid')} },
         x:{ ticks:{font:{size:10}}, grid:{display:false} } } }
   });
 }
@@ -4667,10 +4822,10 @@ function renderAnalytics(){
       const restSum = cats.slice(10).reduce((s,c)=>s+c[1],0);
       const labels = top.map(c=>catName(c[0])).concat(restSum>0?['Прочее']:[]);
       const data = top.map(c=>c[1]).concat(restSum>0?[restSum]:[]);
-      const colors = top.map(c=>catColor(c[0])).concat(restSum>0?['#b8b5ae']:[]);
+      const colors = top.map(c=>catColor(c[0])).concat(restSum>0?[cssVar('--muted-2')]:[]);
       anPie = new Chart(pieCtx, {
         type:'doughnut',
-        data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:'#fff'}]},
+        data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:cssVar('--chart-gap')}]},
         options:{responsive:true, maintainAspectRatio:false, cutout:'58%',
           plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
             tooltip:{callbacks:{label:c=>c.label+': '+money(c.parsed)+' ('+(c.parsed/total*100).toFixed(0)+'%)'}}}}
@@ -4695,14 +4850,14 @@ function renderAnalytics(){
         type:'bar',
         data:{ labels: mk.map(k=>monthLabel(k).replace(/ \d{4}/, m=>' '+m.trim().slice(2))),
           datasets:[
-            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#2e7d32', borderRadius:4},
-            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#c62828', borderRadius:4},
-            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#ef9a9a', borderRadius:4}
+            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:cssVar('--green'), borderRadius:4},
+            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:cssVar('--red'), borderRadius:4},
+            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:cssVar('--v3'), borderRadius:4}
           ]},
         options:{responsive:true, maintainAspectRatio:false,
           plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
             tooltip:{callbacks:{label:c=>c.dataset.label+': '+money(c.parsed.y)}}},
-          scales:{y:{ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:'#eeece8'}},
+          scales:{y:{ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:cssVar('--chart-grid')}},
                   x:{grid:{display:false}, ticks:{font:{size:10}}}}}
       });
     }
@@ -4731,12 +4886,12 @@ function renderAnalytics(){
       data:{ labels: fcMO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: fcMO.map(m=>m.inc),
-           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--green'), borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Расходы', data: fcMO.map(m=>-(m.debt+m.other)),
-           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--red'), borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток', data: fcMO.map(m=>m.close),
-           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
+           borderColor:cssVar('--chart-line'), backgroundColor:cssVar('--chart-line'), borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:cssVar('--chart-gap'), stack:'line', order:0}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
@@ -4747,7 +4902,7 @@ function renderAnalytics(){
             (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
         scales:{
           y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
-              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+              grid:{color: c => c.tick.value === 0 ? cssVar('--chart-zero') : cssVar('--chart-grid')} },
           x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
   }
@@ -4789,7 +4944,7 @@ function renderAnalytics(){
         type:'doughnut',
         data:{ labels: fcShare.rows.map(r=>r.name),
           datasets:[{ data: fcShare.rows.map(r=>r.v), backgroundColor: fcShare.rows.map(r=>r.color),
-                      borderColor:'#fff', borderWidth:2 }]},
+                      borderColor:cssVar('--chart-gap'), borderWidth:2 }]},
         options:{ responsive:true, maintainAspectRatio:false, cutout:'58%',
           plugins:{ legend:{display:false},
             tooltip:{callbacks:{label: c=> c.label+': '+money(c.parsed)
@@ -4998,23 +5153,21 @@ function renderHome(){
 
     const dp = debtProgressAgg();
     document.getElementById('homeDebtProgress').innerHTML = !dp.hasDebt
-      ? `<div class="empty">Долгов нет.</div>`
-      : `<div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
-         <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
-           <span class="mut">Погашено ${money(dp.paid)} (${dp.pct.toFixed(0)}%)</span>
-           <span>Осталось <b class="neg">${money(dp.now)}</b></span>
-         </div>`;
+           ? `<div class="empty">Долгов нет.</div>`
+           : `<div class="tv neg">${money(dp.now)}</div>
+              <div class="tl">Осталось</div>
+              <div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
+              <div class="tl">Погашено ${dp.pct.toFixed(0)}%</div>`;
 
-    const sp = savingsProgressAgg();
-    document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
-      ? `<div class="empty">Цель накоплений не задана.<br>
-           Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
-      : `<div class="bar g"><i style="width:${sp.pct}%"></i></div>
-         <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
-           <span>Собрано <b class="pos">${money(sp.saved)}</b></span>
-           <span class="mut">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</span>
-         </div>`;
-  }
+         const sp = savingsProgressAgg();
+         document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
+           ? `<div class="empty">Цель накоплений не задана.<br>
+                Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
+           : `<div class="tv pos">${money(sp.saved)}</div>
+              <div class="tl">Собрано</div>
+              <div class="bar g"><i style="width:${sp.pct}%"></i></div>
+              <div class="tl">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</div>`;
+       }
 
   const liq = totalLiquid(), debt = totalDebt();
   if(mode==='advanced'){
@@ -5123,7 +5276,15 @@ function renderHome(){
 /* =========================================================================
    ОБЩИЙ РЕНДЕР + СТАРТ
    ========================================================================= */
+function chartTheme(){
+  if(typeof Chart === 'undefined') return;
+  Chart.defaults.color = cssVar('--muted');
+  Chart.defaults.borderColor = cssVar('--chart-grid');
+  Chart.defaults.font.family = "'Manrope', sans-serif";
+}
+
 function renderAll(){
+  chartTheme();
   try{
     // фильтр счетов на вкладке операций
     const fa = document.getElementById('fltAccount');
@@ -5746,6 +5907,18 @@ function renderSync(){
   renderAvatar();
   const ov = document.getElementById('ovAccount');
   if(ov && ov.classList.contains('on')) renderAccountSheet();
+}
+
+
+/* Светлая / тёмная тема. Выбор помним в браузере; графики перерисовываем. */
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('parus_theme', next); }catch(e){}
+  const m = document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute('content', next === 'dark' ? '#08060F' : '#F1EDFB');
+  renderAll();
 }
 </script>
 </body>

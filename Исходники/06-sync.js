@@ -533,3 +533,15 @@ function renderSync(){
   const ov = document.getElementById('ovAccount');
   if(ov && ov.classList.contains('on')) renderAccountSheet();
 }
+
+
+/* Светлая / тёмная тема. Выбор помним в браузере; графики перерисовываем. */
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('parus_theme', next); }catch(e){}
+  const m = document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute('content', next === 'dark' ? '#08060F' : '#F1EDFB');
+  renderAll();
+}

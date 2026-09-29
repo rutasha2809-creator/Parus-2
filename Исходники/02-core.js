@@ -4,13 +4,13 @@
 const KEY = 'finapp_v2';
 
 const ACC_TYPES = {
-  debit:   {label:'Дебетовая карта', short:'дебетовая', icon:'▭', bg:'#ecebe7', asset:true},
-  cash:    {label:'Наличные',        short:'наличные',  icon:'≡', bg:'#eaeee9', asset:true},
-  deposit: {label:'Вклад / накопительный', short:'вклад', icon:'◫', bg:'#e9ebee', asset:true},
-  credit_card:{label:'Кредитная карта', short:'кредитная', icon:'▤', bg:'#f0e8e5', asset:false},
-  loan:    {label:'Кредит / ипотека',  short:'кредит',   icon:'⌂', bg:'#f0ece2', asset:false},
-  installment:{label:'Рассрочка / сплит', short:'рассрочка', icon:'⊞', bg:'#ece9e4', asset:false},
-  debt:    {label:'Прочий долг',       short:'долг',     icon:'§', bg:'#eceaee', asset:false}
+  debit:   {label:'Дебетовая карта', short:'дебетовая', icon:'▭', bg:'rgba(124,92,255,.18)', asset:true},
+  cash:    {label:'Наличные',        short:'наличные',  icon:'≡', bg:'rgba(43,185,174,.18)', asset:true},
+  deposit: {label:'Вклад / накопительный', short:'вклад', icon:'◫', bg:'rgba(91,140,255,.18)', asset:true},
+  credit_card:{label:'Кредитная карта', short:'кредитная', icon:'▤', bg:'rgba(255,92,168,.16)', asset:false},
+  loan:    {label:'Кредит / ипотека',  short:'кредит',   icon:'⌂', bg:'rgba(255,170,80,.18)', asset:false},
+  installment:{label:'Рассрочка / сплит', short:'рассрочка', icon:'⊞', bg:'rgba(192,97,255,.18)', asset:false},
+  debt:    {label:'Прочий долг',       short:'долг',     icon:'§', bg:'rgba(224,66,95,.16)', asset:false}
 };
 
 /* Десять основных валют. Курс — сколько рублей за единицу. */
@@ -29,8 +29,8 @@ const CURRENCIES = {
 const BASE = 'RUB';
 
 /* Приглушённая палитра категорий: тона одной насыщенности, без кислотных цветов */
-const PALETTE = ['#4a4844','#6f7a6c','#9b8564','#9b6b5e','#6d6a7d','#5f7378','#8a7080','#77806a',
-                 '#a08268','#5c5f6b','#6b7d75','#8f6a66','#7a6c86','#63737f','#93855f','#78766f'];
+const PALETTE = ['#7C5CFF','#C061FF','#FF5CA8','#2BB9AE','#5B8CFF','#FFB454','#3DD6A0','#FF7A90',
+                 '#9AA0FF','#E58AFF','#4FC3F7','#F6C177','#8BD17C','#B39DDB','#FF8A65','#90A4AE'];
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
@@ -1338,7 +1338,7 @@ function renderRates(){
         <div class="l"><div class="t">${code} · ${esc(c.name)}</div>
           <div class="s">1 ${c.sym} = столько рублей</div></div>
         <input type="number" step="0.0001" style="width:110px;padding:7px;border:1px solid var(--line);
-          border-radius:8px;background:#faf9f7;text-align:right"
+          border-radius:8px;background:var(--surface2);color:var(--ink);text-align:right"
           value="${r[code] != null ? r[code] : ''}" onchange="saveRate('${code}', this.value)">
       </div>`).join('') +
     `<div style="font-size:12px;color:var(--muted);margin-top:10px">

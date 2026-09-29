@@ -1,3 +1,6 @@
+/* цвет из текущей темы — для графиков */
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+
 /* =========================================================================
    ПЛАТЁЖНЫЙ КАЛЕНДАРЬ: регулярные платежи + прогноз по дням
    ========================================================================= */
@@ -497,7 +500,7 @@ function forecastCatShare(F){
   const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({
     id, v,
     name:  id==='__debt' ? 'Платежи по долгам' : id==='__none' ? 'Без категории' : catName(id),
-    color: id==='__debt' ? '#c62828'          : id==='__none' ? '#b6b3ac'       : catColor(id),
+    color: id==='__debt' ? cssVar('--red')          : id==='__none' ? cssVar('--muted-2')       : catColor(id),
     opt:   id!=='__debt' && id!=='__none' && !catMandatory(id)
   }));
   return { rows, total: round2(total) };
@@ -583,12 +586,12 @@ function renderCalendar(){
       data:{ labels: MO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: MO.map(m=>m.inc),
-           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--green'), borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Расходы', data: MO.map(m=>-(m.debt+m.other)),
-           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--red'), borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток', data: MO.map(m=>m.close),
-           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
+           borderColor:cssVar('--chart-line'), backgroundColor:cssVar('--chart-line'), borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:cssVar('--chart-gap'), stack:'line', order:0}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
@@ -599,7 +602,7 @@ function renderCalendar(){
             (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
         scales:{
           y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
-              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+              grid:{color: c => c.tick.value === 0 ? cssVar('--chart-zero') : cssVar('--chart-grid')} },
           x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
   }
@@ -730,12 +733,12 @@ function renderCapitalHistory(){
     data:{ labels: H.map(h=>h.label),
       datasets:[
         {type:'bar', label:'Активы', data: H.map(h=>h.assets),
-         backgroundColor:'#2e7d32', borderRadius:3, order:3},
+         backgroundColor:cssVar('--green'), borderRadius:3, order:3},
         {type:'bar', label:'Долги', data: H.map(h=>-h.debt),
-         backgroundColor:'#c62828', borderRadius:3, order:3},
+         backgroundColor:cssVar('--red'), borderRadius:3, order:3},
         {type:'line', label:'Чистый капитал', data: H.map(h=>h.net),
-         borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-         tension:.25, pointRadius:3, pointBackgroundColor:'#fff', order:0}
+         borderColor:cssVar('--chart-line'), backgroundColor:cssVar('--chart-line'), borderWidth:2,
+         tension:.25, pointRadius:3, pointBackgroundColor:cssVar('--chart-gap'), order:0}
       ]},
     options:{ responsive:true, maintainAspectRatio:false,
       interaction:{mode:'index', intersect:false},
@@ -746,7 +749,7 @@ function renderCapitalHistory(){
         tooltip:{callbacks:{label: c => c.dataset.label + ': ' + money(Math.abs(c.parsed.y))}}},
       scales:{
         y:{ ticks:{callback:v=>moneyShort(v), font:{size:10}},
-            grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+            grid:{color: c => c.tick.value === 0 ? cssVar('--chart-zero') : cssVar('--chart-grid')} },
         x:{ ticks:{font:{size:10}}, grid:{display:false} } } }
   });
 }
@@ -811,10 +814,10 @@ function renderAnalytics(){
       const restSum = cats.slice(10).reduce((s,c)=>s+c[1],0);
       const labels = top.map(c=>catName(c[0])).concat(restSum>0?['Прочее']:[]);
       const data = top.map(c=>c[1]).concat(restSum>0?[restSum]:[]);
-      const colors = top.map(c=>catColor(c[0])).concat(restSum>0?['#b8b5ae']:[]);
+      const colors = top.map(c=>catColor(c[0])).concat(restSum>0?[cssVar('--muted-2')]:[]);
       anPie = new Chart(pieCtx, {
         type:'doughnut',
-        data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:'#fff'}]},
+        data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:2, borderColor:cssVar('--chart-gap')}]},
         options:{responsive:true, maintainAspectRatio:false, cutout:'58%',
           plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
             tooltip:{callbacks:{label:c=>c.label+': '+money(c.parsed)+' ('+(c.parsed/total*100).toFixed(0)+'%)'}}}}
@@ -839,14 +842,14 @@ function renderAnalytics(){
         type:'bar',
         data:{ labels: mk.map(k=>monthLabel(k).replace(/ \d{4}/, m=>' '+m.trim().slice(2))),
           datasets:[
-            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:'#2e7d32', borderRadius:4},
-            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:'#c62828', borderRadius:4},
-            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:'#ef9a9a', borderRadius:4}
+            {label:'Доходы', data:mk.map(k=>months[k].inc), backgroundColor:cssVar('--green'), borderRadius:4},
+            {label:'Расходы', data:mk.map(k=>months[k].exp), backgroundColor:cssVar('--red'), borderRadius:4},
+            {label:'из них необяз.', data:mk.map(k=>months[k].opt), backgroundColor:cssVar('--v3'), borderRadius:4}
           ]},
         options:{responsive:true, maintainAspectRatio:false,
           plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}, padding:8}},
             tooltip:{callbacks:{label:c=>c.dataset.label+': '+money(c.parsed.y)}}},
-          scales:{y:{ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:'#eeece8'}},
+          scales:{y:{ticks:{callback:v=>moneyShort(v), font:{size:10}}, grid:{color:cssVar('--chart-grid')}},
                   x:{grid:{display:false}, ticks:{font:{size:10}}}}}
       });
     }
@@ -875,12 +878,12 @@ function renderAnalytics(){
       data:{ labels: fcMO.map(m=>m.short),
         datasets:[
           {type:'bar', label:'Доходы', data: fcMO.map(m=>m.inc),
-           backgroundColor:'#2e7d32', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--green'), borderRadius:3, stack:'bars', order:3},
           {type:'bar', label:'Расходы', data: fcMO.map(m=>-(m.debt+m.other)),
-           backgroundColor:'#c62828', borderRadius:3, stack:'bars', order:3},
+           backgroundColor:cssVar('--red'), borderRadius:3, stack:'bars', order:3},
           {type:'line', label:'Остаток', data: fcMO.map(m=>m.close),
-           borderColor:'#2f2e2b', backgroundColor:'#2f2e2b', borderWidth:2,
-           tension:.25, pointRadius:3, pointBackgroundColor:'#fff', stack:'line', order:0}
+           borderColor:cssVar('--chart-line'), backgroundColor:cssVar('--chart-line'), borderWidth:2,
+           tension:.25, pointRadius:3, pointBackgroundColor:cssVar('--chart-gap'), stack:'line', order:0}
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
@@ -891,7 +894,7 @@ function renderAnalytics(){
             (c.dataset.type==='line' ? money(c.parsed.y) : money(Math.abs(c.parsed.y)))}}},
         scales:{
           y:{ stacked:true, ticks:{callback:v=>moneyShort(v), font:{size:10}},
-              grid:{color: c => c.tick.value === 0 ? '#b9b5ad' : '#eeece8'} },
+              grid:{color: c => c.tick.value === 0 ? cssVar('--chart-zero') : cssVar('--chart-grid')} },
           x:{ stacked:true, ticks:{font:{size:10}}, grid:{display:false} } } }
     });
   }
@@ -933,7 +936,7 @@ function renderAnalytics(){
         type:'doughnut',
         data:{ labels: fcShare.rows.map(r=>r.name),
           datasets:[{ data: fcShare.rows.map(r=>r.v), backgroundColor: fcShare.rows.map(r=>r.color),
-                      borderColor:'#fff', borderWidth:2 }]},
+                      borderColor:cssVar('--chart-gap'), borderWidth:2 }]},
         options:{ responsive:true, maintainAspectRatio:false, cutout:'58%',
           plugins:{ legend:{display:false},
             tooltip:{callbacks:{label: c=> c.label+': '+money(c.parsed)
@@ -1142,23 +1145,21 @@ function renderHome(){
 
     const dp = debtProgressAgg();
     document.getElementById('homeDebtProgress').innerHTML = !dp.hasDebt
-      ? `<div class="empty">Долгов нет.</div>`
-      : `<div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
-         <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
-           <span class="mut">Погашено ${money(dp.paid)} (${dp.pct.toFixed(0)}%)</span>
-           <span>Осталось <b class="neg">${money(dp.now)}</b></span>
-         </div>`;
+           ? `<div class="empty">Долгов нет.</div>`
+           : `<div class="tv neg">${money(dp.now)}</div>
+              <div class="tl">Осталось</div>
+              <div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
+              <div class="tl">Погашено ${dp.pct.toFixed(0)}%</div>`;
 
-    const sp = savingsProgressAgg();
-    document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
-      ? `<div class="empty">Цель накоплений не задана.<br>
-           Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
-      : `<div class="bar g"><i style="width:${sp.pct}%"></i></div>
-         <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
-           <span>Собрано <b class="pos">${money(sp.saved)}</b></span>
-           <span class="mut">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</span>
-         </div>`;
-  }
+         const sp = savingsProgressAgg();
+         document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
+           ? `<div class="empty">Цель накоплений не задана.<br>
+                Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
+           : `<div class="tv pos">${money(sp.saved)}</div>
+              <div class="tl">Собрано</div>
+              <div class="bar g"><i style="width:${sp.pct}%"></i></div>
+              <div class="tl">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</div>`;
+       }
 
   const liq = totalLiquid(), debt = totalDebt();
   if(mode==='advanced'){
@@ -1267,7 +1268,15 @@ function renderHome(){
 /* =========================================================================
    ОБЩИЙ РЕНДЕР + СТАРТ
    ========================================================================= */
+function chartTheme(){
+  if(typeof Chart === 'undefined') return;
+  Chart.defaults.color = cssVar('--muted');
+  Chart.defaults.borderColor = cssVar('--chart-grid');
+  Chart.defaults.font.family = "'Manrope', sans-serif";
+}
+
 function renderAll(){
+  chartTheme();
   try{
     // фильтр счетов на вкладке операций
     const fa = document.getElementById('fltAccount');
