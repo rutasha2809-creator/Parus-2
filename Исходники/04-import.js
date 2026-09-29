@@ -363,8 +363,17 @@ function renderMapping(){
         <option value="mdy" ${IMP_DATE_ORDER==='mdy'?'selected':''}>05/08 — это 8 мая (США)</option>
       </select></div>
     <label class="check"><input type="checkbox" id="mpInvert" onchange="rebuildRows()"> Поменять местами приход и расход</label>`;
-  document.getElementById('impMapCard').style.display = 'block';
+  /* Если колонки нашлись сами — настройку не показываем, чтобы не пугать:
+     она открывается кнопкой «Колонки определены неверно?» в предпросмотре */
+  const m = IMP.map;
+  const autoOk = m.date>=0 && (m.amount>=0 || m.debit>=0 || m.credit>=0);
+  document.getElementById('impMapCard').style.display = autoOk ? 'none' : 'block';
   rebuildRows();
+}
+function toggleImpMap(){
+  const c = document.getElementById('impMapCard');
+  c.style.display = c.style.display==='none' ? 'block' : 'none';
+  if(c.style.display==='block') c.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 /* Переключение порядка день/месяц — даты надо разобрать заново */
@@ -516,9 +525,16 @@ function showPreview(){
     card.style.display = 'block';
     document.getElementById('impStats').innerHTML = `<div class="note err">Не найдено ни одной операции. Проверьте настройку колонок.</div>`;
     document.getElementById('impTable').innerHTML = '';
+    if(IMP.mode==='table') document.getElementById('impMapCard').style.display = 'block';
     return;
   }
   card.style.display = 'block';
+  if(!IMP.seen){
+    IMP.seen = true;
+    /* Файл прочитан: убираем окно загрузки и показываем сразу итог */
+    document.getElementById('impUploadCard').style.display = 'none';
+    setTimeout(()=>card.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+  }
 
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
@@ -576,6 +592,7 @@ function showPreview(){
 
   const line = (t, cls) => `<div style="font-size:13px;margin-top:6px" class="${cls||''}">${t}</div>`;
   document.getElementById('impStats').innerHTML = `
+    <div class="note" style="margin-bottom:10px">Выписка прочитана. Проверьте итоги, укажите, куда записать операции, и нажмите «Импортировать».</div>
     <div class="grid3">
       <div class="stat"><div class="n" style="font-size:15px">${rec.filter(r=>r.role!=='repay'&&r.role!=='srcexp').length}</div><div class="l">Запишем операций</div></div>
       <div class="stat"><div class="n pos" style="font-size:15px">${money(inc,{cur:impCur})}</div><div class="l">Приход</div></div>
@@ -627,6 +644,7 @@ function cancelImport(){
   IMP = null;
   document.getElementById('impPreviewCard').style.display = 'none';
   document.getElementById('impMapCard').style.display = 'none';
+  document.getElementById('impUploadCard').style.display = 'block';
   document.getElementById('pasteArea').value = '';
   ['impNewName','impNewBal','impNewLimit'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=''; });
   document.getElementById('impAccount').value = '';

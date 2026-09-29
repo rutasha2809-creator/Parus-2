@@ -707,7 +707,7 @@ nav .brand{display:none}
     <button class="btn btn-p" onclick="openTx()">+ Ввести вручную</button>
   </div>
 
-  <div class="card">
+  <div class="card" id="impUploadCard">
     <h2>Загрузка выписки</h2>
     <div class="note">Поддерживаются <b>CSV</b>, <b>Excel</b> (.xlsx/.xls) и <b>PDF</b>. Файл обрабатывается прямо в браузере и никуда не отправляется.</div>
     <div class="drop" id="drop" onclick="document.getElementById('fileInput').click()">
@@ -729,17 +729,12 @@ nav .brand{display:none}
   </div>
 
   <div class="card" id="impPreviewCard" style="display:none">
-    <h2><span id="impPreviewTitle">Предпросмотр</span></h2>
+    <h2><span id="impPreviewTitle">Проверьте выписку</span></h2>
     <div id="impStats"></div>
-    <div class="f2" style="margin:10px 0">
-      <div class="f" style="margin:0">
-        <label>Записать на счёт</label>
-        <select id="impAccount" onchange="showPreview()"></select>
-      </div>
-      <div class="f" style="margin:0">
-        <label>Строк выбрано</label>
-        <input type="text" id="impSelCount" readonly>
-      </div>
+
+    <div class="sec-title" style="margin-top:16px">Куда записать</div>
+    <div class="f" style="margin:0 0 10px">
+      <select id="impAccount" onchange="showPreview()"></select>
     </div>
     <div id="impNewAcc" style="display:none;margin-bottom:10px">
       <div class="f2">
@@ -756,11 +751,18 @@ nav .brand{display:none}
       <label>Ваш номер телефона (необязательно)</label>
       <input type="tel" id="impPhone" placeholder="+7 900 000-00-00" oninput="onImpPhone(this.value)">
     </div>
-    <div class="scrollx scrolly"><table class="tbl" id="impTable"></table></div>
-    <div class="btnrow" style="margin-top:12px">
+
+    <div class="btnrow" style="margin:14px 0">
       <button class="btn btn-s" onclick="cancelImport()">Отмена</button>
       <button class="btn btn-p" onclick="commitImport()">Импортировать</button>
     </div>
+
+    <details id="impDetails" style="margin-top:6px">
+      <summary style="cursor:pointer;font-weight:600;padding:8px 0">Посмотреть и поправить операции</summary>
+      <div class="f" style="margin:8px 0"><label>Строк выбрано</label><input type="text" id="impSelCount" readonly></div>
+      <div class="scrollx scrolly"><table class="tbl" id="impTable"></table></div>
+    </details>
+    <button class="btn btn-s btn-sm" style="margin-top:12px" onclick="toggleImpMap()">Колонки определены неверно?</button>
   </div>
 
 </section>
@@ -3916,8 +3918,17 @@ function renderMapping(){
         <option value="mdy" ${IMP_DATE_ORDER==='mdy'?'selected':''}>05/08 — это 8 мая (США)</option>
       </select></div>
     <label class="check"><input type="checkbox" id="mpInvert" onchange="rebuildRows()"> Поменять местами приход и расход</label>`;
-  document.getElementById('impMapCard').style.display = 'block';
+  /* Если колонки нашлись сами — настройку не показываем, чтобы не пугать:
+     она открывается кнопкой «Колонки определены неверно?» в предпросмотре */
+  const m = IMP.map;
+  const autoOk = m.date>=0 && (m.amount>=0 || m.debit>=0 || m.credit>=0);
+  document.getElementById('impMapCard').style.display = autoOk ? 'none' : 'block';
   rebuildRows();
+}
+function toggleImpMap(){
+  const c = document.getElementById('impMapCard');
+  c.style.display = c.style.display==='none' ? 'block' : 'none';
+  if(c.style.display==='block') c.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 /* Переключение порядка день/месяц — даты надо разобрать заново */
@@ -4069,9 +4080,16 @@ function showPreview(){
     card.style.display = 'block';
     document.getElementById('impStats').innerHTML = `<div class="note err">Не найдено ни одной операции. Проверьте настройку колонок.</div>`;
     document.getElementById('impTable').innerHTML = '';
+    if(IMP.mode==='table') document.getElementById('impMapCard').style.display = 'block';
     return;
   }
   card.style.display = 'block';
+  if(!IMP.seen){
+    IMP.seen = true;
+    /* Файл прочитан: убираем окно загрузки и показываем сразу итог */
+    document.getElementById('impUploadCard').style.display = 'none';
+    setTimeout(()=>card.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+  }
 
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
@@ -4129,6 +4147,7 @@ function showPreview(){
 
   const line = (t, cls) => `<div style="font-size:13px;margin-top:6px" class="${cls||''}">${t}</div>`;
   document.getElementById('impStats').innerHTML = `
+    <div class="note" style="margin-bottom:10px">Выписка прочитана. Проверьте итоги, укажите, куда записать операции, и нажмите «Импортировать».</div>
     <div class="grid3">
       <div class="stat"><div class="n" style="font-size:15px">${rec.filter(r=>r.role!=='repay'&&r.role!=='srcexp').length}</div><div class="l">Запишем операций</div></div>
       <div class="stat"><div class="n pos" style="font-size:15px">${money(inc,{cur:impCur})}</div><div class="l">Приход</div></div>
@@ -4180,6 +4199,7 @@ function cancelImport(){
   IMP = null;
   document.getElementById('impPreviewCard').style.display = 'none';
   document.getElementById('impMapCard').style.display = 'none';
+  document.getElementById('impUploadCard').style.display = 'block';
   document.getElementById('pasteArea').value = '';
   ['impNewName','impNewBal','impNewLimit'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=''; });
   document.getElementById('impAccount').value = '';
