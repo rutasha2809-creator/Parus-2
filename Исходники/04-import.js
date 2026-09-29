@@ -6,6 +6,7 @@ if(window.pdfjsLib){
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+var IMP_MY_PHONE = '';
 var IMP = null;   // текущий разбираемый импорт  // {raw: [][], headers: [], map:{date,desc,amount,debit,credit}, rows:[], mode}
 
 /* Счёт, с которого открыли «Загрузить выписку» из его развёрнутой строки —
@@ -266,6 +267,7 @@ function parsePasted(){
 
 /* ---------------- маппинг колонок для таблиц ---------------- */
 function startMapping(raw){
+  if(!IMP_MY_PHONE && S.settings.myPhone) IMP_MY_PHONE = S.settings.myPhone;
   if(!raw || raw.length<2){ toast('В файле нет данных'); return; }
 
   // находим строку заголовков — первую, где есть похожие на «дата» и «сумма»
@@ -276,10 +278,28 @@ function startMapping(raw){
     if(hits >= 2){ hIdx = i; break; }
   }
   const headers = raw[hIdx].map((h,i)=> String(h).trim() || 'Колонка '+(i+1));
-  const body = raw.slice(hIdx+1);
+  let body = raw.slice(hIdx+1);
 
-  IMP = {mode:'table', raw: body, headers, map:{}};
+  /* Выписки по кредитной карте (Совкомбанк и др.) делят сумму на две колонки:
+     «Собственные средства» и «Средства банка». Вторая строка шапки — подписи
+     этих колонок. Без неё покупки в кредит терялись: читалась только первая. */
+  let ownCol = -1, bankCol = -1;
+  if(body.length){
+    const sub = body[0].map(c=>String(c||'').toLowerCase());
+    const o = sub.findIndex(c=>/собственн/.test(c));
+    const b = sub.findIndex(c=>/средства банка|заемные|заёмные|кредитные средства/.test(c));
+    if(o>=0 && b>=0){
+      ownCol = o; bankCol = b;
+      headers[o] = 'Собственные средства';
+      headers[b] = 'Средства банка';
+      body = body.slice(1);
+    }
+  }
+
+  IMP = {mode:'table', raw: body, headers, map:{}, isCard: bankCol>=0};
   autoDetectColumns();
+  if(bankCol>=0){ IMP.map.amount = ownCol; IMP.map.bank = bankCol; IMP.map.debit = -1; IMP.map.credit = -1; }
+  else IMP.map.bank = -1;
   renderMapping();
 }
 
@@ -332,6 +352,7 @@ function renderMapping(){
       <div class="f"><label>Описание</label><select id="mpDesc" onchange="rebuildRows()">${opts(IMP.map.desc)}</select></div>
     </div>
     <div class="f"><label>Сумма (одна колонка со знаком)</label><select id="mpAmount" onchange="rebuildRows()">${opts(IMP.map.amount)}</select></div>
+    <div class="f"><label>Сумма за счёт средств банка (кредитные карты)</label><select id="mpBank" onchange="rebuildRows()">${opts(IMP.map.bank)}</select></div>
     <div class="f2">
       <div class="f"><label>Или: расход</label><select id="mpDebit" onchange="rebuildRows()">${opts(IMP.map.debit)}</select></div>
       <div class="f"><label>Или: приход</label><select id="mpCredit" onchange="rebuildRows()">${opts(IMP.map.credit)}</select></div>
@@ -354,7 +375,10 @@ function setDateOrder(v){
 
 function rebuildRows(){
   const g = id => parseInt(document.getElementById(id).value, 10);
-  IMP.map = {date:g('mpDate'), desc:g('mpDesc'), amount:g('mpAmount'), debit:g('mpDebit'), credit:g('mpCredit')};
+  const bankEl = document.getElementById('mpBank');
+  IMP.map = {date:g('mpDate'), desc:g('mpDesc'), amount:g('mpAmount'), debit:g('mpDebit'), credit:g('mpCredit'),
+             bank: bankEl ? g('mpBank') : -1};
+  IMP.isCard = IMP.map.bank >= 0;
   const invert = document.getElementById('mpInvert').checked;
   const M = IMP.map;
   const out = [];
@@ -362,8 +386,20 @@ function rebuildRows(){
   for(const r of IMP.raw){
     const date = M.date>=0 ? parseAnyDate(r[M.date]) : null;
     if(!date) continue;
-    let amount = null, kind = null;
+    const desc = M.desc>=0 ? String(r[M.desc]||'').trim().slice(0,120) : '';
 
+    /* Колонка «средства банка» — это деньги в кредит: покупка увеличивает долг.
+       Строка может быть заполнена в обеих колонках сразу — тогда это две операции. */
+    if(M.bank>=0){
+      const bv = parseAnyNumber(r[M.bank]);
+      if(bv!==null && bv!==0){
+        let kind = bv<0 ? 'expense' : 'income';
+        if(invert) kind = kind==='expense' ? 'income' : 'expense';
+        out.push({ date, desc, amount: Math.abs(bv), kind, col:'bank' });
+      }
+    }
+
+    let amount = null, kind = null;
     if(M.debit>=0 || M.credit>=0){
       const d = M.debit>=0 ? parseAnyNumber(r[M.debit]) : null;
       const c = M.credit>=0 ? parseAnyNumber(r[M.credit]) : null;
@@ -377,25 +413,80 @@ function rebuildRows(){
     if(amount===null || amount===0) continue;
     if(invert) kind = kind==='expense' ? 'income' : 'expense';
 
-    out.push({ date, desc: M.desc>=0 ? String(r[M.desc]||'').trim().slice(0,120) : '', amount, kind });
+    out.push({ date, desc, amount, kind, col: M.bank>=0 ? 'own' : null });
   }
   IMP.rows = prepRows(out);
   showPreview();
 }
 
-/* ---------------- подготовка строк: категории + дубли ---------------- */
+/* ---------------- подготовка строк: роли, категории, дубли ---------------- */
+
+/* Телефон человека — цифры без «+7» и пробелов, только последние 10.
+   Нужен, чтобы узнавать входящие переводы с его же номера. */
+function phoneDigits(s){ return String(s||'').replace(/\D/g,'').slice(-10); }
+
+/* Что за строка на самом деле. Главное — не принять переводы между своими
+   счетами за доходы и расходы: на выписке одного из банков их было больше
+   трети, и цифры на главном экране выходили завышены в разы.
+     own    — перевод между своими счетами: не записываем
+     fund   — пополнение собственными деньгами кредитной карты: не записываем
+     repay  — погашение кредита: запишем как перевод на карту
+     srcexp — комиссия или трата собственными деньгами по кредитной карте:
+              спишется со счёта, откуда пополняли карту
+     ask    — исходящий перевод по СБП: неизвестно, себе или другому человеку
+     fee    — комиссия банка (обычный расход)                                */
+function classifyRow(r){
+  const d = ruleNorm(r.desc);
+  const digits = String(r.desc||'').replace(/\D/g,'');
+  const my = phoneDigits(IMP_MY_PHONE);
+  const fromMe = my.length===10 && digits.includes(my);
+  const isCard = !!(IMP && IMP.isCard);
+
+  if(d.includes('перевод собственных средств'))
+    return isCard && r.col==='own' && r.kind==='income'
+      ? {role:'fund',  why:'пополнение карты своими деньгами'}
+      : {role:'own',   why:'перевод между своими счетами'};
+  if(r.kind==='income' && fromMe && /зачислени/.test(d))
+    return {role:'own', why:'перевод с вашего номера'};
+
+  if(isCard && r.col==='own' && r.kind==='expense'){
+    if(/погашение кредита/.test(d)) return {role:'repay', why:'погашение кредита'};
+    return {role:'srcexp', why: /комисси/.test(d) ? 'комиссия' : 'списание своих денег'};
+  }
+  if(/комисси/.test(d)) return {role:'fee', why:'комиссия'};
+  if(r.kind==='expense' && /перевод согласно распоряжению/.test(d))
+    return {role:'ask', why:'перевод — себе или другому?'};
+  return {role:'normal', why:''};
+}
+
 function prepRows(rows){
   const existing = new Set(S.transactions.map(t => t.date+'|'+t.amount.toFixed(2)+'|'+(t.note||'').toLowerCase().slice(0,40)));
   return rows.map(r=>{
     const key = r.date+'|'+r.amount.toFixed(2)+'|'+r.desc.toLowerCase().slice(0,40);
+    const cl = classifyRow(r);
+    const skip = cl.role==='own' || cl.role==='fund';
     return Object.assign({}, r, {
       id: uid(),
+      role: cl.role, why: cl.why,
       categoryId: guessCategory(r.desc, r.kind),
       dup: existing.has(key),
-      use: !existing.has(key)
+      use: !existing.has(key) && !skip
     });
   });
 }
+
+/* Номер телефона поменяли — роли надо определить заново */
+function onImpPhone(v){
+  IMP_MY_PHONE = v;
+  if(!IMP || !IMP.rows) return;
+  for(const r of IMP.rows){
+    const cl = classifyRow(r);
+    r.role = cl.role; r.why = cl.why;
+    r.use = !r.dup && cl.role!=='own' && cl.role!=='fund';
+  }
+  showPreview();
+}
+
 /* Приводим текст к виду, в котором мелкие различия написания не мешают
    сравнению: регистр, «ё» против «е» (банки в выписках пишут «ПЯТЕРОЧКА»,
    а человек в описании — «Пятёрочка») и лишние пробелы. */
@@ -415,6 +506,8 @@ function guessCategory(desc, kind){
 }
 
 /* ---------------- предпросмотр ---------------- */
+function impSum(rows){ return round2(rows.reduce((s,r)=>s+r.amount,0)); }
+
 function showPreview(){
   if(!IMP || !IMP.rows){ return; }
   const rows = IMP.rows;
@@ -430,44 +523,72 @@ function showPreview(){
   const accSel = document.getElementById('impAccount');
   const usable = S.accounts.filter(a=>!a.archived && (ACC_TYPES[a.type].asset || a.type==='credit_card'));
   /* Сохраняем выбор пользователя — иначе при каждой перерисовке
-     список сбрасывался бы на первый счёт. Если счёта ещё не выбирали
-     в этом заходе — подставляем тот, с которого открыли импорт. */
+     список сбрасывался бы. Если счёта ещё не выбирали — подставляем тот,
+     с которого открыли импорт; для карточной выписки — кредитную карту;
+     а если подходящих счетов нет — предлагаем завести новый. */
   const prevAcc = accSel.value || IMP_PRESET_ACCOUNT || '';
   IMP_PRESET_ACCOUNT = null;
-  accSel.innerHTML = usable.length
-    ? usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
-    : `<option value="">— сначала добавьте счёт —</option>`;
-  if(prevAcc && usable.some(a=>a.id===prevAcc)) accSel.value = prevAcc;
+  accSel.innerHTML = usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
+    + `<option value="__new__">➕ Новый счёт</option>`;
+  if(prevAcc && (prevAcc==='__new__' || usable.some(a=>a.id===prevAcc))) accSel.value = prevAcc;
+  else {
+    const pick = IMP.isCard ? usable.find(a=>a.type==='credit_card') : usable.find(a=>ACC_TYPES[a.type].asset);
+    accSel.value = pick ? pick.id : '__new__';
+  }
+  const isNew = accSel.value==='__new__';
+  const phEl = document.getElementById('impPhone');
+  if(!phEl.value && IMP_MY_PHONE) phEl.value = IMP_MY_PHONE;
+  document.getElementById('impNewAcc').style.display = isNew ? 'block' : 'none';
+  document.getElementById('impNewBalLbl').textContent = IMP.isCard ? 'Текущий долг по карте, ₽' : 'Сколько сейчас на счёте, ₽';
+  document.getElementById('impNewLimitBox').style.display = IMP.isCard ? 'block' : 'none';
+  const nn = document.getElementById('impNewName');
+  if(isNew && !nn.value) nn.placeholder = IMP.isCard ? 'Например: Кредитная карта' : 'Например: Дебетовая карта';
 
+  const target = isNew ? null : S.accounts.find(a=>a.id===accSel.value);
+  const cardWarn = IMP.isCard && target && target.type!=='credit_card';
+
+  /* Со счёта, которым гасят кредитку, спишутся погашения и комиссии */
+  const needSrc = rows.some(r=>r.use && (r.role==='repay' || r.role==='srcexp'));
+  const srcSel = document.getElementById('impSrcAcc');
+  const assets = S.accounts.filter(a=>!a.archived && ACC_TYPES[a.type].asset && a.type!=='deposit');
+  const prevSrc = srcSel.value;
+  srcSel.innerHTML = assets.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
+    + `<option value="">— записать на самой карте —</option>`;
+  if(prevSrc!=='' && assets.some(a=>a.id===prevSrc)) srcSel.value = prevSrc;
+  else if(prevSrc==='' && srcSel.dataset.touched) srcSel.value = '';
+  document.getElementById('impSrcBox').style.display = needSrc ? 'block' : 'none';
+
+  const rec = rows.filter(r=>r.use);
+  const inc = impSum(rec.filter(r=>r.kind==='income' && r.role!=='repay' && r.role!=='srcexp'));
+  const exp = impSum(rec.filter(r=>r.kind==='expense' && r.role!=='repay' && r.role!=='srcexp'));
+  const own = rows.filter(r=>r.role==='own' || r.role==='fund');
+  const ownOff = own.filter(r=>!r.use);
+  const rep = rows.filter(r=>r.role==='repay');
+  const srx = rows.filter(r=>r.role==='srcexp');
+  const ask = rows.filter(r=>r.role==='ask' && r.use);
   const dups = rows.filter(r=>r.dup).length;
-  const inc = rows.filter(r=>r.kind==='income').reduce((s,r)=>s+r.amount,0);
-  const exp = rows.filter(r=>r.kind==='expense').reduce((s,r)=>s+r.amount,0);
   const dates = rows.map(r=>r.date).sort();
 
-  /* В какой валюте запишутся суммы. Своей валюты у операции нет —
-     она берётся у счёта. Показываем это явно, иначе долларовая выписка
-     на рублёвом счёте молча превратится в рубли. */
-  const impAcc = S.accounts.find(a=>a.id===accSel.value) || usable[0];
-  const impCur = impAcc ? accCurrency(impAcc) : BASE;
+  /* В какой валюте запишутся суммы — берётся у счёта */
+  const impAcc = target || usable[0];
+  const impCur = target ? accCurrency(target) : BASE;
   const curName = (CURRENCIES[impCur]||{}).name || impCur;
 
+  const line = (t, cls) => `<div style="font-size:13px;margin-top:6px" class="${cls||''}">${t}</div>`;
   document.getElementById('impStats').innerHTML = `
     <div class="grid3">
-      <div class="stat"><div class="n" style="font-size:15px">${rows.length}</div><div class="l">Операций</div></div>
+      <div class="stat"><div class="n" style="font-size:15px">${rec.filter(r=>r.role!=='repay'&&r.role!=='srcexp').length}</div><div class="l">Запишем операций</div></div>
       <div class="stat"><div class="n pos" style="font-size:15px">${money(inc,{cur:impCur})}</div><div class="l">Приход</div></div>
       <div class="stat"><div class="n neg" style="font-size:15px">${money(exp,{cur:impCur})}</div><div class="l">Расход</div></div>
     </div>
     <div style="font-size:12px;color:var(--muted);margin-top:8px">Период: ${dateLong(dates[0])} — ${dateLong(dates[dates.length-1])}</div>
-    <div class="note ${impCur===BASE?'':'warn'}" style="margin-top:8px">
-      Суммы будут записаны в валюте счёта: <b>${impCur} · ${esc(curName)}</b>.
-      ${impCur===BASE
-        ? 'Если выписка в другой валюте — выберите счёт в этой валюте или заведите новый.'
-        : `Проверьте, что выписка действительно в ${impCur}. Пересчёт в рубли идёт по курсу из настроек.`}
-    </div>
-    ${dups ? `<div class="note warn" style="margin-top:8px">Найдено похожих на уже существующие: <b>${dups}</b>. Они сняты с отметки — снимите галочку «дубль», если хотите импортировать.</div>` : ''}`;
-
-  const catOpts = kind => S.categories.filter(c=>c.kind===kind)
-      .map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    ${own.length ? line(`Переводы между своими счетами не считаем доходом и расходом: <b>${ownOff.length}</b> шт. на ${money(impSum(ownOff),{cur:impCur})} пропущено.`) : ''}
+    ${rep.length ? line(`Погашения кредита: <b>${rep.length}</b> шт. на ${money(impSum(rep),{cur:impCur})} — запишем как переводы с вашего счёта на карту.`) : ''}
+    ${srx.length ? line(`Комиссии и списания своих денег по карте: <b>${srx.length}</b> шт. на ${money(impSum(srx),{cur:impCur})} — спишем со счёта, откуда гасите карту.`) : ''}
+    ${ask.length ? line(`Исходящие переводы по СБП (<b>${ask.length}</b> шт.) записаны как расход. Если это перевод себе — снимите галочку. Чтобы приложение узнавало их само, укажите ваш номер телефона ниже.`,'note warn') : ''}
+    ${cardWarn ? line(`Похоже на выписку по кредитной карте, а выбран счёт другого типа. Лучше выбрать кредитную карту или завести новый счёт.`,'note warn') : ''}
+    ${impCur===BASE ? '' : `<div class="note warn" style="margin-top:8px">Суммы будут записаны в валюте счёта: <b>${impCur} · ${esc(curName)}</b>. Проверьте, что выписка действительно в ${impCur}.</div>`}
+    ${dups ? `<div class="note warn" style="margin-top:8px">Найдено похожих на уже существующие: <b>${dups}</b>. Они сняты с отметки — поставьте галочку, если хотите их импортировать.</div>` : ''}`;
 
   document.getElementById('impTable').innerHTML = `
     <thead><tr>
@@ -475,16 +596,23 @@ function showPreview(){
       <th>Дата</th><th>Описание</th><th class="r">Сумма</th><th>Категория</th>
     </tr></thead>
     <tbody>${rows.map((r,i)=>`
-      <tr class="${r.dup?'':''}" style="${r.dup?'opacity:.55':''}">
-        <td><input type="checkbox" ${r.use?'checked':''} onchange="IMP.rows[${i}].use=this.checked; updSel()"></td>
+      <tr style="${(r.dup||!r.use)?'opacity:.55':''}">
+        <td><input type="checkbox" ${r.use?'checked':''} onchange="IMP.rows[${i}].use=this.checked; updSel(); showPreviewStats()"></td>
         <td style="white-space:nowrap">${dateShort(r.date)}</td>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.desc)||'<span class="mut">без описания</span>'}${r.dup?' <span class="chip bad">дубль</span>':''}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis">${esc(r.desc)||'<span class="mut">без описания</span>'}${r.dup?' <span class="chip bad">дубль</span>':''}${r.why?` <span class="chip">${esc(r.why)}</span>`:''}</td>
         <td class="r ${r.kind==='income'?'pos':'neg'}" style="white-space:nowrap">${r.kind==='income'?'+':'−'}${money(r.amount,{cur:impCur})}</td>
         <td><select onchange="IMP.rows[${i}].categoryId=this.value" style="max-width:150px;padding:4px;border:1px solid var(--line);border-radius:6px;font-size:12px">
           ${S.categories.filter(c=>c.kind===r.kind).map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}
         </select></td>
       </tr>`).join('')}</tbody>`;
   updSel();
+}
+/* Галочку в таблице сняли — итоги наверху пересчитываем, таблицу не трогаем */
+function showPreviewStats(){
+  const t = document.getElementById('impTable');
+  const y = t.parentNode.scrollTop;
+  showPreview();
+  t.parentNode.scrollTop = y;
 }
 function toggleAllImp(v){
   IMP.rows.forEach(r=>r.use = v);
@@ -500,23 +628,79 @@ function cancelImport(){
   document.getElementById('impPreviewCard').style.display = 'none';
   document.getElementById('impMapCard').style.display = 'none';
   document.getElementById('pasteArea').value = '';
+  ['impNewName','impNewBal','impNewLimit'].forEach(i=>{ const e=document.getElementById(i); if(e) e.value=''; });
+  document.getElementById('impAccount').value = '';
+  const ss = document.getElementById('impSrcAcc'); if(ss){ ss.value=''; delete ss.dataset.touched; }
 }
 function commitImport(){
   if(!IMP || !IMP.rows) return;
-  const accountId = document.getElementById('impAccount').value;
-  if(!accountId){ toast('Выберите счёт для зачисления'); return; }
+  let accountId = document.getElementById('impAccount').value;
+  const isNew = accountId==='__new__';
+  let acct = null, typedBal = null;
+  if(isNew){
+    const name = document.getElementById('impNewName').value.trim();
+    const balRaw = document.getElementById('impNewBal').value.trim();
+    if(!name){ toast('Назовите новый счёт'); return; }
+    typedBal = parseAnyNumber(balRaw);
+    if(balRaw==='' || typedBal==null || isNaN(typedBal)){
+      toast(IMP.isCard ? 'Укажите, какой сейчас долг по карте' : 'Укажите, сколько сейчас на счёте'); return;
+    }
+    typedBal = Math.abs(typedBal);
+    acct = {id: uid(), type: IMP.isCard ? 'credit_card' : 'debit', name, currency: BASE,
+            openingBalance: 0, archived: false, note: ''};
+    if(IMP.isCard){
+      const lim = parseAnyNumber(document.getElementById('impNewLimit').value);
+      acct.limit = lim>0 ? lim : null; acct.rate = null; acct.paymentDay = 25;
+      acct.minPayment = null; acct.minPercent = 5; acct.gracePeriodDays = null; acct.graceUntil = null;
+    }
+    accountId = acct.id;
+  } else {
+    if(!accountId){ toast('Выберите счёт для зачисления'); return; }
+    acct = acc(accountId);
+  }
   const sel = IMP.rows.filter(r=>r.use);
   if(!sel.length){ toast('Не выбрано ни одной операции'); return; }
 
+  const srcId = document.getElementById('impSrcAcc').value;
+  const src = srcId ? acc(srcId) : null;
+  const txs = [];
+  let nRec = 0, nRep = 0, nSrc = 0, nSkip = 0;
   for(const r of sel){
-    S.transactions.push({
-      id: uid(), date: r.date, type: r.kind, accountId,
-      categoryId: r.categoryId, amount: r.amount, note: r.desc, source: 'import'
-    });
+    if(r.role==='repay'){
+      if(!src){ nSkip++; continue; }
+      txs.push({id: uid(), date: r.date, type:'transfer', accountId: src.id, toAccountId: accountId,
+                amount: r.amount, note: r.desc, source:'import'});
+      /* Деньги на счёте погашения были до выписки — компенсируем, чтобы
+         его остаток не ушёл в минус из-за старых списаний */
+      src.openingBalance = round2((src.openingBalance||0) + r.amount);
+      nRep++;
+    } else if(r.role==='srcexp'){
+      const tgt = src || acct;
+      txs.push({id: uid(), date: r.date, type:'expense', accountId: tgt.id,
+                categoryId: r.categoryId, amount: r.amount, note: r.desc, source:'import'});
+      /* Компенсируем, чтобы остаток не сдвинулся из-за старых списаний */
+      if(!(isNew && !src)) tgt.openingBalance = round2((tgt.openingBalance||0) + (ACC_TYPES[tgt.type].asset ? r.amount : -r.amount));
+      nSrc++;
+    } else {
+      txs.push({id: uid(), date: r.date, type: r.kind, accountId,
+                categoryId: r.categoryId, amount: r.amount, note: r.desc, source:'import'});
+      nRec++;
+    }
   }
+
+  if(isNew) S.accounts.push(acct);
+  S.transactions.push(...txs);
+  if(isNew){
+    /* Начальный остаток подбираем так, чтобы после всех операций
+       на счёте оказалась именно та сумма, которую назвал человек */
+    acct.openingBalance = round2(typedBal - balance(acct));
+  }
+  const ph = document.getElementById('impPhone').value.trim();
+  if(phoneDigits(ph).length===10) S.settings.myPhone = ph;
   save(); cancelImport(); renderAll();
-  toast(`Импортировано операций: ${sel.length}`);
-  go('accounts');
+  toast(`Записано операций: ${nRec}` + (nRep ? `, погашений: ${nRep}` : '')
+    + (nSrc ? `, списаний: ${nSrc}` : '') + (nSkip ? `, пропущено без счёта погашения: ${nSkip}` : ''));
+  go(isNew ? 'home' : 'accounts');
 }
 
 /* ---------------- правила автокатегоризации ----------------

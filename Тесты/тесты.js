@@ -241,20 +241,91 @@ function reset(W, patch){
 
   W.S.accounts = [{id:'a1',type:'debit',name:'Карта',currency:'RUB',openingBalance:50000}];
   W.save(); W.renderHome();
-  check('после добавления счёта — один шаг закрыт', doneN(), 1);
+  check('один счёт без операций — шаг «выписка» ещё не закрыт', doneN(), 0);
+
+  W.S.transactions = [{id:'t1',date:T,type:'expense',accountId:'a1',categoryId:'c_food',amount:1200}];
+  W.save(); W.renderHome();
+  check('счёт и операции — шаг «выписка» закрыт', doneN(), 1);
 
   W.S.recurring = [{id:'r1',name:'Зарплата',kind:'income',amount:80000,freq:'monthly',
                     startDate:T,accountId:'a1',categoryId:'c_salary'}];
   W.save(); W.renderHome();
-  check('после регулярного платежа — два шага', doneN(), 2);
+  check('после регулярного платежа — подсказка закрыта, если есть и выписка', card().style.display, 'none');
 
-  W.S.transactions = [{id:'t1',date:T,type:'expense',accountId:'a1',categoryId:'c_food',amount:1200}];
+  W.S.recurring = [];
   W.save(); W.renderHome();
-  check('когда всё заполнено — подсказка исчезает', card().style.display, 'none');
 
   W.S.transactions = [];
   W.save(); W.renderHome();
   check('если данные удалили — подсказка вернулась', card().style.display, 'block');
+
+
+  /* ======================================================================
+     Выписка как первый шаг: счёт создаётся при загрузке, переводы между
+     своими счетами не считаются доходом/расходом. Данные выдуманные.
+     ====================================================================== */
+  group('Загрузка выписки — дебетовая, новый счёт');
+
+  const DEB = [
+    ['Дата, время операции (МСК)','Сумма операции (руб)','Начислено кешбэка (баллы)','Описание операции','Номер карты/ стикера'],
+    ['','Собственные средства','','',''],
+    ['29.09.2026 20:56','+2 000,00','','Зачисление перевода денежных средств по номеру телефона +7 900 111-22-33',''],
+    ['28.09.2026 12:41','-15 000,00','','Перевод собственных средств. Без НДС','' ],
+    ['26.09.2026 13:08','-1 056,00','','NPD.NALOG.RU','*1111'],
+    ['25.09.2026 20:09','+3 645,83','','Зачисление перевода денежных средств','']
+  ];
+  reset(W); W.go('import'); W.IMP_MY_PHONE = '';
+  W.startMapping(DEB);
+  check('разобрано строк', W.IMP.rows.length, 4);
+  checkTrue('выписка не карточная', !W.IMP.isCard);
+  check('перевод собственных средств — «свой»', W.IMP.rows.find(r=>r.amount===15000).role, 'own');
+  checkTrue('свой перевод по умолчанию не записывается', !W.IMP.rows.find(r=>r.amount===15000).use);
+  check('без номера телефона зачисление — обычный доход', W.IMP.rows.find(r=>r.amount===2000).role, 'normal');
+  W.onImpPhone('+7 (900) 111-22-33');
+  check('с номером телефона зачисление с него — «свой» перевод', W.IMP.rows.find(r=>r.amount===2000).role, 'own');
+  check('в списке счетов есть «Новый счёт» и он выбран',
+    D.getElementById('impAccount').value, '__new__');
+  D.getElementById('impNewName').value = 'Дебетовая';
+  W.commitImport();
+  check('без остатка счёт не создаётся', W.S.accounts.length, 0);
+  D.getElementById('impNewBal').value = '30 000,50';
+  W.commitImport();
+  check('счёт создан', W.S.accounts.length, 1);
+  check('тип нового счёта', W.S.accounts[0].type, 'debit');
+  check('записаны только настоящие операции', W.S.transactions.length, 2);
+  check('остаток на счёте — тот, что назвал человек', W.round2(W.balance(W.S.accounts[0])), 30000.5);
+  check('номер телефона запомнен', W.S.settings.myPhone, '+7 (900) 111-22-33');
+
+  group('Загрузка выписки — кредитная карта');
+  const CRD = [
+    ['Дата, время операции (МСК)','Сумма операции (руб)','','Начислено кешбэка (баллы)','Описание операции','Номер карты/ стикера'],
+    ['','Собственные средства','Средства банка','','',''],
+    ['29.09.2026 22:05','-299,00','','+5','SG*Premium','*2222'],
+    ['27.09.2026 23:08','','-64,00','','Оплата по подписке СБП, 2026',''],
+    ['26.09.2026 10:00','','--13,27','','Комиссия за уведомления',''],
+    ['25.09.2026 12:00','-2 000,00','','','Погашение кредита',''],
+    ['24.09.2026 12:00','+5 000,00','','','Перевод собственных средств. Без НДС','']
+  ];
+  reset(W, { accounts: [{id:'d1',type:'debit',name:'Дебетовая',currency:'RUB',openingBalance:10000}] });
+  W.go('import'); W.IMP_MY_PHONE = '';
+  W.startMapping(CRD);
+  checkTrue('выписка распознана как карточная', W.IMP.isCard);
+  check('колонка «Средства банка» тоже читается — строк', W.IMP.rows.length, 5);
+  check('погашение кредита распознано', W.IMP.rows.find(r=>r.amount===2000).role, 'repay');
+  check('пополнение карты своими деньгами — не операция', W.IMP.rows.find(r=>r.amount===5000).role, 'fund');
+  check('двойной минус в числе не ломает сумму', W.IMP.rows.some(r=>r.amount===13.27), true);
+  check('трата из «Средств банка» — обычный расход', W.IMP.rows.find(r=>r.amount===64).role, 'normal');
+  D.getElementById('impAccount').value = '__new__'; W.showPreview();
+  D.getElementById('impNewName').value = 'Кредитка';
+  D.getElementById('impNewBal').value = '3000';
+  D.getElementById('impSrcAcc').value = 'd1';
+  W.commitImport();
+  const cc = W.S.accounts.find(a=>a.name==='Кредитка');
+  checkTrue('создана кредитная карта', cc && cc.type==='credit_card');
+  check('долг по карте — тот, что назвал человек', W.round2(W.balance(cc)), 3000);
+  const rp = W.S.transactions.find(t=>t.type==='transfer');
+  checkTrue('погашение записано переводом со счёта на карту', rp && rp.accountId==='d1' && rp.toAccountId===cc.id && rp.amount===2000);
+  check('остаток дебетовой счёта не ушёл вниз из-за старых списаний', W.round2(W.balance(W.acc('d1'))), 10000);
 
   /* ======================================================================
      Объединённая страница счетов: раскрытие и быстрый ввод.

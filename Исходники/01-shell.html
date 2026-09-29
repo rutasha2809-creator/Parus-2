@@ -733,13 +733,28 @@ nav .brand{display:none}
     <div id="impStats"></div>
     <div class="f2" style="margin:10px 0">
       <div class="f" style="margin:0">
-        <label>Зачислить на счёт</label>
+        <label>Записать на счёт</label>
         <select id="impAccount" onchange="showPreview()"></select>
       </div>
       <div class="f" style="margin:0">
         <label>Строк выбрано</label>
         <input type="text" id="impSelCount" readonly>
       </div>
+    </div>
+    <div id="impNewAcc" style="display:none;margin-bottom:10px">
+      <div class="f2">
+        <div class="f" style="margin:0"><label>Название счёта</label><input type="text" id="impNewName"></div>
+        <div class="f" style="margin:0"><label id="impNewBalLbl">Сколько сейчас на счёте, ₽</label><input type="text" inputmode="decimal" id="impNewBal"></div>
+      </div>
+      <div class="f" id="impNewLimitBox" style="display:none;margin-top:8px"><label>Кредитный лимит, ₽ (необязательно)</label><input type="text" inputmode="decimal" id="impNewLimit"></div>
+    </div>
+    <div id="impSrcBox" class="f" style="display:none;margin-bottom:10px">
+      <label>Погашения и комиссии по карте списывать со счёта</label>
+      <select id="impSrcAcc" onchange="this.dataset.touched=1;showPreview()"></select>
+    </div>
+    <div class="f" style="margin-bottom:10px">
+      <label>Ваш номер телефона (необязательно)</label>
+      <input type="tel" id="impPhone" placeholder="+7 900 000-00-00" oninput="onImpPhone(this.value)">
     </div>
     <div class="scrollx scrolly"><table class="tbl" id="impTable"></table></div>
     <div class="btnrow" style="margin-top:12px">
