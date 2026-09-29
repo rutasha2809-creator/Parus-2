@@ -1258,7 +1258,7 @@ function renderHome(){
       alerts.push({t:'Приближается срок: '+a.name, s:money(balance(a))+' до '+dateLong(a.dueDate), cls:'opt', go:'debts'});
   }
   /* Вход — самое важное предупреждение: без него данные живут только здесь */
-  if(typeof sbUser !== 'undefined' && !sbUser && typeof syncCfg === 'function' && syncCfg()){
+  if(typeof LOGIN_ENABLED !== 'undefined' && LOGIN_ENABLED && typeof sbUser !== 'undefined' && !sbUser && typeof syncCfg === 'function' && syncCfg()){
     alerts.unshift({t:'Войдите в аккаунт', s:'Данные сохранятся и откроются на телефоне. Регистрация не нужна — имя и почта', cls:'opt', act:'openAccountSheet()'});
   }
   if(!S.accounts.length) alerts.push({t:'Добавьте счета', s:'Карты, наличные, вклады и кредиты — база для всех расчётов', cls:'info', go:'accounts'});

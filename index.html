@@ -5569,7 +5569,7 @@ function renderHome(){
       alerts.push({t:'Приближается срок: '+a.name, s:money(balance(a))+' до '+dateLong(a.dueDate), cls:'opt', go:'debts'});
   }
   /* Вход — самое важное предупреждение: без него данные живут только здесь */
-  if(typeof sbUser !== 'undefined' && !sbUser && typeof syncCfg === 'function' && syncCfg()){
+  if(typeof LOGIN_ENABLED !== 'undefined' && LOGIN_ENABLED && typeof sbUser !== 'undefined' && !sbUser && typeof syncCfg === 'function' && syncCfg()){
     alerts.unshift({t:'Войдите в аккаунт', s:'Данные сохранятся и откроются на телефоне. Регистрация не нужна — имя и почта', cls:'opt', act:'openAccountSheet()'});
   }
   if(!S.accounts.length) alerts.push({t:'Добавьте счета', s:'Карты, наличные, вклады и кредиты — база для всех расчётов', cls:'info', go:'accounts'});
@@ -6045,8 +6045,12 @@ function renderAvatar(){
   btn.innerHTML = p.avatar
     ? `<img src="${p.avatar}" alt="">`
     : (guest ? '?' : esc(initials()));
-  btn.title = guest ? 'Войти в аккаунт' : (p.name || (sbUser && sbUser.email) || 'Аккаунт');
+  btn.title = guest ? (LOGIN_ENABLED ? 'Войти в аккаунт' : 'Настройки') : (p.name || (sbUser && sbUser.email) || 'Аккаунт');
 }
+
+/* Вход в аккаунт пока выключен: база Supabase на паузе. Позже вернём вход
+   по паролю — тогда достаточно поставить true. */
+var LOGIN_ENABLED = false;
 
 /* ---------------- окно аккаунта ---------------- */
 function openAccountSheet(){
@@ -6126,7 +6130,7 @@ function settingsBlockHtml(){
         ? `Данные хранятся в двух местах: в этом браузере — поэтому приложение работает без интернета,
            и копия на сервере, привязанная к вашей почте — чтобы те же данные открывались на других устройствах.
            Доступ к ним есть только у вас: другие пользователи вашу копию не видят.`
-        : `Вход не выполнен, поэтому данные хранятся только в этом браузере и на другом устройстве не откроются.
+        : `${LOGIN_ENABLED ? 'Вход не выполнен, поэтому данные' : 'Данные'} хранятся только в этом браузере и на другом устройстве не откроются.
            Очистка данных браузера удалит их — делайте резервную копию.`}
       <br><br>
       К банкам приложение не подключается и ничего не списывает.
@@ -6145,7 +6149,7 @@ function renderAccountSheet(){
 
   /* --- гость: вход, он же регистрация --- */
   if(!sbUser){
-    box.innerHTML = `
+    const loginHtml = LOGIN_ENABLED ? `
       <h3>Вход в аккаунт</h3>
       <div class="note">Введите имя и почту — придёт письмо со ссылкой.
         Отдельная регистрация не нужна: если вы здесь впервые, аккаунт создастся сам.
@@ -6159,7 +6163,8 @@ function renderAccountSheet(){
       <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6">
         Без входа приложение тоже работает, но данные останутся только в этом браузере
         и не откроются на телефоне.
-      </div>
+      </div>` : `<h3>Настройки</h3>`;
+    box.innerHTML = loginHtml + `
 
       <div class="sec-title" style="margin-top:18px">Данные</div>
       <div class="row"><div class="l"><div class="t">Резервная копия</div><div class="s">Сохранить все данные в файл</div></div>
