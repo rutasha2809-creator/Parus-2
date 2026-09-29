@@ -38,6 +38,7 @@ const DEFAULT = {
   version: 2,
   accounts: [],
   transactions: [],
+  pendingImports: [],   // выписки, которые ждут анализа
   categories: [
     // расходы — обязательные
     /* Категорий «Ипотека» и «Платежи по кредитам» здесь намеренно нет.
@@ -112,7 +113,7 @@ function load(){
     if(!raw){ const d = JSON.parse(JSON.stringify(DEFAULT)); localStorage.setItem(KEY, JSON.stringify(d)); return d; }
     const p = JSON.parse(raw);
     const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT)), p);
-    ['accounts','transactions','categories','rules','recurring'].forEach(k=>{ if(!Array.isArray(merged[k])) merged[k]=[]; });
+    ['accounts','transactions','categories','rules','recurring','pendingImports'].forEach(k=>{ if(!Array.isArray(merged[k])) merged[k]=[]; });
     /* settings — объект внутри объекта: Object.assign выше подменяет его
        целиком значением из сохранённых данных, так что новые поля вроде
        mode в него не попадают сами. У кого уже есть счета — знает, как
@@ -432,6 +433,7 @@ function go(name){
   document.querySelectorAll('.nv').forEach(b=>b.classList.toggle('on', b.dataset.s===name));
   window.scrollTo(0,0);
   renderAll();
+  if(name==='import' && typeof renderImport==='function') renderImport();
 }
 
 /* =========================================================================

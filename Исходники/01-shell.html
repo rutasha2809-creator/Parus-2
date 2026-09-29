@@ -708,8 +708,9 @@ nav .brand{display:none}
   </div>
 
   <div class="card" id="impUploadCard">
-    <h2>Загрузка выписки</h2>
-    <div class="note">Поддерживаются <b>CSV</b>, <b>Excel</b> (.xlsx/.xls) и <b>PDF</b>. Файл обрабатывается прямо в браузере и никуда не отправляется.</div>
+    <h2>Загрузка выписок</h2>
+    <div class="note" id="impUploadIntro"></div>
+    <div class="note" style="margin-top:8px">Поддерживаются <b>CSV</b>, <b>Excel</b> (.xlsx/.xls) и <b>PDF</b>. Файл обрабатывается прямо в браузере и никуда не отправляется.</div>
     <div class="drop" id="drop" onclick="document.getElementById('fileInput').click()">
       <span class="big">▤</span>
       <div class="t">Выберите файл или перетащите сюда</div>
@@ -723,46 +724,62 @@ nav .brand{display:none}
     </div>
   </div>
 
+  <div class="card" id="impListCard" style="display:none">
+    <h2>Загруженные выписки</h2>
+    <div id="impList"></div>
+    <button class="btn btn-p btn-blk" style="margin-top:12px" onclick="analyzeStatements()">Проанализировать выписки</button>
+  </div>
+
+  <div class="card" id="impNameCard" style="display:none">
+    <h2>Название счёта</h2>
+    <div id="impNameStats"></div>
+    <div id="impNameForm" style="display:none">
+      <div class="f" style="margin-top:12px"><label>Как называется счёт</label>
+        <input type="text" id="impStName" list="impNameList" placeholder="Например: Дебетовая карта" oninput="onStmtName()" autocomplete="off">
+        <datalist id="impNameList"></datalist></div>
+      <div class="note" id="impStHint" style="display:none"></div>
+      <div class="f2">
+        <div class="f" style="margin:0"><label>Тип</label>
+          <select id="impStType" onchange="IMP.typeTouched=true;onStmtName()">
+            <option value="debit">Дебетовая карта или счёт</option>
+            <option value="credit_card">Кредитная карта</option>
+            <option value="deposit">Накопительный счёт или вклад</option>
+          </select></div>
+        <div class="f" style="margin:0"><label id="impStBalLbl">Сколько сейчас на счёте, ₽</label>
+          <input type="text" inputmode="decimal" id="impStBal"></div>
+      </div>
+      <div class="f" id="impStLimitBox" style="display:none;margin-top:8px"><label>Кредитный лимит, ₽ (необязательно)</label>
+        <input type="text" inputmode="decimal" id="impStLimit"></div>
+      <div class="btnrow" style="margin-top:14px">
+        <button class="btn btn-s" onclick="cancelStatement()">Отмена</button>
+        <button class="btn btn-p" onclick="addStatement()">Добавить в список</button>
+      </div>
+    </div>
+    <button class="btn btn-s btn-sm" style="margin-top:12px" onclick="toggleImpMap()">Колонки определены неверно?</button>
+  </div>
+
   <div class="card" id="impMapCard" style="display:none">
     <h2>Настройка колонок</h2>
     <div id="impMapBody"></div>
   </div>
 
-  <div class="card" id="impPreviewCard" style="display:none">
-    <h2><span id="impPreviewTitle">Проверьте выписку</span></h2>
-    <div id="impStats"></div>
-
-    <div class="sec-title" style="margin-top:16px">Куда записать</div>
-    <div class="f" style="margin:0 0 10px">
-      <select id="impAccount" onchange="showPreview()"></select>
+  <div class="card" id="impReviewCard" style="display:none">
+    <h2>Проверка операций</h2>
+    <div id="impRvStats"></div>
+    <div id="impRvSrcBox" class="f" style="display:none;margin:12px 0 0">
+      <label>Погашения и комиссии по кредитной карте списывать со счёта</label>
+      <select id="impRvSrc" onchange="rvSrc(this.value)"></select>
     </div>
-    <div id="impNewAcc" style="display:none;margin-bottom:10px">
-      <div class="f2">
-        <div class="f" style="margin:0" id="impNewNameBox"><label>Название счёта</label><input type="text" id="impNewName"></div>
-        <div class="f" style="margin:0"><label id="impNewBalLbl">Сколько сейчас на счёте, ₽</label><input type="text" inputmode="decimal" id="impNewBal"></div>
-      </div>
-      <div class="f" id="impNewLimitBox" style="display:none;margin-top:8px"><label>Кредитный лимит, ₽ (необязательно)</label><input type="text" inputmode="decimal" id="impNewLimit"></div>
-    </div>
-    <div id="impSrcBox" class="f" style="display:none;margin-bottom:10px">
-      <label>Погашения и комиссии по карте списывать со счёта</label>
-      <select id="impSrcAcc" onchange="this.dataset.touched=1;showPreview()"></select>
-    </div>
-    <div class="f" style="margin-bottom:10px">
-      <label>Ваш номер телефона (необязательно)</label>
-      <input type="tel" id="impPhone" placeholder="+7 900 000-00-00" oninput="onImpPhone(this.value)">
-    </div>
-
     <div class="btnrow" style="margin:14px 0">
-      <button class="btn btn-s" onclick="cancelImport()">Отмена</button>
-      <button class="btn btn-p" onclick="commitImport()">Импортировать</button>
+      <button class="btn btn-s" onclick="backToStatements()">← К выпискам</button>
+      <button class="btn btn-p" onclick="commitAnalysis()">Записать</button>
     </div>
-
-    <details id="impDetails" style="margin-top:6px">
-      <summary style="cursor:pointer;font-weight:600;padding:8px 0">Посмотреть и поправить операции</summary>
-      <div class="f" style="margin:8px 0"><label>Строк выбрано</label><input type="text" id="impSelCount" readonly></div>
-      <div class="scrollx scrolly"><table class="tbl" id="impTable"></table></div>
-    </details>
-    <button class="btn btn-s btn-sm" style="margin-top:12px" onclick="toggleImpMap()">Колонки определены неверно?</button>
+    <div id="impRvFilter" class="btnrow" style="margin-bottom:10px"></div>
+    <div class="scrollx scrolly"><table class="tbl" id="impRvTable"></table></div>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn btn-s" onclick="backToStatements()">← К выпискам</button>
+      <button class="btn btn-p" onclick="commitAnalysis()">Записать</button>
+    </div>
   </div>
 
 </section>

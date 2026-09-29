@@ -261,42 +261,62 @@ function reset(W, patch){
 
 
   /* ======================================================================
-     Выписка как первый шаг: счёт создаётся при загрузке, переводы между
-     своими счетами не считаются доходом/расходом. Данные выдуманные.
+     Выписки по очереди: название счёта → анализ → проверка → запись.
+     Данные выдуманные.
      ====================================================================== */
-  group('Загрузка выписки — дебетовая, новый счёт');
+  group('Загрузка выписок — название счёта обязательно');
+  const HDR = ['Дата, время операции (МСК)','Сумма операции (руб)','Описание операции'];
+  const setVal = (id, v) => { D.getElementById(id).value = v; };
+  const addSt = (raw, name, bal, type) => {
+    W.go('import'); W.startMapping(raw);
+    setVal('impStName', name); if(type) setVal('impStType', type);
+    W.onStmtName(); setVal('impStBal', bal===undefined ? '' : bal);
+    W.addStatement();
+  };
+  const STA = [HDR,
+    ['20.09.2026 10:00','-5 000,00','Перевод собственных средств. Без НДС'],
+    ['26.09.2026 13:08','-1 056,00','NPD.NALOG.RU'],
+    ['27.09.2026 09:00','-800,00','Перевод согласно распоряжению / СБП / Счет плательщика 1 тел. 9000000000. Без НДС']];
+  const STB = [HDR,
+    ['20.09.2026 10:05','+5 000,00','Перевод собственных средств. Без НДС'],
+    ['24.09.2026 10:00','+10,00','Проценты']];
 
-  const DEB = [
-    ['Дата, время операции (МСК)','Сумма операции (руб)','Начислено кешбэка (баллы)','Описание операции','Номер карты/ стикера'],
-    ['','Собственные средства','','',''],
-    ['29.09.2026 20:56','+2 000,00','','Зачисление перевода денежных средств по номеру телефона +7 900 111-22-33',''],
-    ['28.09.2026 12:41','-15 000,00','','Перевод собственных средств. Без НДС','' ],
-    ['26.09.2026 13:08','-1 056,00','','NPD.NALOG.RU','*1111'],
-    ['25.09.2026 20:09','+3 645,83','','Зачисление перевода денежных средств','']
-  ];
-  reset(W); W.go('import'); W.IMP_MY_PHONE = '';
-  W.startMapping(DEB);
-  check('разобрано строк', W.IMP.rows.length, 4);
-  checkTrue('выписка не карточная', !W.IMP.isCard);
-  check('перевод собственных средств — «свой»', W.IMP.rows.find(r=>r.amount===15000).role, 'own');
-  checkTrue('свой перевод по умолчанию не записывается', !W.IMP.rows.find(r=>r.amount===15000).use);
-  check('без номера телефона зачисление — обычный доход', W.IMP.rows.find(r=>r.amount===2000).role, 'normal');
-  W.onImpPhone('+7 (900) 111-22-33');
-  check('с номером телефона зачисление с него — «свой» перевод', W.IMP.rows.find(r=>r.amount===2000).role, 'own');
-  check('в списке счетов есть «Новый счёт» и он выбран',
-    D.getElementById('impAccount').value, '__new__');
-  D.getElementById('impNewName').value = 'Дебетовая';
-  W.commitImport();
-  check('без остатка счёт не создаётся', W.S.accounts.length, 0);
-  D.getElementById('impNewBal').value = '30 000,50';
-  W.commitImport();
-  check('счёт создан', W.S.accounts.length, 1);
-  check('тип нового счёта', W.S.accounts[0].type, 'debit');
-  check('записаны только настоящие операции', W.S.transactions.length, 2);
-  check('остаток на счёте — тот, что назвал человек', W.round2(W.balance(W.S.accounts[0])), 30000.5);
-  check('номер телефона запомнен', W.S.settings.myPhone, '+7 (900) 111-22-33');
+  reset(W); W.go('import'); W.startMapping(STA);
+  W.addStatement();
+  check('без названия выписка не добавляется', W.pendingList().length, 0);
+  setVal('impStName', 'Основная'); W.addStatement();
+  check('без остатка выписка не добавляется', W.pendingList().length, 0);
+  setVal('impStBal', '30 000,50'); W.addStatement();
+  check('с названием и остатком — добавлена', W.pendingList().length, 1);
+  check('выписки ждут в данных приложения', W.S.pendingImports.length, 1);
+  check('после добавления показан список выписок', D.getElementById('impListCard').style.display, 'block');
+  check('окно загрузки снова открыто для следующей выписки', D.getElementById('impUploadCard').style.display, 'block');
+  W.analyzeStatements();
+  check('анализ с одной выпиской — свой перевод без пары пропущен', W.ANA.rows.find(r=>r.amount===5000).use, false);
+  check('исходящий СБП без пары — расход, помечен для проверки', W.needsAttention(W.ANA.rows.find(r=>r.amount===800)), true);
+  W.backToStatements();
+  check('вернулись к списку выписок', D.getElementById('impReviewCard').style.display, 'none');
 
-  group('Загрузка выписки — кредитная карта');
+  group('Загрузка выписок — переводы между счетами находятся сами');
+  addSt(STB, 'Накопительный', '20 000', 'deposit');
+  check('две выписки в списке', W.pendingList().length, 2);
+  W.analyzeStatements();
+  const ox = W.ANA.rows.find(r=>r.amount===5000 && r.kind==='expense');
+  const oy = W.ANA.rows.find(r=>r.amount===5000 && r.kind==='income');
+  check('расход найден как перевод', ox.role, 'xfer');
+  check('причина — пополнение вклада', ox.why, 'пополнение вклада');
+  check('вторая сторона не считается доходом', oy.use, false);
+  checkTrue('пара сопоставлена по названию счетов', ox.peer.startsWith('s:'));
+  W.commitAnalysis();
+  const A1 = W.S.accounts.find(a=>a.name==='Основная'), B1 = W.S.accounts.find(a=>a.name==='Накопительный');
+  checkTrue('счета созданы', A1 && B1 && B1.type==='deposit');
+  check('перевод записан один', W.S.transactions.filter(t=>t.type==='transfer').length, 1);
+  checkTrue('перевод идёт с основного на накопительный', W.S.transactions.some(t=>t.type==='transfer' && t.accountId===A1.id && t.toAccountId===B1.id));
+  check('остаток основного — как назвал человек', W.round2(W.balance(A1)), 30000.5);
+  check('остаток накопительного — как назвал человек', W.round2(W.balance(B1)), 20000);
+  check('очередь выписок очищена', W.S.pendingImports.length, 0);
+
+  group('Загрузка выписок — одна выписка двумя файлами, кредитка');
   const CRD = [
     ['Дата, время операции (МСК)','Сумма операции (руб)','','Начислено кешбэка (баллы)','Описание операции','Номер карты/ стикера'],
     ['','Собственные средства','Средства банка','','',''],
@@ -304,88 +324,50 @@ function reset(W, patch){
     ['27.09.2026 23:08','','-64,00','','Оплата по подписке СБП, 2026',''],
     ['26.09.2026 10:00','','--13,27','','Комиссия за уведомления',''],
     ['25.09.2026 12:00','-2 000,00','','','Погашение кредита',''],
-    ['24.09.2026 12:00','+5 000,00','','','Перевод собственных средств. Без НДС','']
-  ];
-  reset(W, { accounts: [{id:'d1',type:'debit',name:'Дебетовая',currency:'RUB',openingBalance:10000}] });
-  W.go('import'); W.IMP_MY_PHONE = '';
-  W.startMapping(CRD);
-  checkTrue('выписка распознана как карточная', W.IMP.isCard);
-  check('колонка «Средства банка» тоже читается — строк', W.IMP.rows.length, 5);
-  check('погашение кредита распознано', W.IMP.rows.find(r=>r.amount===2000).role, 'repay');
-  check('пополнение карты своими деньгами — не операция', W.IMP.rows.find(r=>r.amount===5000).role, 'fund');
-  check('двойной минус в числе не ломает сумму', W.IMP.rows.some(r=>r.amount===13.27), true);
-  check('трата из «Средств банка» — обычный расход', W.IMP.rows.find(r=>r.amount===64).role, 'normal');
-  D.getElementById('impAccount').value = '__new__'; W.showPreview();
-  D.getElementById('impNewName').value = 'Кредитка';
-  D.getElementById('impNewBal').value = '3000';
-  D.getElementById('impSrcAcc').value = 'd1';
-  W.commitImport();
-  const cc = W.S.accounts.find(a=>a.name==='Кредитка');
-  checkTrue('создана кредитная карта', cc && cc.type==='credit_card');
-  check('долг по карте — тот, что назвал человек', W.round2(W.balance(cc)), 3000);
-  const rp = W.S.transactions.find(t=>t.type==='transfer');
-  checkTrue('погашение записано переводом со счёта на карту', rp && rp.accountId==='d1' && rp.toAccountId===cc.id && rp.amount===2000);
-  check('остаток дебетовой счёта не ушёл вниз из-за старых списаний', W.round2(W.balance(W.acc('d1'))), 10000);
+    ['24.09.2026 12:00','+5 000,00','','','Перевод собственных средств. Без НДС','']];
+  reset(W);
+  addSt(STA, 'Основная', '30000');
+  addSt(CRD, 'Кредитка', '3000');
+  check('кредитка определена по двум колонкам', W.pendingList()[1].type, 'credit_card');
+  addSt(CRD, 'кредитка');   // тот же файл ещё раз, название с другим регистром
+  check('то же название — та же выписка', W.pendingList().length, 2);
+  W.analyzeStatements();
+  const crows = W.ANA.rows.filter(r=>r.sid===W.pendingList()[1].sid);
+  check('одинаковые операции второго файла — дубли', crows.filter(r=>r.dup).length, 5);
+  check('погашение кредита распознано', crows.find(r=>r.amount===2000).role, 'repay');
+  check('пополнение своими деньгами — не операция', crows.find(r=>r.amount===5000).role, 'fund');
+  check('двойной минус читается', crows.some(r=>r.amount===13.27), true);
+  check('со счёта, откуда гасят кредит, по умолчанию единственная дебетовая', W.ANA.srcId, 's:'+W.pendingList()[0].sid);
+  W.ANA.rows.forEach(r=>{ if(r.dup) r.use = false; });
+  W.commitAnalysis();
+  const CC = W.S.accounts.find(a=>a.name==='Кредитка'), AA = W.S.accounts.find(a=>a.name==='Основная');
+  check('долг по карте — как назвал человек', W.round2(W.balance(CC)), 3000);
+  check('остаток дебетовой — как назвал человек', W.round2(W.balance(AA)), 30000);
+  checkTrue('погашение — перевод с дебетовой на карту', W.S.transactions.some(t=>t.type==='transfer' && t.accountId===AA.id && t.toAccountId===CC.id && t.amount===2000));
 
+  group('Загрузка выписок — ручная правка и запоминание');
+  reset(W);
+  addSt(STA, 'Основная', '10000');
+  W.analyzeStatements();
+  const rk = W.ANA.rows.find(r=>r.amount===800);
+  W.rvSet(rk.id, 'role', 'xfer'); W.rvSet(rk.id, 'peer', '__new__'); W.rvSet(rk.id, 'peerName', 'Резервный');
+  const rn = W.ANA.rows.find(r=>r.amount===1056);
+  W.rvSet(rn.id, 'cat', 'c_tax');
+  W.rvFilter('all');
+  checkTrue('под строкой подсказка, как назвать счёт', D.getElementById('impRvTable').innerHTML.includes('назовите её так же'));
+  W.commitAnalysis();
+  const RZ = W.S.accounts.find(a=>a.name==='Резервный');
+  checkTrue('счёт из перевода создан и ждёт выписки', RZ && RZ.placeholder);
+  checkTrue('правка категории запомнилась как правило', W.S.rules.some(x=>x.categoryId==='c_tax' && x.match.includes('npd')));
 
-  group('Загрузка выписки — ручная правка: перевод и погашение кредита');
-  const MAN = [
-    ['Дата, время операции (МСК)','Сумма операции (руб)','Описание операции'],
-    ['20.09.2026 10:00','-5 000,00','Перевод на другую карту'],
-    ['21.09.2026 10:00','+7 000,00','Пополнение с другой карты'],
-    ['22.09.2026 10:00','-3 000,00','Платёж по кредиту'],
-    ['23.09.2026 10:00','-100,00','Кофе']
-  ];
-  reset(W, { accounts: [
-    {id:'m1',type:'debit',name:'Основная',currency:'RUB',openingBalance:20000},
-    {id:'m2',type:'debit',name:'Вторая',currency:'RUB',openingBalance:1000},
-    {id:'ln',type:'loan',name:'Кредит',currency:'RUB',openingBalance:50000}] });
-  W.go('import'); W.IMP_MY_PHONE = '';
-  W.startMapping(MAN);
-  D.getElementById('impAccount').value = 'm1'; W.showPreview();
-  const ri = a => W.IMP.rows.findIndex(r=>r.amount===a);
-  checkTrue('в списке строки есть выбор «Как записать»', D.getElementById('impTable').innerHTML.includes('Погашение кредита'));
-  W.setImpRole(ri(5000),'xfer');  W.IMP.rows[ri(5000)].peer='m2';
-  W.setImpRole(ri(7000),'xfer');  W.IMP.rows[ri(7000)].peer='m2';
-  W.setImpRole(ri(3000),'loan');  W.IMP.rows[ri(3000)].peer='ln';
-  W.commitImport();
-  const tr = W.S.transactions.filter(t=>t.type==='transfer');
-  check('записано три перевода', tr.length, 3);
-  checkTrue('расход-перевод идёт со счёта выписки на второй', tr.some(t=>t.accountId==='m1'&&t.toAccountId==='m2'&&t.amount===5000));
-  checkTrue('приход-перевод идёт со второго счёта на счёт выписки', tr.some(t=>t.accountId==='m2'&&t.toAccountId==='m1'&&t.amount===7000));
-  checkTrue('погашение кредита — перевод на кредит', tr.some(t=>t.accountId==='m1'&&t.toAccountId==='ln'&&t.amount===3000));
-  check('обычный расход остался расходом', W.S.transactions.filter(t=>t.type==='expense').length, 1);
-  check('остаток второго счёта не изменился из-за старых операций', W.round2(W.balance(W.acc('m2'))), 1000);
-  check('долг по кредиту не изменился из-за старых операций', W.round2(W.balance(W.acc('ln'))), 50000);
-
-
-  group('Загрузка выписки — первая выписка, второй счёт создаётся из перевода');
-  reset(W); W.go('import'); W.IMP_MY_PHONE = '';
-  W.startMapping(MAN);
-  D.getElementById('impNewName').value = 'Основная'; D.getElementById('impNewBal').value = '10000';
-  W.setImpRole(ri(5000),'xfer'); W.setImpPeer(ri(5000),'__new__'); W.IMP.rows[ri(5000)].peerName = 'Накопительный';
-  W.setImpRole(ri(3000),'loan'); W.setImpPeer(ri(3000),'__new__'); W.IMP.rows[ri(3000)].peerName = 'Кредит в банке';
-  checkTrue('под строкой появилась подсказка, как назвать счёт', D.getElementById('impTable').innerHTML.includes('Назовите счёт так, как он называется в вашем банке'));
-  W.commitImport();
-  const pk = W.S.accounts.find(a=>a.name==='Накопительный'), kr = W.S.accounts.find(a=>a.name==='Кредит в банке');
-  checkTrue('создан счёт из перевода', pk && pk.type==='debit' && pk.placeholder);
-  checkTrue('создан кредит из погашения', kr && kr.type==='loan');
-  check('переводов записано', W.S.transactions.filter(t=>t.type==='transfer').length, 2);
-  check('остаток основного счёта — как назвал человек', W.round2(W.balance(W.acc(W.S.accounts[0].id))), 10000);
-
-  /* вторая выписка по счёту «Накопительный» */
-  W.go('import'); W.startMapping([
-    ['Дата, время операции (МСК)','Сумма операции (руб)','Описание операции'],
-    ['20.09.2026 10:05','+5 000,00','Зачисление перевода денежных средств'],
-    ['24.09.2026 10:00','+10,00','Проценты']]);
-  D.getElementById('impAccount').value = pk.id; W.showPreview();
-  checkTrue('счёт помечен «ждёт выписки»', D.getElementById('impAccount').innerHTML.includes('ждёт выписки'));
-  check('поле «название» скрыто, остаток спрашивается', D.getElementById('impNewNameBox').style.display, 'none');
-  D.getElementById('impNewBal').value = '20 000';
-  checkTrue('зеркальный перевод из первой выписки не считается доходом', !W.IMP.rows.find(r=>r.amount===5000).use);
-  W.commitImport();
-  check('остаток накопительного — как назвал человек', W.round2(W.balance(W.acc(pk.id))), 20000);
-  checkTrue('метка «ждёт выписки» снята', !W.acc(pk.id).placeholder);
+  addSt(STB, 'Резервный');
+  check('без остатка выписка по счёту «ждёт выписки» не добавляется', W.pendingList().length, 0);
+  addSt(STB, 'Резервный', '5000');
+  check('счёт из перевода находится по названию', W.pendingList()[0].existingId, RZ.id);
+  W.analyzeStatements(); W.commitAnalysis();
+  check('счёт больше не «ждёт выписки»', !!W.acc(RZ.id).placeholder, false);
+  check('остаток резервного — как назвал человек', W.round2(W.balance(W.acc(RZ.id))), 5000);
+  check('дубль не создал второй счёт', W.S.accounts.filter(a=>a.name==='Резервный').length, 1);
 
   /* ======================================================================
      Объединённая страница счетов: раскрытие и быстрый ввод.
