@@ -575,8 +575,9 @@ function showPreview(){
   document.getElementById('impSrcBox').style.display = needSrc ? 'block' : 'none';
 
   const rec = rows.filter(r=>r.use);
-  const inc = impSum(rec.filter(r=>r.kind==='income' && r.role!=='repay' && r.role!=='srcexp'));
-  const exp = impSum(rec.filter(r=>r.kind==='expense' && r.role!=='repay' && r.role!=='srcexp'));
+  const notPlain = r => r.role==='repay' || r.role==='srcexp' || r.role==='xfer' || r.role==='loan';
+  const inc = impSum(rec.filter(r=>r.kind==='income' && !notPlain(r)));
+  const exp = impSum(rec.filter(r=>r.kind==='expense' && !notPlain(r)));
   const own = rows.filter(r=>r.role==='own' || r.role==='fund');
   const ownOff = own.filter(r=>!r.use);
   const rep = rows.filter(r=>r.role==='repay');
@@ -607,10 +608,28 @@ function showPreview(){
     ${impCur===BASE ? '' : `<div class="note warn" style="margin-top:8px">Суммы будут записаны в валюте счёта: <b>${impCur} · ${esc(curName)}</b>. Проверьте, что выписка действительно в ${impCur}.</div>`}
     ${dups ? `<div class="note warn" style="margin-top:8px">Найдено похожих на уже существующие: <b>${dups}</b>. Они сняты с отметки — поставьте галочку, если хотите их импортировать.</div>` : ''}`;
 
+  /* Счета, которые можно выбрать второй стороной перевода */
+  const peerOpts = (r) => {
+    const list = S.accounts.filter(a=>!a.archived && (!target || a.id!==target.id) &&
+      (r.role==='loan' ? ['loan','credit_card','installment','debt'].includes(a.type)
+                       : (r.kind==='income' ? ACC_TYPES[a.type].asset : true)));
+    return `<option value="">— выберите счёт —</option>` +
+      list.map(a=>`<option value="${a.id}" ${a.id===r.peer?'selected':''}>${esc(accLabel(a))}</option>`).join('');
+  };
+  const roleOpts = (r) => {
+    const base = [['normal', r.kind==='income'?'Обычный доход':'Обычный расход'],
+                  ['xfer','Перевод между своими счетами']];
+    if(r.kind==='expense') base.push(['loan','Погашение кредита']);
+    const cur = ['normal','fee','ask'].includes(r.role) ? 'normal' : r.role;
+    if(!base.some(o=>o[0]===cur)) base.push([cur, r.why || cur]);
+    return base.map(o=>`<option value="${o[0]}" ${o[0]===cur?'selected':''}>${esc(o[1])}</option>`).join('');
+  };
+  const selStyle = 'max-width:170px;padding:4px;border:1px solid var(--line);border-radius:6px;font-size:12px';
+
   document.getElementById('impTable').innerHTML = `
     <thead><tr>
       <th style="width:28px"><input type="checkbox" checked onchange="toggleAllImp(this.checked)"></th>
-      <th>Дата</th><th>Описание</th><th class="r">Сумма</th><th>Категория</th>
+      <th>Дата</th><th>Описание</th><th class="r">Сумма</th><th>Как записать</th><th>Категория / счёт</th>
     </tr></thead>
     <tbody>${rows.map((r,i)=>`
       <tr style="${(r.dup||!r.use)?'opacity:.55':''}">
@@ -618,11 +637,22 @@ function showPreview(){
         <td style="white-space:nowrap">${dateShort(r.date)}</td>
         <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis">${esc(r.desc)||'<span class="mut">без описания</span>'}${r.dup?' <span class="chip bad">дубль</span>':''}${r.why?` <span class="chip">${esc(r.why)}</span>`:''}</td>
         <td class="r ${r.kind==='income'?'pos':'neg'}" style="white-space:nowrap">${r.kind==='income'?'+':'−'}${money(r.amount,{cur:impCur})}</td>
-        <td><select onchange="IMP.rows[${i}].categoryId=this.value" style="max-width:150px;padding:4px;border:1px solid var(--line);border-radius:6px;font-size:12px">
-          ${S.categories.filter(c=>c.kind===r.kind).map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}
-        </select></td>
+        <td><select onchange="setImpRole(${i},this.value)" style="${selStyle}">${roleOpts(r)}</select></td>
+        <td>${(r.role==='xfer'||r.role==='loan')
+          ? `<select onchange="IMP.rows[${i}].peer=this.value" style="${selStyle}">${peerOpts(r)}</select>`
+          : `<select onchange="IMP.rows[${i}].categoryId=this.value" style="${selStyle}">
+              ${S.categories.filter(c=>c.kind===r.kind).map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}
+            </select>`}</td>
       </tr>`).join('')}</tbody>`;
   updSel();
+}
+/* Способ записи строки поменяли вручную */
+function setImpRole(i, v){
+  const r = IMP.rows[i];
+  r.role = v; r.why = '';
+  if(v==='xfer' || v==='loan'){ r.peer = ''; r.use = true; }
+  else if(v==='normal'){ r.use = true; }
+  showPreviewStats();
 }
 /* Галочку в таблице сняли — итоги наверху пересчитываем, таблицу не трогаем */
 function showPreviewStats(){
@@ -682,7 +712,7 @@ function commitImport(){
   const srcId = document.getElementById('impSrcAcc').value;
   const src = srcId ? acc(srcId) : null;
   const txs = [];
-  let nRec = 0, nRep = 0, nSrc = 0, nSkip = 0;
+  let nRec = 0, nRep = 0, nSrc = 0, nSkip = 0, nXfer = 0;
   for(const r of sel){
     if(r.role==='repay'){
       if(!src){ nSkip++; continue; }
@@ -699,6 +729,18 @@ function commitImport(){
       /* Компенсируем, чтобы остаток не сдвинулся из-за старых списаний */
       if(!(isNew && !src)) tgt.openingBalance = round2((tgt.openingBalance||0) + (ACC_TYPES[tgt.type].asset ? r.amount : -r.amount));
       nSrc++;
+    } else if(r.role==='xfer' || r.role==='loan'){
+      const peer = r.peer ? acc(r.peer) : null;
+      if(!peer){ nSkip++; continue; }
+      const out = r.kind==='expense';   // деньги ушли с этого счёта на peer — или наоборот
+      txs.push({id: uid(), date: r.date, type:'transfer',
+                accountId: out ? accountId : peer.id, toAccountId: out ? peer.id : accountId,
+                amount: r.amount, note: r.desc, source:'import'});
+      /* Второй счёт уже показывает актуальный остаток — гасим влияние старой операции */
+      const asset = ACC_TYPES[peer.type].asset;
+      const eff = out ? (asset ? r.amount : -r.amount) : (asset ? -r.amount : r.amount);
+      peer.openingBalance = round2((peer.openingBalance||0) - eff);
+      nXfer++;
     } else {
       txs.push({id: uid(), date: r.date, type: r.kind, accountId,
                 categoryId: r.categoryId, amount: r.amount, note: r.desc, source:'import'});
@@ -717,7 +759,7 @@ function commitImport(){
   if(phoneDigits(ph).length===10) S.settings.myPhone = ph;
   save(); cancelImport(); renderAll();
   toast(`Записано операций: ${nRec}` + (nRep ? `, погашений: ${nRep}` : '')
-    + (nSrc ? `, списаний: ${nSrc}` : '') + (nSkip ? `, пропущено без счёта погашения: ${nSkip}` : ''));
+    + (nSrc ? `, списаний: ${nSrc}` : '') + (nXfer ? `, переводов: ${nXfer}` : '') + (nSkip ? `, пропущено без выбранного счёта: ${nSkip}` : ''));
   go(isNew ? 'home' : 'accounts');
 }
 

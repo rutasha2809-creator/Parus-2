@@ -327,6 +327,37 @@ function reset(W, patch){
   checkTrue('погашение записано переводом со счёта на карту', rp && rp.accountId==='d1' && rp.toAccountId===cc.id && rp.amount===2000);
   check('остаток дебетовой счёта не ушёл вниз из-за старых списаний', W.round2(W.balance(W.acc('d1'))), 10000);
 
+
+  group('Загрузка выписки — ручная правка: перевод и погашение кредита');
+  const MAN = [
+    ['Дата, время операции (МСК)','Сумма операции (руб)','Описание операции'],
+    ['20.09.2026 10:00','-5 000,00','Перевод на другую карту'],
+    ['21.09.2026 10:00','+7 000,00','Пополнение с другой карты'],
+    ['22.09.2026 10:00','-3 000,00','Платёж по кредиту'],
+    ['23.09.2026 10:00','-100,00','Кофе']
+  ];
+  reset(W, { accounts: [
+    {id:'m1',type:'debit',name:'Основная',currency:'RUB',openingBalance:20000},
+    {id:'m2',type:'debit',name:'Вторая',currency:'RUB',openingBalance:1000},
+    {id:'ln',type:'loan',name:'Кредит',currency:'RUB',openingBalance:50000}] });
+  W.go('import'); W.IMP_MY_PHONE = '';
+  W.startMapping(MAN);
+  D.getElementById('impAccount').value = 'm1'; W.showPreview();
+  const ri = a => W.IMP.rows.findIndex(r=>r.amount===a);
+  checkTrue('в списке строки есть выбор «Как записать»', D.getElementById('impTable').innerHTML.includes('Погашение кредита'));
+  W.setImpRole(ri(5000),'xfer');  W.IMP.rows[ri(5000)].peer='m2';
+  W.setImpRole(ri(7000),'xfer');  W.IMP.rows[ri(7000)].peer='m2';
+  W.setImpRole(ri(3000),'loan');  W.IMP.rows[ri(3000)].peer='ln';
+  W.commitImport();
+  const tr = W.S.transactions.filter(t=>t.type==='transfer');
+  check('записано три перевода', tr.length, 3);
+  checkTrue('расход-перевод идёт со счёта выписки на второй', tr.some(t=>t.accountId==='m1'&&t.toAccountId==='m2'&&t.amount===5000));
+  checkTrue('приход-перевод идёт со второго счёта на счёт выписки', tr.some(t=>t.accountId==='m2'&&t.toAccountId==='m1'&&t.amount===7000));
+  checkTrue('погашение кредита — перевод на кредит', tr.some(t=>t.accountId==='m1'&&t.toAccountId==='ln'&&t.amount===3000));
+  check('обычный расход остался расходом', W.S.transactions.filter(t=>t.type==='expense').length, 1);
+  check('остаток второго счёта не изменился из-за старых операций', W.round2(W.balance(W.acc('m2'))), 1000);
+  check('долг по кредиту не изменился из-за старых операций', W.round2(W.balance(W.acc('ln'))), 50000);
+
   /* ======================================================================
      Объединённая страница счетов: раскрытие и быстрый ввод.
      ====================================================================== */
