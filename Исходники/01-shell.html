@@ -438,8 +438,14 @@ nav button.on{color:var(--brand)}
 /* на простом главном экране своя кнопка «Добавить операцию» — плавающая не нужна */
 body:has(#s-home.active[data-mode="simple"]) .fab{display:none}
 #s-home.active{display:flex;flex-direction:column}
-#s-home #cardOnboard{order:-2}
-#s-home #homeSimple{order:-1}
+#s-home.active #cardOnboard{order:1}
+#s-home.active #cardAlerts{order:2}
+#s-home.active #homeSimpleTop{order:3}
+#s-home.active #cardDebtDue{order:4}
+#s-home.active #cardUpcoming{order:5}
+#s-home.active #homeSimpleBottom{order:6}
+#s-home.active #homeAdvanced{order:7}
+#s-home.active #cardTx{order:8}
 .tv{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;letter-spacing:-.5px;line-height:1.15}
 .tl{font-size:11.5px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.aurora span{animation:none}}
@@ -476,15 +482,14 @@ nav .brand{display:none}
 
   #s-home.active{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
   #s-home.active>*{grid-column:1/-1;margin-bottom:0}
-  #s-home.active:has(#cardDebtDue[style*="block"]) #cardDebtDue,
-  #s-home.active:has(#cardDebtDue[style*="block"]) #cardTx{grid-column:span 1}
-  #homeSimple{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-  #homeSimple[style*="none"]{display:none}
-  #homeSimple .hero{grid-column:1/3;grid-row:1/3;margin:0;display:flex;flex-direction:column;justify-content:center;min-height:210px}
-  #homeSimple .tiles{display:contents}
-  #homeSimple .tiles .card{grid-column:3/5;margin:0}
-  #homeSimple .addbtn{grid-column:1/-1;margin:0!important}
-  .hero-v{font-size:52px}
+  #s-home.active[data-mode="simple"] #homeSimpleTop,
+  #s-home.active[data-mode="simple"] #homeSimpleBottom,
+  #s-home.active[data-mode="simple"] #cardDebtDue,
+  #s-home.active[data-mode="simple"] #cardUpcoming{grid-column:span 1}
+  #homeSimpleTop .hero{margin:0;height:100%;display:flex;flex-direction:column;justify-content:center;min-height:200px}
+  #homeSimpleBottom .tiles{margin-bottom:16px}
+  #homeSimpleBottom .addbtn{margin-bottom:0!important}
+  .hero-v{font-size:46px}
   #homeAdvanced{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
   #homeAdvanced[style*="none"]{display:none}
   #homeAdvanced>*{margin:0}
@@ -550,24 +555,13 @@ nav .brand{display:none}
     <div id="debtDue"></div>
   </div>
 
-  <!-- ---- простой режим: три главных цифры + быстрый ввод ---- -->
-  <div id="homeSimple" style="display:none">
+  <!-- ---- простой режим: сколько денег сейчас ---- -->
+  <div id="homeSimpleTop" style="display:none">
     <div class="hero">
-      <div class="hero-l">Можно потратить</div>
-      <div class="hero-v" id="kSafe">—</div>
-      <div class="hero-s" id="kSafeNote">—</div>
+      <div class="hero-l">Остаток на счетах</div>
+      <div class="hero-v" id="kCash">—</div>
+      <div class="hero-s" id="kCashNote">—</div>
     </div>
-    <div class="grid2 tiles">
-      <div class="card">
-        <h2>Долги <button class="act" onclick="go('debts')">→</button></h2>
-        <div id="homeDebtProgress"></div>
-      </div>
-      <div class="card">
-        <h2>Подушка <button class="act" onclick="go('accounts')">→</button></h2>
-        <div id="homeSavingsProgress"></div>
-      </div>
-    </div>
-    <button class="btn addbtn btn-blk" onclick="openTx()" style="margin-bottom:12px">+ Добавить операцию</button>
   </div>
 
   <!-- ---- расширенный режим: как было ---- -->
@@ -576,7 +570,6 @@ nav .brand{display:none}
       <div class="stat"><div class="n pos" id="kLiquid">—</div><div class="l">Свободные деньги</div></div>
       <div class="stat"><div class="n neg" id="kDebt">—</div><div class="l">Всего долгов</div></div>
     </div>
-
     <div class="card">
       <h2>Этот месяц <button class="act" onclick="go('analytics')">Аналитика →</button></h2>
       <div class="grid3">
@@ -595,16 +588,31 @@ nav .brand{display:none}
         </div>
       </div>
     </div>
-
-    <div class="card">
-      <h2>Ближайшие платежи <button class="act" onclick="go('calendar')">Календарь →</button></h2>
-      <div id="upcoming"></div>
-    </div>
-
     <div class="card">
       <h2>Счета <button class="act" onclick="go('accounts')">Все →</button></h2>
       <div id="homeAccounts"></div>
     </div>
+  </div>
+
+  <!-- ---- что скоро спишется: общее для обоих режимов ---- -->
+  <div class="card" id="cardUpcoming">
+    <h2>Ближайшие платежи <button class="act" onclick="go('calendar')">Календарь →</button></h2>
+    <div id="upcoming"></div>
+  </div>
+
+  <!-- ---- простой режим: куда я двигаюсь ---- -->
+  <div id="homeSimpleBottom" style="display:none">
+    <div class="grid2 tiles">
+      <div class="card">
+        <h2>Долги <button class="act" onclick="go('debts')">→</button></h2>
+        <div id="homeDebtProgress"></div>
+      </div>
+      <div class="card">
+        <h2>Подушка <button class="act" onclick="go('accounts')">→</button></h2>
+        <div id="homeSavingsProgress"></div>
+      </div>
+    </div>
+    <button class="btn addbtn btn-blk" onclick="openTx()" style="margin-bottom:12px">+ Добавить операцию</button>
   </div>
 
   <div class="card" id="cardTx">

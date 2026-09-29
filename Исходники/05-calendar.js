@@ -1085,24 +1085,28 @@ function renderOnboard(){
     </div>`).join('');
 }
 
-/* «Можно потратить» — для простого режима, без таблиц и графиков.
-   Берём остаток сейчас, вычитаем всё, что точно спишется (обязательные
-   платежи и долги) до ближайшего дохода, и делим на число дней до него —
-   это и есть сумма, которую можно спокойно тратить каждый день, не уходя
-   в минус. Дохода на горизонте не видно — делим на 30 дней вперёд. */
-function safeToSpend(){
+/* Деньги на каждый день: только дебетовые карты и наличные.
+   Вклады и накопительные счета сюда не входят никогда — даже те, что можно
+   снять в любой момент: человек должен видеть ту же цифру, что и в банке. */
+function everydayMoney(){
+  return round2(S.accounts
+    .filter(a => !a.archived && (a.type === 'debit' || a.type === 'cash'))
+    .reduce((s,a) => s + toBase(balance(a), accCurrency(a)), 0));
+}
+
+/* Что спишется до ближайшего дохода и сколько после этого останется.
+   Если доходов в прогнозе нет — считаем на 30 дней вперёд. */
+function untilIncome(){
   const F = buildForecast(120);
-  let nextIncomeIdx = -1;
-  for(let i=1;i<F.length;i++){ if(F[i].inc > 0){ nextIncomeIdx = i; break; } }
-  const buf = S.settings.minBuffer || 0;
-  const days = nextIncomeIdx > 0 ? nextIncomeIdx : Math.max(1, Math.min(30, F.length-1));
-  let committed = 0;
-  for(let i=0;i<=days && i<F.length;i++) committed += F[i].exp;
-  const free = Math.max(0, round2(totalLiquid() - committed - buf));
-  return {
-    perDay: round2(free/days), days, free,
-    nextIncomeDate: nextIncomeIdx>0 ? F[nextIncomeIdx].date : null
-  };
+  let idx = -1;
+  for(let i=1;i<F.length;i++){ if(F[i].inc > 0){ idx = i; break; } }
+  const days = idx > 0 ? idx : Math.max(1, Math.min(30, F.length-1));
+  let spend = 0;
+  for(let i=0;i<=days && i<F.length;i++) spend += F[i].exp;
+  spend = round2(spend);
+  const now = everydayMoney();
+  return { now, spend, days, after: round2(now - spend),
+           nextIncomeDate: idx > 0 ? F[idx].date : null };
 }
 
 /* Долги одной цифрой: сколько было, сколько осталось, сколько погашено —
@@ -1129,38 +1133,42 @@ function savingsProgressAgg(){
 function renderHome(){
   renderOnboard();
   const mode = S.settings.mode || 'simple';
-  document.getElementById('homeSimple').style.display   = mode==='simple'   ? '' : 'none';
-       document.getElementById('s-home').dataset.mode = mode;
-  document.getElementById('homeAdvanced').style.display = mode==='advanced' ? '' : 'none';
+  document.getElementById('homeSimpleTop').style.display    = mode==='simple'   ? '' : 'none';
+  document.getElementById('homeSimpleBottom').style.display = mode==='simple'   ? '' : 'none';
+  document.getElementById('homeAdvanced').style.display     = mode==='advanced' ? '' : 'none';
+  document.getElementById('s-home').dataset.mode = mode;
 
   document.getElementById('hNet').textContent = moneyShort(netWorth());
   const n = new Date();
   document.getElementById('hSub').textContent = MONTHS_N[n.getMonth()] + ' ' + n.getFullYear();
 
   if(mode==='simple'){
-    const st = safeToSpend();
-    document.getElementById('kSafe').textContent = money(st.perDay);
-    document.getElementById('kSafeNote').textContent = st.nextIncomeDate
-      ? `На ${st.days} ${plural(st.days,'день','дня','дней')} до дохода ${dateShort(st.nextIncomeDate)} · свободно ${money(st.free)}`
-      : `На ближайшие ${st.days} дней · свободно ${money(st.free)}`;
+    const st = untilIncome();
+    document.getElementById('kCash').textContent = money(st.now);
+    document.getElementById('kCashNote').textContent =
+      st.spend <= 0
+        ? 'Списаний в ближайшие дни не запланировано'
+        : (st.nextIncomeDate
+            ? `До дохода ${dateShort(st.nextIncomeDate)} спишется ${money(st.spend)} — останется ${money(st.after)}`
+            : `За ${st.days} ${plural(st.days,'день','дня','дней')} спишется ${money(st.spend)} — останется ${money(st.after)}`);
 
     const dp = debtProgressAgg();
     document.getElementById('homeDebtProgress').innerHTML = !dp.hasDebt
-           ? `<div class="empty">Долгов нет.</div>`
-           : `<div class="tv neg">${money(dp.now)}</div>
-              <div class="tl">Осталось</div>
-              <div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
-              <div class="tl">Погашено ${dp.pct.toFixed(0)}%</div>`;
+      ? `<div class="empty">Долгов нет.</div>`
+      : `<div class="tv neg">${money(dp.now)}</div>
+         <div class="tl">Осталось</div>
+         <div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
+         <div class="tl">Погашено ${dp.pct.toFixed(0)}%</div>`;
 
-         const sp = savingsProgressAgg();
-         document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
-           ? `<div class="empty">Цель накоплений не задана.<br>
-                Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
-           : `<div class="tv pos">${money(sp.saved)}</div>
-              <div class="tl">Собрано</div>
-              <div class="bar g"><i style="width:${sp.pct}%"></i></div>
-              <div class="tl">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</div>`;
-       }
+    const sp = savingsProgressAgg();
+    document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
+      ? `<div class="empty">Цель накоплений не задана.<br>
+           Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
+      : `<div class="tv pos">${money(sp.saved)}</div>
+         <div class="tl">Собрано</div>
+         <div class="bar g"><i style="width:${sp.pct}%"></i></div>
+         <div class="tl">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</div>`;
+  }
 
   const liq = totalLiquid(), debt = totalDebt();
   if(mode==='advanced'){
@@ -1231,10 +1239,15 @@ function renderHome(){
 
   if(typeof renderDebtReminders === 'function') renderDebtReminders();
 
+  /* В простом режиме карточка показывает только то, что требует действий
+     с деньгами: просрочки, разрывы и нехватку. Напоминание про вход и советы
+     по заполнению там только мешают — для них есть «С чего начать». */
+  const shown = mode==='simple' ? alerts.filter(a => !a.act && a.cls !== 'info') : alerts;
+
   const ac = document.getElementById('cardAlerts');
-  if(alerts.length){
+  if(shown.length){
     ac.style.display = 'block';
-    document.getElementById('alerts').innerHTML = alerts.map(a=>`
+    document.getElementById('alerts').innerHTML = shown.map(a=>`
       <div class="row" onclick="${a.act ? a.act : `go('${a.go}')`}" style="cursor:pointer">
         <div class="l"><div class="t">${esc(a.t)} <span class="chip ${a.cls}">${a.cls==='bad'?'важно':a.cls==='opt'?'внимание':'совет'}</span></div>
           <div class="s">${esc(a.s)}</div></div><div class="v mut">›</div></div>`).join('');

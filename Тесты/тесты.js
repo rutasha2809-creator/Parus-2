@@ -755,15 +755,17 @@ function reset(W, patch){
 
   reset(W, { settings: Object.assign({}, W.S.settings, { mode: 'simple' }) });
   W.go('home');
-  checkTrue('простой режим по умолчанию — блок #homeSimple виден',
-    W.document.getElementById('homeSimple').style.display !== 'none');
+  checkTrue('простой режим по умолчанию — блок «Остаток на счетах» виден',
+    W.document.getElementById('homeSimpleTop').style.display !== 'none');
   checkTrue('расширенный блок #homeAdvanced скрыт',
     W.document.getElementById('homeAdvanced').style.display === 'none');
 
   W.setAppMode('advanced');
   checkTrue('после переключения — #homeAdvanced виден',
     W.document.getElementById('homeAdvanced').style.display !== 'none');
-  checkTrue('#homeSimple скрыт', W.document.getElementById('homeSimple').style.display === 'none');
+  checkTrue('блоки простого режима скрыты',
+    W.document.getElementById('homeSimpleTop').style.display === 'none'
+    && W.document.getElementById('homeSimpleBottom').style.display === 'none');
   check('режим сохранён в настройках', W.S.settings.mode, 'advanced');
 
   W.setAppMode('simple');
@@ -807,16 +809,50 @@ function reset(W, patch){
   });
   checkTrue('вклад без цели не считается подушкой — hasGoal = false', !W.savingsProgressAgg().hasGoal);
 
-  /* --- «Можно потратить» --- */
+  /* --- «Остаток на счетах»: только карты и наличные --- */
   reset(W, {
     settings: Object.assign({}, W.S.settings, { mode: 'simple', minBuffer: 0 }),
-    accounts: [{ id:'card', type:'debit', name:'Карта', openingBalance: 10000 }]
+    accounts: [
+      { id:'card', type:'debit',   name:'Карта',    openingBalance: 10000 },
+      { id:'nal',  type:'cash',    name:'Наличные', openingBalance: 2000 },
+      { id:'dep',  type:'deposit', name:'Вклад',    openingBalance: 50000, liquid:true },
+      { id:'cc',   type:'credit_card', name:'Кредитка', openingBalance: 7000 }
+    ]
   });
-  let st = W.safeToSpend();
-  checkTrue('«можно потратить» в день не отрицательно', st.perDay >= 0);
-  checkTrue('свободная сумма не отрицательна', st.free >= 0);
-  checkTrue('горизонт в днях положительный', st.days > 0);
-  check('свободная сумма при пустых операциях равна остатку', st.free, 10000);
+  check('в остаток вошли только карта и наличные', W.everydayMoney(), 12000);
+  checkTrue('вклад в остаток не попал, даже со снятием в любой момент',
+            W.everydayMoney() !== W.totalLiquid());
+
+  /* --- сколько спишется до ближайшего дохода --- */
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple', minBuffer: 0 }),
+    accounts: [{ id:'card', type:'debit', name:'Карта', openingBalance: 30000 }],
+    recurring: [
+      { id:'r1', name:'Зарплата', amount: 50000, kind:'income', freq:'monthly',
+        startDate: W.addDays(W.today(), 10), accountId:'card', categoryId:'', active:true },
+      { id:'r2', name:'Интернет', amount: 1000, kind:'expense', freq:'monthly',
+        startDate: W.addDays(W.today(), 3), accountId:'card', categoryId:'', active:true }
+    ]
+  });
+  let ui = W.untilIncome();
+  check('ближайший доход найден', ui.nextIncomeDate, W.addDays(W.today(), 10));
+  check('до дохода 10 дней', ui.days, 10);
+  check('спишется только платёж до этой даты', ui.spend, 1000);
+  check('останется — остаток минус списания', ui.after, 29000);
+
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple', minBuffer: 0 }),
+    accounts: [{ id:'card', type:'debit', name:'Карта', openingBalance: 30000 }]
+  });
+  ui = W.untilIncome();
+  check('без доходов в прогнозе горизонт — 30 дней', ui.days, 30);
+  check('списаний нет — остаётся весь остаток', ui.after, 30000);
+
+  /* --- в простом режиме в «Требует внимания» нет напоминания про вход --- */
+  W.go('home');
+  const alertsHtml = W.document.getElementById('alerts').innerHTML;
+  checkTrue('напоминание «Войдите в аккаунт» в простом режиме не показывается',
+            !alertsHtml.includes('Войдите в аккаунт'));
 
   /* --- поле «Цель накоплений» в форме вклада --- */
   W.openAccount();
