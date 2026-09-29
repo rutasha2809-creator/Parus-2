@@ -1130,11 +1130,27 @@ function savingsProgressAgg(){
   return { saved, goal, pct, hasGoal: list.length>0 };
 }
 
+/* Ближайшие платежи для простого режима: только то, что нужно оплатить —
+   обязательные платежи из календаря и погашение долгов. Доходов здесь нет,
+   переводов между своими счетами тоже. Просроченные долги тоже видны. */
+function upcomingPayments(days){
+  const T = today(), limit = addDays(T, days);
+  const out = [];
+  const F = buildForecast(days + 1);
+  for(const d of F)
+    for(const e of d.items)
+      if(!e.done && !e.debt && !e.transfer && e.kind==='expense' && d.date <= limit)
+        out.push({name:e.name, date:d.date, amount:e.amount, debt:false, overdue:false});
+  for(const r of debtReminders(days))
+    if(!r.paid && r.amount > 0)
+      out.push({name:r.name, date:r.date, amount:r.amount, debt:true, overdue:r.baseStatus==='overdue'});
+  return out.sort((a,b)=>a.date.localeCompare(b.date));
+}
+
 function renderHome(){
   renderOnboard();
   const mode = S.settings.mode || 'simple';
   document.getElementById('homeSimpleTop').style.display    = mode==='simple'   ? '' : 'none';
-  document.getElementById('homeSimpleBottom').style.display = mode==='simple'   ? '' : 'none';
   document.getElementById('homeAdvanced').style.display     = mode==='advanced' ? '' : 'none';
   document.getElementById('s-home').dataset.mode = mode;
 
@@ -1151,6 +1167,13 @@ function renderHome(){
         : (st.nextIncomeDate
             ? `До дохода ${dateShort(st.nextIncomeDate)} спишется ${money(st.spend)} — останется ${money(st.after)}`
             : `За ${st.days} ${plural(st.days,'день','дня','дней')} спишется ${money(st.spend)} — останется ${money(st.after)}`);
+
+    const soon = upcomingPayments(14);
+    const soonSum = round2(soon.reduce((t,x)=>t+x.amount,0));
+    document.getElementById('kSoon').textContent = money(soonSum);
+    document.getElementById('kSoonNote').textContent = soon.length
+      ? `${soon.length} ${plural(soon.length,'платёж','платежа','платежей')}`
+      : 'Платежей не запланировано';
 
     const dp = debtProgressAgg();
     document.getElementById('homeDebtProgress').innerHTML = !dp.hasDebt
@@ -1254,16 +1277,25 @@ function renderHome(){
   } else ac.style.display = 'none';
 
   // ближайшие платежи
-  const up = [];
-  for(let i=0;i<F.length && up.length<6;i++)
-    for(const e of F[i].items)
-      /* платежи по долгам показаны отдельной карточкой с кнопкой «Внести» */
-      if(!e.done && !e.debt && up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
-  document.getElementById('upcoming').innerHTML = up.length
-    ? up.map(e=>`<div class="row"><div class="l"><div class="t">${esc(e.name)}</div>
-        <div class="s">${dateLong(e.date)}, ${DOW[parseISO(e.date).getDay()]}</div></div>
-        <div class="v ${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</div></div>`).join('')
-    : `<div class="empty">Запланированных платежей нет. Добавьте регулярные платежи в календаре.</div>`;
+  if(mode==='simple'){
+    const list = upcomingPayments(14).slice(0,6);
+    document.getElementById('upcoming').innerHTML = list.length
+      ? list.map(e=>`<div class="row"><div class="l"><div class="t">${esc(e.name)}</div>
+          <div class="s">${e.overdue?'просрочен · ':''}${dateLong(e.date)}, ${DOW[parseISO(e.date).getDay()]}${e.debt?' · погашение долга':''}</div></div>
+          <div class="v neg">−${money(e.amount)}</div></div>`).join('')
+      : `<div class="empty">Платежей на ближайшие две недели нет.</div>`;
+  } else {
+    const up = [];
+    for(let i=0;i<F.length && up.length<6;i++)
+      for(const e of F[i].items)
+        /* платежи по долгам показаны отдельной карточкой с кнопкой «Внести» */
+        if(!e.done && !e.debt && up.length<6) up.push(Object.assign({}, e, {date:F[i].date}));
+    document.getElementById('upcoming').innerHTML = up.length
+      ? up.map(e=>`<div class="row"><div class="l"><div class="t">${esc(e.name)}</div>
+          <div class="s">${dateLong(e.date)}, ${DOW[parseISO(e.date).getDay()]}</div></div>
+          <div class="v ${e.kind==='income'?'pos':'neg'}">${e.kind==='income'?'+':'−'}${money(e.amount)}</div></div>`).join('')
+      : `<div class="empty">Запланированных платежей нет. Добавьте регулярные платежи в календаре.</div>`;
+  }
 
   // счета
   document.getElementById('homeAccounts').innerHTML = S.accounts.length

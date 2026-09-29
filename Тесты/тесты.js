@@ -763,9 +763,8 @@ function reset(W, patch){
   W.setAppMode('advanced');
   checkTrue('после переключения — #homeAdvanced виден',
     W.document.getElementById('homeAdvanced').style.display !== 'none');
-  checkTrue('блоки простого режима скрыты',
-    W.document.getElementById('homeSimpleTop').style.display === 'none'
-    && W.document.getElementById('homeSimpleBottom').style.display === 'none');
+  checkTrue('блок простого режима скрыт',
+    W.document.getElementById('homeSimpleTop').style.display === 'none');
   check('режим сохранён в настройках', W.S.settings.mode, 'advanced');
 
   W.setAppMode('simple');
@@ -847,6 +846,34 @@ function reset(W, patch){
   ui = W.untilIncome();
   check('без доходов в прогнозе горизонт — 30 дней', ui.days, 30);
   check('списаний нет — остаётся весь остаток', ui.after, 30000);
+
+  /* --- ближайшие платежи: только расходы и погашение долгов, без доходов --- */
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple', minBuffer: 0 }),
+    accounts: [
+      { id:'card', type:'debit', name:'Карта', openingBalance: 30000 },
+      { id:'ins', type:'installment', name:'Рассрочка', openingBalance: 6000, partsLeft: 2, payment: 3000,
+        freq:'monthly', nextPaymentDate: W.addDays(W.today(), 5) }
+    ],
+    recurring: [
+      { id:'r1', name:'Зарплата', amount: 50000, kind:'income', freq:'monthly',
+        startDate: W.addDays(W.today(), 4), accountId:'card', categoryId:'', active:true },
+      { id:'r2', name:'Интернет', amount: 1000, kind:'expense', freq:'monthly',
+        startDate: W.addDays(W.today(), 3), accountId:'card', categoryId:'', active:true }
+    ]
+  });
+  const upc = W.upcomingPayments(14);
+  checkTrue('зарплаты в ближайших платежах нет', !upc.some(x => x.name === 'Зарплата'));
+  checkTrue('обязательный платёж есть', upc.some(x => x.name === 'Интернет' && x.amount === 1000));
+  checkTrue('погашение долга есть и помечено', upc.some(x => x.debt && x.amount === 3000));
+  W.go('home');
+  check('на плитке сумма платежей за 14 дней', W.document.getElementById('kSoon').textContent.replace(/\s|\u00a0/g,''), '4000₽');
+  checkTrue('в списке ближайших платежей нет кнопок ввода',
+    !W.document.getElementById('upcoming').innerHTML.includes('button'));
+  check('карточка «Платежи по долгам» с кнопками в простом режиме скрыта',
+    W.getComputedStyle(W.document.getElementById('cardDebtDue')).display, 'none');
+  check('«Последние операции» в простом режиме скрыты',
+    W.getComputedStyle(W.document.getElementById('cardTx')).display, 'none');
 
   /* --- в простом режиме в «Требует внимания» нет напоминания про вход --- */
   W.go('home');

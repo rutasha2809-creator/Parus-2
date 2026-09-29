@@ -436,14 +436,12 @@ nav button.on{color:var(--brand)}
 .tiles .empty{padding:10px 0;font-size:12px}
 .addbtn{background:var(--card);border:1px dashed var(--muted-2);color:var(--brand);border-radius:var(--r-control);padding:13px}
 /* на простом главном экране своя кнопка «Добавить операцию» — плавающая не нужна */
-body:has(#s-home.active[data-mode="simple"]) .fab{display:none}
 #s-home.active{display:flex;flex-direction:column}
 #s-home.active #cardOnboard{order:1}
 #s-home.active #cardAlerts{order:2}
 #s-home.active #homeSimpleTop{order:3}
 #s-home.active #cardDebtDue{order:4}
 #s-home.active #cardUpcoming{order:5}
-#s-home.active #homeSimpleBottom{order:6}
 #s-home.active #homeAdvanced{order:7}
 #s-home.active #cardTx{order:8}
 .tv{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;letter-spacing:-.5px;line-height:1.15}
@@ -483,13 +481,10 @@ nav .brand{display:none}
   #s-home.active{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
   #s-home.active>*{grid-column:1/-1;margin-bottom:0}
   #s-home.active[data-mode="simple"] #homeSimpleTop,
-  #s-home.active[data-mode="simple"] #homeSimpleBottom,
-  #s-home.active[data-mode="simple"] #cardDebtDue,
   #s-home.active[data-mode="simple"] #cardUpcoming{grid-column:span 1}
-  #homeSimpleTop .hero{margin:0;height:100%;display:flex;flex-direction:column;justify-content:center;min-height:200px}
-  #homeSimpleBottom .tiles{margin-bottom:16px}
-  #homeSimpleBottom .addbtn{margin-bottom:0!important}
-  .hero-v{font-size:46px}
+  #s-home.active[data-mode="simple"] #homeSimpleTop{align-self:stretch}
+  #s-home.active[data-mode="simple"] #homeSimpleTop .kpis{height:100%;margin:0}
+  .kpi{min-height:132px}
   #homeAdvanced{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
   #homeAdvanced[style*="none"]{display:none}
   #homeAdvanced>*{margin:0}
@@ -499,6 +494,30 @@ nav .brand{display:none}
   .sheet{border-radius:24px;max-height:88vh}
   .fab{right:32px;bottom:32px}
 }
+
+/* ---------- простой режим: плитки-сводки, по две в ряд ---------- */
+#s-home[data-mode="simple"] #cardTx,
+#s-home[data-mode="simple"] #cardDebtDue{display:none!important}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.kpi{position:relative;display:flex;flex-direction:column;gap:2px;min-height:124px;padding:15px 15px 14px;
+  background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);cursor:pointer;color:var(--ink);
+  transition:transform .25s cubic-bezier(.2,.8,.3,1),box-shadow .25s ease,border-color .25s}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-hi);border-color:var(--brand)}
+.kpi:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.kpi--main{background:var(--hero-bg);color:#fff;border-color:rgba(255,255,255,.16);box-shadow:var(--shadow-hi)}
+.kpi-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.kpi-i{width:26px;height:26px;border-radius:8px;background:var(--chip-bg);color:var(--brand);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kpi--main .kpi-i{background:rgba(255,255,255,.18);color:#fff}
+.kpi-i svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kpi-l{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);line-height:1.2}
+.kpi--main .kpi-l{color:rgba(255,255,255,.86)}
+.kpi-v{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.6px;line-height:1.15}
+.kpi-s{font-size:11.5px;color:var(--muted);margin-top:auto;padding-top:6px;line-height:1.4}
+.kpi--main .kpi-s{color:rgba(255,255,255,.82)}
+.kpi .bar{margin:8px 0 5px}
+.kpi .empty{padding:2px 0;font-size:12px;text-align:left}
 </style>
 </head>
 <body>
@@ -555,12 +574,27 @@ nav .brand{display:none}
     <div id="debtDue"></div>
   </div>
 
-  <!-- ---- простой режим: сколько денег сейчас ---- -->
+  <!-- ---- простой режим: четыре плитки-сводки ---- -->
   <div id="homeSimpleTop" style="display:none">
-    <div class="hero">
-      <div class="hero-l">Остаток на счетах</div>
-      <div class="hero-v" id="kCash">—</div>
-      <div class="hero-s" id="kCashNote">—</div>
+    <div class="kpis">
+      <div class="kpi kpi--main" role="button" tabindex="0" onclick="go('accounts')">
+        <div class="kpi-h"><span class="kpi-i"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h3"/></svg></span><span class="kpi-l">Остаток на счетах</span></div>
+        <div class="kpi-v" id="kCash">—</div>
+        <div class="kpi-s" id="kCashNote">—</div>
+      </div>
+      <div class="kpi" role="button" tabindex="0" onclick="go('calendar')">
+        <div class="kpi-h"><span class="kpi-i"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span><span class="kpi-l">Платежи на 14 дней</span></div>
+        <div class="kpi-v" id="kSoon">—</div>
+        <div class="kpi-s" id="kSoonNote">—</div>
+      </div>
+      <div class="kpi" role="button" tabindex="0" onclick="go('debts')">
+        <div class="kpi-h"><span class="kpi-i"><svg viewBox="0 0 24 24"><path d="M4 7l6 6 4-4 6 6"/><path d="M15 15h5v-5"/></svg></span><span class="kpi-l">Долги</span></div>
+        <div id="homeDebtProgress"></div>
+      </div>
+      <div class="kpi" role="button" tabindex="0" onclick="go('accounts')">
+        <div class="kpi-h"><span class="kpi-i"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/></svg></span><span class="kpi-l">Подушка</span></div>
+        <div id="homeSavingsProgress"></div>
+      </div>
     </div>
   </div>
 
@@ -598,21 +632,6 @@ nav .brand{display:none}
   <div class="card" id="cardUpcoming">
     <h2>Ближайшие платежи <button class="act" onclick="go('calendar')">Календарь →</button></h2>
     <div id="upcoming"></div>
-  </div>
-
-  <!-- ---- простой режим: куда я двигаюсь ---- -->
-  <div id="homeSimpleBottom" style="display:none">
-    <div class="grid2 tiles">
-      <div class="card">
-        <h2>Долги <button class="act" onclick="go('debts')">→</button></h2>
-        <div id="homeDebtProgress"></div>
-      </div>
-      <div class="card">
-        <h2>Подушка <button class="act" onclick="go('accounts')">→</button></h2>
-        <div id="homeSavingsProgress"></div>
-      </div>
-    </div>
-    <button class="btn addbtn btn-blk" onclick="openTx()" style="margin-bottom:12px">+ Добавить операцию</button>
   </div>
 
   <div class="card" id="cardTx">
