@@ -95,7 +95,12 @@ const DEFAULT = {
     /* Ориентировочные курсы — проверьте и поправьте в настройках.
        Приложение считает итоги, переводя всё в рубли. */
     rates: { RUB:1, USD:80, EUR:93, CNY:11, GBP:108, CHF:99, JPY:0.55, KZT:0.16, TRY:2.0, AED:22 },
-    ratesUpdated: null
+    ratesUpdated: null,
+    /* 'simple' — только главное: сколько можно тратить, долги, подушка.
+       'advanced' — все возможности (мультивалюта, ручные графики банков,
+       детальная аналитика). Новым пользователям — простой; см. миграцию
+       в load() для тех, у кого уже есть данные. */
+    mode: 'simple'
   }
 };
 
@@ -108,6 +113,14 @@ function load(){
     const p = JSON.parse(raw);
     const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT)), p);
     ['accounts','transactions','categories','rules','recurring'].forEach(k=>{ if(!Array.isArray(merged[k])) merged[k]=[]; });
+    /* settings — объект внутри объекта: Object.assign выше подменяет его
+       целиком значением из сохранённых данных, так что новые поля вроде
+       mode в него не попадают сами. У кого уже есть счета — знает, как
+       пользоваться сложным приложением, не будем неожиданно всё упрощать.
+       У кого пусто — включаем простой режим по умолчанию. */
+    if(merged.settings.mode !== 'simple' && merged.settings.mode !== 'advanced'){
+      merged.settings.mode = merged.accounts.length ? 'advanced' : 'simple';
+    }
     return merged;
   }catch(e){
     console.error('Ошибка чтения данных', e);
@@ -490,6 +503,10 @@ function accTypeFields(a){
         кредитной карты, который тоже нигде не учитывается. Не зависит от
         галочки выше и даты окончания.
       </div>
+      <div class="f"><label>Цель накоплений, ₽ (необязательно)</label>
+        <input type="number" step="0.01" id="acGoal" value="${v('goal')||''}" placeholder="напр. 300000">
+        <div class="hint">Если это подушка безопасности или накопления на цель — впишите сумму,
+          и на главном экране будет видно, сколько уже собрано.</div></div>
       <div class="f"><label>Проценты выплачиваются на счёт</label>
         <select id="acLinkAcc"><option value="">— не указан —</option>
         ${liquidAccounts().map(x=>`<option value="${x.id}" ${a&&a.linkAccountId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
@@ -600,6 +617,7 @@ function saveAccount(id){
     a.capitalization = gb('acCapital'); a.linkAccountId = g('acLinkAcc');
     a.liquid = gb('acLiquid');                 // доступен ли к снятию прямо сейчас
     a.excludeFromBalance = gb('acExclude');    // резерв — вообще не в остатке денег
+    a.goal = gn('acGoal');                     // целевая сумма — для прогресса на главном экране
   }
   if(type==='credit_card'){
     a.limit = gn('acLimit'); a.rate = gn('acRate');

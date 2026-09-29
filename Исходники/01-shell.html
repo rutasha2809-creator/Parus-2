@@ -329,11 +329,6 @@ nav button.on{color:var(--brand);font-weight:650}
     <div id="onboardSteps"></div>
   </div>
 
-  <div class="grid2" style="margin-bottom:12px">
-    <div class="stat"><div class="n pos" id="kLiquid">—</div><div class="l">Свободные деньги</div></div>
-    <div class="stat"><div class="n neg" id="kDebt">—</div><div class="l">Всего долгов</div></div>
-  </div>
-
   <div class="card" id="cardAlerts" style="display:none">
     <h2>Требует внимания</h2>
     <div id="alerts"></div>
@@ -344,33 +339,62 @@ nav button.on{color:var(--brand);font-weight:650}
     <div id="debtDue"></div>
   </div>
 
-  <div class="card">
-    <h2>Этот месяц <button class="act" onclick="go('analytics')">Аналитика →</button></h2>
-    <div class="grid3">
-      <div class="stat"><div class="n pos" id="kInc" style="font-size:15px">—</div><div class="l">Доходы</div></div>
-      <div class="stat"><div class="n neg" id="kExp" style="font-size:15px">—</div><div class="l">Расходы</div></div>
-      <div class="stat"><div class="n" id="kNet" style="font-size:15px">—</div><div class="l">Итог</div></div>
+  <!-- ---- простой режим: три главных цифры + быстрый ввод ---- -->
+  <div id="homeSimple" style="display:none">
+    <div class="card">
+      <h2>Можно потратить</h2>
+      <div class="n pos" id="kSafe" style="font-size:30px">—</div>
+      <div class="s mut" id="kSafeNote" style="margin-top:2px">—</div>
     </div>
-    <div style="margin-top:12px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
-        <span class="mut">Обязательные / необязательные</span><span id="kOptPct" class="mut">—</span>
-      </div>
-      <div class="bar a"><i id="kOptBar" style="width:0%"></i></div>
-      <div style="display:flex;justify-content:space-between;font-size:11.5px">
-        <span class="mut">Обяз. <b id="kReqSum">—</b></span>
-        <span style="color:var(--amber)">Необяз. <b id="kOptSum">—</b></span>
-      </div>
+
+    <div class="card">
+      <h2>Долги <button class="act" onclick="go('debts')">Все долги →</button></h2>
+      <div id="homeDebtProgress"></div>
     </div>
+
+    <div class="card">
+      <h2>Подушка безопасности <button class="act" onclick="go('accounts')">Счета →</button></h2>
+      <div id="homeSavingsProgress"></div>
+    </div>
+
+    <button class="btn btn-p btn-blk" onclick="openTx()" style="margin-bottom:12px">+ Добавить операцию</button>
   </div>
 
-  <div class="card">
-    <h2>Ближайшие платежи <button class="act" onclick="go('calendar')">Календарь →</button></h2>
-    <div id="upcoming"></div>
-  </div>
+  <!-- ---- расширенный режим: как было ---- -->
+  <div id="homeAdvanced" style="display:none">
+    <div class="grid2" style="margin-bottom:12px">
+      <div class="stat"><div class="n pos" id="kLiquid">—</div><div class="l">Свободные деньги</div></div>
+      <div class="stat"><div class="n neg" id="kDebt">—</div><div class="l">Всего долгов</div></div>
+    </div>
 
-  <div class="card">
-    <h2>Счета <button class="act" onclick="go('accounts')">Все →</button></h2>
-    <div id="homeAccounts"></div>
+    <div class="card">
+      <h2>Этот месяц <button class="act" onclick="go('analytics')">Аналитика →</button></h2>
+      <div class="grid3">
+        <div class="stat"><div class="n pos" id="kInc" style="font-size:15px">—</div><div class="l">Доходы</div></div>
+        <div class="stat"><div class="n neg" id="kExp" style="font-size:15px">—</div><div class="l">Расходы</div></div>
+        <div class="stat"><div class="n" id="kNet" style="font-size:15px">—</div><div class="l">Итог</div></div>
+      </div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+          <span class="mut">Обязательные / необязательные</span><span id="kOptPct" class="mut">—</span>
+        </div>
+        <div class="bar a"><i id="kOptBar" style="width:0%"></i></div>
+        <div style="display:flex;justify-content:space-between;font-size:11.5px">
+          <span class="mut">Обяз. <b id="kReqSum">—</b></span>
+          <span style="color:var(--amber)">Необяз. <b id="kOptSum">—</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ближайшие платежи <button class="act" onclick="go('calendar')">Календарь →</button></h2>
+      <div id="upcoming"></div>
+    </div>
+
+    <div class="card">
+      <h2>Счета <button class="act" onclick="go('accounts')">Все →</button></h2>
+      <div id="homeAccounts"></div>
+    </div>
   </div>
 
   <div class="card">

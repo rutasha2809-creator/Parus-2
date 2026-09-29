@@ -748,6 +748,84 @@ function reset(W, patch){
   checkTrue('на годовом горизонте больше 3 колонок месяцев (реально есть что прокручивать)', cols > 4);
 
   /* ======================================================================
+     Простой режим — главный экран: «Можно потратить», прогресс по долгам
+     и подушке, переключатель режимов.
+     ====================================================================== */
+  group('Простой режим — главный экран');
+
+  reset(W, { settings: Object.assign({}, W.S.settings, { mode: 'simple' }) });
+  W.go('home');
+  checkTrue('простой режим по умолчанию — блок #homeSimple виден',
+    W.document.getElementById('homeSimple').style.display !== 'none');
+  checkTrue('расширенный блок #homeAdvanced скрыт',
+    W.document.getElementById('homeAdvanced').style.display === 'none');
+
+  W.setAppMode('advanced');
+  checkTrue('после переключения — #homeAdvanced виден',
+    W.document.getElementById('homeAdvanced').style.display !== 'none');
+  checkTrue('#homeSimple скрыт', W.document.getElementById('homeSimple').style.display === 'none');
+  check('режим сохранён в настройках', W.S.settings.mode, 'advanced');
+
+  W.setAppMode('simple');
+  check('переключение обратно в простой режим', W.S.settings.mode, 'simple');
+
+  /* --- прогресс по долгам --- */
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple' }),
+    accounts: [{ id:'debt1', type:'debt', name:'Долг другу', openingBalance: 10000 }],
+    transactions: [
+      { id:'p1', type:'transfer', date: W.today(), accountId:'card', toAccountId:'debt1', amount: 3000 }
+    ]
+  });
+  let dp = W.debtProgressAgg();
+  checkTrue('прогресс по долгам считается: есть долг', dp.hasDebt);
+  check('стартовая сумма долга', dp.start, 10000);
+  check('погашено', dp.paid, 3000);
+  check('остаток долга', dp.now, 7000);
+  check('процент погашения', dp.pct, 30);
+
+  reset(W, { settings: Object.assign({}, W.S.settings, { mode: 'simple' }) });
+  checkTrue('без долгов — hasDebt = false', !W.debtProgressAgg().hasDebt);
+
+  /* --- прогресс по подушке безопасности --- */
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple' }),
+    accounts: [{ id:'dep1', type:'deposit', name:'Подушка', openingBalance: 0, goal: 5000 }],
+    transactions: [
+      { id:'i1', type:'income', date: W.today(), accountId:'dep1', amount: 2000 }
+    ]
+  });
+  let sp = W.savingsProgressAgg();
+  checkTrue('цель накоплений задана — hasGoal', sp.hasGoal);
+  check('собрано', sp.saved, 2000);
+  check('цель', sp.goal, 5000);
+  check('процент накоплений', sp.pct, 40);
+
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple' }),
+    accounts: [{ id:'dep2', type:'deposit', name:'Просто вклад', openingBalance: 1000 }]
+  });
+  checkTrue('вклад без цели не считается подушкой — hasGoal = false', !W.savingsProgressAgg().hasGoal);
+
+  /* --- «Можно потратить» --- */
+  reset(W, {
+    settings: Object.assign({}, W.S.settings, { mode: 'simple', minBuffer: 0 }),
+    accounts: [{ id:'card', type:'debit', name:'Карта', openingBalance: 10000 }]
+  });
+  let st = W.safeToSpend();
+  checkTrue('«можно потратить» в день не отрицательно', st.perDay >= 0);
+  checkTrue('свободная сумма не отрицательна', st.free >= 0);
+  checkTrue('горизонт в днях положительный', st.days > 0);
+  check('свободная сумма при пустых операциях равна остатку', st.free, 10000);
+
+  /* --- поле «Цель накоплений» в форме вклада --- */
+  W.openAccount();
+  W.document.getElementById('acType').value = 'deposit';
+  W.accTypeFields();
+  const depFieldsHtml = W.document.getElementById('acFields').innerHTML;
+  checkTrue('в форме вклада есть поле «Цель накоплений»', depFieldsHtml.includes('acGoal'));
+
+  /* ======================================================================
      ИТОГ
      ====================================================================== */
   console.log('\n' + '═'.repeat(60));

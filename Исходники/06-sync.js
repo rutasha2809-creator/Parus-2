@@ -325,12 +325,32 @@ function openAccountSheet(){
   renderAccountSheet();
   openOv('ovAccount');
 }
+function setAppMode(m){
+  if(m !== 'simple' && m !== 'advanced') return;
+  S.settings.mode = m;
+  save();
+  renderAccountSheet();
+  renderAll();
+  toast(m === 'simple' ? 'Включён простой режим' : 'Включён расширенный режим');
+}
 
 /* Общий хвост окна профиля: категории расходов, курсы валют, о приложении.
    Один и тот же блок нужен и гостю, и вошедшему — вынесен отдельно,
    чтобы не дублировать разметку. */
 function settingsBlockHtml(){
+  const mode = S.settings.mode || 'simple';
   return `
+    <div class="sec-title" style="margin-top:4px">Режим приложения</div>
+    <div class="seg sm" id="modeSeg">
+      <button data-m="simple" class="${mode==='simple'?'on':''}" onclick="setAppMode('simple')">Простой</button>
+      <button data-m="advanced" class="${mode==='advanced'?'on':''}" onclick="setAppMode('advanced')">Расширенный</button>
+    </div>
+    <div class="hint" style="margin:-6px 0 12px">
+      Простой — на главном экране только самое нужное: сколько можно тратить,
+      прогресс по долгам и подушке безопасности. Расширенный — все возможности:
+      валюты, ручные графики банков, распознавание выписок, детальная аналитика.
+    </div>
+
     <div class="sec-title" style="margin-top:18px">Категории</div>
     <div class="row" onclick="toggleCatSection()" style="cursor:pointer">
       <div class="l"><div class="t">Категории расходов</div>

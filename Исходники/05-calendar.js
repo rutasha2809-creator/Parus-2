@@ -1082,34 +1082,109 @@ function renderOnboard(){
     </div>`).join('');
 }
 
+/* «Можно потратить» — для простого режима, без таблиц и графиков.
+   Берём остаток сейчас, вычитаем всё, что точно спишется (обязательные
+   платежи и долги) до ближайшего дохода, и делим на число дней до него —
+   это и есть сумма, которую можно спокойно тратить каждый день, не уходя
+   в минус. Дохода на горизонте не видно — делим на 30 дней вперёд. */
+function safeToSpend(){
+  const F = buildForecast(120);
+  let nextIncomeIdx = -1;
+  for(let i=1;i<F.length;i++){ if(F[i].inc > 0){ nextIncomeIdx = i; break; } }
+  const buf = S.settings.minBuffer || 0;
+  const days = nextIncomeIdx > 0 ? nextIncomeIdx : Math.max(1, Math.min(30, F.length-1));
+  let committed = 0;
+  for(let i=0;i<=days && i<F.length;i++) committed += F[i].exp;
+  const free = Math.max(0, round2(totalLiquid() - committed - buf));
+  return {
+    perDay: round2(free/days), days, free,
+    nextIncomeDate: nextIncomeIdx>0 ? F[nextIncomeIdx].date : null
+  };
+}
+
+/* Долги одной цифрой: сколько было, сколько осталось, сколько погашено —
+   для карточки на главном экране в простом режиме. */
+function debtProgressAgg(){
+  const list = debtAccounts();
+  const start = round2(list.reduce((s,a)=>s+Math.max(0,toBase(Number(a.openingBalance)||0, accCurrency(a))),0));
+  const now = totalDebt();
+  const paid = Math.max(0, round2(start - now));
+  const pct = start>0 ? Math.min(100, paid/start*100) : 0;
+  return { start, now, paid, pct, hasDebt: list.length>0 };
+}
+
+/* Подушка безопасности: считаем только вклады с заданной целью —
+   остальные накопительные счета в эту цифру не попадают. */
+function savingsProgressAgg(){
+  const list = S.accounts.filter(a=>!a.archived && a.type==='deposit' && Number(a.goal)>0);
+  const saved = round2(list.reduce((s,a)=>s+toBase(balance(a), accCurrency(a)),0));
+  const goal = round2(list.reduce((s,a)=>s+toBase(Number(a.goal)||0, accCurrency(a)),0));
+  const pct = goal>0 ? Math.min(100, saved/goal*100) : 0;
+  return { saved, goal, pct, hasGoal: list.length>0 };
+}
+
 function renderHome(){
   renderOnboard();
-  const liq = totalLiquid(), debt = totalDebt();
+  const mode = S.settings.mode || 'simple';
+  document.getElementById('homeSimple').style.display   = mode==='simple'   ? 'block' : 'none';
+  document.getElementById('homeAdvanced').style.display = mode==='advanced' ? 'block' : 'none';
+
   document.getElementById('hNet').textContent = moneyShort(netWorth());
-  document.getElementById('kLiquid').textContent = moneyShort(liq);
-  document.getElementById('kLiquid').className = 'n ' + (liq<0?'neg':'pos');
-  document.getElementById('kDebt').textContent = moneyShort(debt);
-
   const n = new Date();
-  const [f,t] = periodRange('thismonth');
-  const m = txInRange(f,t);
-  const inc = m.filter(x=>x.type==='income').reduce((s,x)=>s+txBase(x),0);
-  const exp = m.filter(x=>x.type==='expense').reduce((s,x)=>s+txBase(x),0);
-  const req = m.filter(x=>x.type==='expense' && catMandatory(x.categoryId)).reduce((s,x)=>s+txBase(x),0);
-  const opt = exp - req;
-
   document.getElementById('hSub').textContent = MONTHS_N[n.getMonth()] + ' ' + n.getFullYear();
-  document.getElementById('kInc').textContent = moneyShort(inc);
-  document.getElementById('kExp').textContent = moneyShort(exp);
-  const kn = document.getElementById('kNet');
-  kn.textContent = moneyShort(inc-exp);
-  kn.className = 'n ' + (inc-exp>=0?'pos':'neg');
 
-  const pct = exp>0 ? opt/exp*100 : 0;
-  document.getElementById('kOptBar').style.width = pct+'%';
-  document.getElementById('kOptPct').textContent = exp>0 ? pct.toFixed(0)+'% необязательных' : '—';
-  document.getElementById('kReqSum').textContent = moneyShort(req);
-  document.getElementById('kOptSum').textContent = moneyShort(opt);
+  if(mode==='simple'){
+    const st = safeToSpend();
+    document.getElementById('kSafe').textContent = money(st.perDay);
+    document.getElementById('kSafeNote').textContent = st.nextIncomeDate
+      ? `На ${st.days} ${plural(st.days,'день','дня','дней')} до дохода ${dateShort(st.nextIncomeDate)} · свободно ${money(st.free)}`
+      : `На ближайшие ${st.days} дней · свободно ${money(st.free)}`;
+
+    const dp = debtProgressAgg();
+    document.getElementById('homeDebtProgress').innerHTML = !dp.hasDebt
+      ? `<div class="empty">Долгов нет.</div>`
+      : `<div class="bar ${dp.pct>66?'g':dp.pct>33?'a':'r'}"><i style="width:${dp.pct}%"></i></div>
+         <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
+           <span class="mut">Погашено ${money(dp.paid)} (${dp.pct.toFixed(0)}%)</span>
+           <span>Осталось <b class="neg">${money(dp.now)}</b></span>
+         </div>`;
+
+    const sp = savingsProgressAgg();
+    document.getElementById('homeSavingsProgress').innerHTML = !sp.hasGoal
+      ? `<div class="empty">Цель накоплений не задана.<br>
+           Откройте вклад-подушку на «Счета» и впишите целевую сумму.</div>`
+      : `<div class="bar g"><i style="width:${sp.pct}%"></i></div>
+         <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
+           <span>Собрано <b class="pos">${money(sp.saved)}</b></span>
+           <span class="mut">Цель ${money(sp.goal)} (${sp.pct.toFixed(0)}%)</span>
+         </div>`;
+  }
+
+  const liq = totalLiquid(), debt = totalDebt();
+  if(mode==='advanced'){
+    document.getElementById('kLiquid').textContent = moneyShort(liq);
+    document.getElementById('kLiquid').className = 'n ' + (liq<0?'neg':'pos');
+    document.getElementById('kDebt').textContent = moneyShort(debt);
+
+    const [f,t] = periodRange('thismonth');
+    const m = txInRange(f,t);
+    const inc = m.filter(x=>x.type==='income').reduce((s,x)=>s+txBase(x),0);
+    const exp = m.filter(x=>x.type==='expense').reduce((s,x)=>s+txBase(x),0);
+    const req = m.filter(x=>x.type==='expense' && catMandatory(x.categoryId)).reduce((s,x)=>s+txBase(x),0);
+    const opt = exp - req;
+
+    document.getElementById('kInc').textContent = moneyShort(inc);
+    document.getElementById('kExp').textContent = moneyShort(exp);
+    const kn = document.getElementById('kNet');
+    kn.textContent = moneyShort(inc-exp);
+    kn.className = 'n ' + (inc-exp>=0?'pos':'neg');
+
+    const pct = exp>0 ? opt/exp*100 : 0;
+    document.getElementById('kOptBar').style.width = pct+'%';
+    document.getElementById('kOptPct').textContent = exp>0 ? pct.toFixed(0)+'% необязательных' : '—';
+    document.getElementById('kReqSum').textContent = moneyShort(req);
+    document.getElementById('kOptSum').textContent = moneyShort(opt);
+  }
 
   // предупреждения
   const alerts = [];
