@@ -358,6 +358,35 @@ function reset(W, patch){
   check('остаток второго счёта не изменился из-за старых операций', W.round2(W.balance(W.acc('m2'))), 1000);
   check('долг по кредиту не изменился из-за старых операций', W.round2(W.balance(W.acc('ln'))), 50000);
 
+
+  group('Загрузка выписки — первая выписка, второй счёт создаётся из перевода');
+  reset(W); W.go('import'); W.IMP_MY_PHONE = '';
+  W.startMapping(MAN);
+  D.getElementById('impNewName').value = 'Основная'; D.getElementById('impNewBal').value = '10000';
+  W.setImpRole(ri(5000),'xfer'); W.setImpPeer(ri(5000),'__new__'); W.IMP.rows[ri(5000)].peerName = 'Накопительный';
+  W.setImpRole(ri(3000),'loan'); W.setImpPeer(ri(3000),'__new__'); W.IMP.rows[ri(3000)].peerName = 'Кредит в банке';
+  checkTrue('под строкой появилась подсказка, как назвать счёт', D.getElementById('impTable').innerHTML.includes('Назовите счёт так, как он называется в вашем банке'));
+  W.commitImport();
+  const pk = W.S.accounts.find(a=>a.name==='Накопительный'), kr = W.S.accounts.find(a=>a.name==='Кредит в банке');
+  checkTrue('создан счёт из перевода', pk && pk.type==='debit' && pk.placeholder);
+  checkTrue('создан кредит из погашения', kr && kr.type==='loan');
+  check('переводов записано', W.S.transactions.filter(t=>t.type==='transfer').length, 2);
+  check('остаток основного счёта — как назвал человек', W.round2(W.balance(W.acc(W.S.accounts[0].id))), 10000);
+
+  /* вторая выписка по счёту «Накопительный» */
+  W.go('import'); W.startMapping([
+    ['Дата, время операции (МСК)','Сумма операции (руб)','Описание операции'],
+    ['20.09.2026 10:05','+5 000,00','Зачисление перевода денежных средств'],
+    ['24.09.2026 10:00','+10,00','Проценты']]);
+  D.getElementById('impAccount').value = pk.id; W.showPreview();
+  checkTrue('счёт помечен «ждёт выписки»', D.getElementById('impAccount').innerHTML.includes('ждёт выписки'));
+  check('поле «название» скрыто, остаток спрашивается', D.getElementById('impNewNameBox').style.display, 'none');
+  D.getElementById('impNewBal').value = '20 000';
+  checkTrue('зеркальный перевод из первой выписки не считается доходом', !W.IMP.rows.find(r=>r.amount===5000).use);
+  W.commitImport();
+  check('остаток накопительного — как назвал человек', W.round2(W.balance(W.acc(pk.id))), 20000);
+  checkTrue('метка «ждёт выписки» снята', !W.acc(pk.id).placeholder);
+
   /* ======================================================================
      Объединённая страница счетов: раскрытие и быстрый ввод.
      ====================================================================== */

@@ -738,7 +738,7 @@ nav .brand{display:none}
     </div>
     <div id="impNewAcc" style="display:none;margin-bottom:10px">
       <div class="f2">
-        <div class="f" style="margin:0"><label>Название счёта</label><input type="text" id="impNewName"></div>
+        <div class="f" style="margin:0" id="impNewNameBox"><label>Название счёта</label><input type="text" id="impNewName"></div>
         <div class="f" style="margin:0"><label id="impNewBalLbl">Сколько сейчас на счёте, ₽</label><input type="text" inputmode="decimal" id="impNewBal"></div>
       </div>
       <div class="f" id="impNewLimitBox" style="display:none;margin-top:8px"><label>Кредитный лимит, ₽ (необязательно)</label><input type="text" inputmode="decimal" id="impNewLimit"></div>
@@ -4099,7 +4099,7 @@ function showPreview(){
      а если подходящих счетов нет — предлагаем завести новый. */
   const prevAcc = accSel.value || IMP_PRESET_ACCOUNT || '';
   IMP_PRESET_ACCOUNT = null;
-  accSel.innerHTML = usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}</option>`).join('')
+  accSel.innerHTML = usable.map(a=>`<option value="${a.id}">${esc(accLabel(a))}${a.placeholder?' — ждёт выписки':''}</option>`).join('')
     + `<option value="__new__">➕ Новый счёт</option>`;
   if(prevAcc && (prevAcc==='__new__' || usable.some(a=>a.id===prevAcc))) accSel.value = prevAcc;
   else {
@@ -4109,14 +4109,32 @@ function showPreview(){
   const isNew = accSel.value==='__new__';
   const phEl = document.getElementById('impPhone');
   if(!phEl.value && IMP_MY_PHONE) phEl.value = IMP_MY_PHONE;
-  document.getElementById('impNewAcc').style.display = isNew ? 'block' : 'none';
-  document.getElementById('impNewBalLbl').textContent = IMP.isCard ? 'Текущий долг по карте, ₽' : 'Сколько сейчас на счёте, ₽';
+  const tAcc0 = isNew ? null : S.accounts.find(a=>a.id===accSel.value);
+  const isWait = !!(tAcc0 && tAcc0.placeholder);   // счёт создан из перевода в другой выписке
+  document.getElementById('impNewAcc').style.display = (isNew || isWait) ? 'block' : 'none';
+  document.getElementById('impNewNameBox').style.display = isNew ? 'block' : 'none';
+  document.getElementById('impNewBalLbl').textContent = (IMP.isCard || (tAcc0 && tAcc0.type==='credit_card')) ? 'Текущий долг по карте, ₽' : 'Сколько сейчас на счёте, ₽';
   document.getElementById('impNewLimitBox').style.display = IMP.isCard ? 'block' : 'none';
   const nn = document.getElementById('impNewName');
   if(isNew && !nn.value) nn.placeholder = IMP.isCard ? 'Например: Кредитная карта' : 'Например: Дебетовая карта';
 
   const target = isNew ? null : S.accounts.find(a=>a.id===accSel.value);
   const cardWarn = IMP.isCard && target && target.type!=='credit_card';
+
+  /* Вторая сторона перевода, который уже записан из выписки другого счёта,
+     второй раз доходом или расходом не считаем */
+  if(target && IMP.mirrorFor!==target.id){
+    IMP.mirrorFor = target.id;
+    const day = d => Date.parse(d+'T00:00:00Z');
+    const used = new Set();
+    for(const r of rows){
+      if(r.role!=='normal' || r.dup) continue;
+      const m = S.transactions.find(t=>t.type==='transfer' && !used.has(t.id) && t.amount===r.amount &&
+        (r.kind==='income' ? t.toAccountId===target.id : t.accountId===target.id) &&
+        Math.abs(day(t.date)-day(r.date)) <= 3*86400000);
+      if(m){ used.add(m.id); r.role='own'; r.why='уже записан как перевод'; r.use=false; }
+    }
+  }
 
   /* Со счёта, которым гасят кредитку, спишутся погашения и комиссии */
   const needSrc = rows.some(r=>r.use && (r.role==='repay' || r.role==='srcexp'));
@@ -4169,6 +4187,7 @@ function showPreview(){
       (r.role==='loan' ? ['loan','credit_card','installment','debt'].includes(a.type)
                        : (r.kind==='income' ? ACC_TYPES[a.type].asset : true)));
     return `<option value="">— выберите счёт —</option>` +
+      `<option value="__new__" ${r.peer==='__new__'?'selected':''}>➕ Новый счёт…</option>` +
       list.map(a=>`<option value="${a.id}" ${a.id===r.peer?'selected':''}>${esc(accLabel(a))}</option>`).join('');
   };
   const roleOpts = (r) => {
@@ -4194,7 +4213,10 @@ function showPreview(){
         <td class="r ${r.kind==='income'?'pos':'neg'}" style="white-space:nowrap">${r.kind==='income'?'+':'−'}${money(r.amount,{cur:impCur})}</td>
         <td><select onchange="setImpRole(${i},this.value)" style="${selStyle}">${roleOpts(r)}</select></td>
         <td>${(r.role==='xfer'||r.role==='loan')
-          ? `<select onchange="IMP.rows[${i}].peer=this.value" style="${selStyle}">${peerOpts(r)}</select>`
+          ? `<select onchange="setImpPeer(${i},this.value)" style="${selStyle}">${peerOpts(r)}</select>`
+            + (r.peer==='__new__' ? `<input type="text" value="${esc(r.peerName||'')}" oninput="IMP.rows[${i}].peerName=this.value"
+                placeholder="${r.role==='loan'?'Например: Кредит в банке':'Например: Накопительный счёт'}" style="${selStyle};margin-top:4px;width:100%">
+                <div style="font-size:11px;color:var(--muted);margin-top:3px;max-width:170px">Назовите счёт так, как он называется в вашем банке. Когда будете загружать выписку по нему, выберите этот счёт в списке — операции сопоставятся сами.</div>` : '')
           : `<select onchange="IMP.rows[${i}].categoryId=this.value" style="${selStyle}">
               ${S.categories.filter(c=>c.kind===r.kind).map(c=>`<option value="${c.id}" ${c.id===r.categoryId?'selected':''}>${esc(c.name)}</option>`).join('')}
             </select>`}</td>
@@ -4207,6 +4229,10 @@ function setImpRole(i, v){
   r.role = v; r.why = '';
   if(v==='xfer' || v==='loan'){ r.peer = ''; r.use = true; }
   else if(v==='normal'){ r.use = true; }
+  showPreviewStats();
+}
+function setImpPeer(i, v){
+  IMP.rows[i].peer = v;
   showPreviewStats();
 }
 /* Галочку в таблице сняли — итоги наверху пересчитываем, таблицу не трогаем */
@@ -4260,6 +4286,12 @@ function commitImport(){
   } else {
     if(!accountId){ toast('Выберите счёт для зачисления'); return; }
     acct = acc(accountId);
+    if(acct.placeholder){
+      const balRaw = document.getElementById('impNewBal').value.trim();
+      typedBal = parseAnyNumber(balRaw);
+      if(balRaw==='' || typedBal==null || isNaN(typedBal)){ toast('Укажите, сколько сейчас на этом счёте'); return; }
+      typedBal = Math.abs(typedBal);
+    }
   }
   const sel = IMP.rows.filter(r=>r.use);
   if(!sel.length){ toast('Не выбрано ни одной операции'); return; }
@@ -4267,6 +4299,7 @@ function commitImport(){
   const srcId = document.getElementById('impSrcAcc').value;
   const src = srcId ? acc(srcId) : null;
   const txs = [];
+  const newPeers = {};
   let nRec = 0, nRep = 0, nSrc = 0, nSkip = 0, nXfer = 0;
   for(const r of sel){
     if(r.role==='repay'){
@@ -4285,7 +4318,20 @@ function commitImport(){
       if(!(isNew && !src)) tgt.openingBalance = round2((tgt.openingBalance||0) + (ACC_TYPES[tgt.type].asset ? r.amount : -r.amount));
       nSrc++;
     } else if(r.role==='xfer' || r.role==='loan'){
-      const peer = r.peer ? acc(r.peer) : null;
+      let peer = null, peerIsNew = false;
+      if(r.peer==='__new__'){
+        const pn = (r.peerName||'').trim();
+        if(pn){
+          const key = pn.toLowerCase();
+          peer = S.accounts.find(a=>!a.archived && a.name.trim().toLowerCase()===key) || newPeers[key] || null;
+          if(!peer){
+            /* Заготовка счёта: остаток зададим, когда придёт его выписка */
+            peer = newPeers[key] = {id: uid(), type: r.role==='loan' ? 'loan' : 'debit', name: pn, currency: BASE,
+                                    openingBalance: 0, archived: false, note: '', placeholder: true};
+          }
+          peerIsNew = !!newPeers[key];
+        }
+      } else if(r.peer) peer = acc(r.peer);
       if(!peer){ nSkip++; continue; }
       const out = r.kind==='expense';   // деньги ушли с этого счёта на peer — или наоборот
       txs.push({id: uid(), date: r.date, type:'transfer',
@@ -4294,7 +4340,7 @@ function commitImport(){
       /* Второй счёт уже показывает актуальный остаток — гасим влияние старой операции */
       const asset = ACC_TYPES[peer.type].asset;
       const eff = out ? (asset ? r.amount : -r.amount) : (asset ? -r.amount : r.amount);
-      peer.openingBalance = round2((peer.openingBalance||0) - eff);
+      if(!peerIsNew && !peer.placeholder) peer.openingBalance = round2((peer.openingBalance||0) - eff);
       nXfer++;
     } else {
       txs.push({id: uid(), date: r.date, type: r.kind, accountId,
@@ -4304,8 +4350,10 @@ function commitImport(){
   }
 
   if(isNew) S.accounts.push(acct);
+  Object.values(newPeers).forEach(a=>S.accounts.push(a));
   S.transactions.push(...txs);
-  if(isNew){
+  if(isNew || acct.placeholder){
+    delete acct.placeholder;
     /* Начальный остаток подбираем так, чтобы после всех операций
        на счёте оказалась именно та сумма, которую назвал человек */
     acct.openingBalance = round2(typedBal - balance(acct));
@@ -4314,7 +4362,8 @@ function commitImport(){
   if(phoneDigits(ph).length===10) S.settings.myPhone = ph;
   save(); cancelImport(); renderAll();
   toast(`Записано операций: ${nRec}` + (nRep ? `, погашений: ${nRep}` : '')
-    + (nSrc ? `, списаний: ${nSrc}` : '') + (nXfer ? `, переводов: ${nXfer}` : '') + (nSkip ? `, пропущено без выбранного счёта: ${nSkip}` : ''));
+    + (nSrc ? `, списаний: ${nSrc}` : '') + (nXfer ? `, переводов: ${nXfer}` : '') + (nSkip ? `, пропущено без выбранного счёта: ${nSkip}` : '')
+    + (Object.keys(newPeers).length ? `. Новые счета: ${Object.values(newPeers).map(a=>a.name).join(', ')} — загрузите по ним выписку` : ''));
   go(isNew ? 'home' : 'accounts');
 }
 
